@@ -159,6 +159,8 @@ export default function PaymentUploadPage() {
     );
   }
 
+  const planType = paymentData.plan_type ?? '';
+
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
@@ -170,8 +172,8 @@ export default function PaymentUploadPage() {
           </Link>
           <h1 className="text-xl font-bold text-slate-900">Complete Payment</h1>
           <p className="text-xs text-slate-600">
-            {paymentData.plan_type.includes('basic') ? 'Member Basic' : 
-             paymentData.plan_type.includes('plus') ? 'Member Plus' : 
+            {planType.includes('basic') ? 'Member Basic' : 
+             planType.includes('plus') ? 'Member Plus' : 
              'Driver Plan'} - R{paymentData.amount}/year
           </p>
         </div>
