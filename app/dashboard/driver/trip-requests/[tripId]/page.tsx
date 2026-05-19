@@ -38,6 +38,8 @@ type ChatConversation = {
   passenger?: PassengerProfile;
   messages: ChatMessage[];
   agreementNotes?: string | null;
+  agreementSaveState?: 'saved' | 'error' | null;
+  agreementSaveMessage?: string | null;
 };
 
 type DriverTrip = {
@@ -242,11 +244,11 @@ async function saveAgreementNotes(formData: FormData) {
   );
 
   if (error) {
-    redirect(`/dashboard/driver/trip-requests/${tripId}?notes_error=${encodeURIComponent(error.message)}`);
+    redirect(`/dashboard/driver/trip-requests/${tripId}?notes_error_passenger=${passengerId}&notes_error=${encodeURIComponent(error.message)}`);
   }
 
   revalidatePath(`/dashboard/driver/trip-requests/${tripId}`);
-  redirect(`/dashboard/driver/trip-requests/${tripId}?notes_saved=1`);
+  redirect(`/dashboard/driver/trip-requests/${tripId}?notes_saved_passenger=${passengerId}`);
 }
 
 async function getDriverTripRequests(tripId: string) {
@@ -339,7 +341,7 @@ export default async function TripRequestsPage({
   searchParams,
 }: {
   params: Promise<{ tripId: string }>;
-  searchParams?: Promise<{ notes_saved?: string; notes_error?: string }>;
+  searchParams?: Promise<{ notes_saved_passenger?: string; notes_error?: string; notes_error_passenger?: string }>;
 }) {
   const { tripId } = await params;
   const resolvedSearchParams = await searchParams;
@@ -409,22 +411,13 @@ export default async function TripRequestsPage({
           </div>
         </div>
 
-        {resolvedSearchParams?.notes_saved === '1' ? (
-          <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-800">
-            Agreement notes saved.
-          </div>
-        ) : null}
-
-        {resolvedSearchParams?.notes_error ? (
-          <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm font-medium text-rose-800">
-            {resolvedSearchParams.notes_error}
-          </div>
-        ) : null}
-
         <ChatSection
           conversations={conversations}
           driverProfileId={driverProfileId}
           tripId={trip.id}
+          savedPassengerId={resolvedSearchParams?.notes_saved_passenger || ''}
+          errorPassengerId={resolvedSearchParams?.notes_error_passenger || ''}
+          errorMessage={resolvedSearchParams?.notes_error || ''}
         />
 
         <RequestSection
@@ -442,10 +435,16 @@ function ChatSection({
   conversations,
   driverProfileId,
   tripId,
+  savedPassengerId,
+  errorPassengerId,
+  errorMessage,
 }: {
   conversations: ChatConversation[];
   driverProfileId: string;
   tripId: string;
+  savedPassengerId: string;
+  errorPassengerId: string;
+  errorMessage: string;
 }) {
   return (
     <div className="mb-4">
@@ -460,6 +459,20 @@ function ChatSection({
               conversation={conversation}
               driverProfileId={driverProfileId}
               tripId={tripId}
+              agreementSaveState={
+                savedPassengerId === conversation.participantId
+                  ? 'saved'
+                  : errorPassengerId === conversation.participantId
+                    ? 'error'
+                    : null
+              }
+              agreementSaveMessage={
+                savedPassengerId === conversation.participantId
+                  ? 'Agreement notes saved.'
+                  : errorPassengerId === conversation.participantId
+                    ? errorMessage || 'Could not save agreement notes.'
+                    : null
+              }
             />
           ))}
         </div>
@@ -476,10 +489,14 @@ function ChatCard({
   conversation,
   driverProfileId,
   tripId,
+  agreementSaveState,
+  agreementSaveMessage,
 }: {
   conversation: ChatConversation;
   driverProfileId: string;
   tripId: string;
+  agreementSaveState: 'saved' | 'error' | null;
+  agreementSaveMessage: string | null;
 }) {
   const passengerName = conversation.passenger
     ? `${conversation.passenger.first_name || 'Passenger'} ${conversation.passenger.surname || ''}`.trim()
@@ -553,6 +570,17 @@ function ChatCard({
           <Save className="w-4 h-4" />
           Save agreement notes
         </button>
+        {agreementSaveMessage ? (
+          <div
+            className={`rounded-lg border px-3 py-2 text-xs font-medium ${
+              agreementSaveState === 'saved'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                : 'border-rose-200 bg-rose-50 text-rose-800'
+            }`}
+          >
+            {agreementSaveMessage}
+          </div>
+        ) : null}
       </form>
     </div>
   );
