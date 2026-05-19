@@ -169,7 +169,7 @@ async function saveAgreementNotes(formData: FormData) {
   const notes = String(formData.get('notes') || '').trim();
 
   if (!tripId || !passengerId) {
-    redirect(`/dashboard/driver/trip-requests/${tripId || ''}`);
+    redirect(`/dashboard/driver/trip-requests/${tripId || ''}?notes_error=${encodeURIComponent('Missing trip or passenger details.')}`);
   }
 
   const supabase = await createClient();
@@ -227,10 +227,10 @@ async function saveAgreementNotes(formData: FormData) {
   ]);
 
   if (!existingChat && !existingRequest) {
-    redirect(`/dashboard/driver/trip-requests/${tripId}`);
+    redirect(`/dashboard/driver/trip-requests/${tripId}?notes_error=${encodeURIComponent('Passenger conversation could not be found.')}`);
   }
 
-  await supabase.from('trip_agreements').upsert(
+  const { error } = await supabase.from('trip_agreements').upsert(
     {
       trip_id: tripId,
       passenger_id: passengerId,
@@ -241,8 +241,12 @@ async function saveAgreementNotes(formData: FormData) {
     { onConflict: 'trip_id,passenger_id' }
   );
 
+  if (error) {
+    redirect(`/dashboard/driver/trip-requests/${tripId}?notes_error=${encodeURIComponent(error.message)}`);
+  }
+
   revalidatePath(`/dashboard/driver/trip-requests/${tripId}`);
-  redirect(`/dashboard/driver/trip-requests/${tripId}`);
+  redirect(`/dashboard/driver/trip-requests/${tripId}?notes_saved=1`);
 }
 
 async function getDriverTripRequests(tripId: string) {
@@ -332,10 +336,13 @@ async function getDriverTripRequests(tripId: string) {
 
 export default async function TripRequestsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ tripId: string }>;
+  searchParams?: Promise<{ notes_saved?: string; notes_error?: string }>;
 }) {
   const { tripId } = await params;
+  const resolvedSearchParams = await searchParams;
   const { trip, requests, chatMessages, driverProfileId, passengersById, agreementNotesByPassengerId } = await getDriverTripRequests(tripId);
   const confirmedBookings = requests.filter((request) => request.status === 'accepted');
   const seatsBooked = Math.max((trip.seats_total || 0) - (trip.seats_available || 0), 0);
@@ -401,6 +408,18 @@ export default async function TripRequestsPage({
             </div>
           </div>
         </div>
+
+        {resolvedSearchParams?.notes_saved === '1' ? (
+          <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-800">
+            Agreement notes saved.
+          </div>
+        ) : null}
+
+        {resolvedSearchParams?.notes_error ? (
+          <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm font-medium text-rose-800">
+            {resolvedSearchParams.notes_error}
+          </div>
+        ) : null}
 
         <ChatSection
           conversations={conversations}
@@ -511,7 +530,7 @@ function ChatCard({
           placeholder={`Reply to ${passengerName}...`}
           className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
         />
-        <button className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-500 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-600 hover:bg-emerald-50">
+        <button type="submit" className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-500 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-600 hover:bg-emerald-50">
           <Send className="w-4 h-4" />
           Send reply
         </button>
@@ -530,7 +549,7 @@ function ChatCard({
           placeholder="Add any agreed changes for this passenger..."
           className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
         />
-        <button className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600">
+        <button type="submit" className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600">
           <Save className="w-4 h-4" />
           Save agreement notes
         </button>
