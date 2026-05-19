@@ -442,17 +442,39 @@ export async function requestTripSeat(
     .insert({
       trip_id: tripId,
       passenger_id: profile.id,
+      status: 'accepted',
       seats_requested: seatsRequested,
       message,
       pickup_point: pickupPoint,
       dropoff_point: dropoffPoint,
+      accepted_at: new Date().toISOString(),
     })
     .select()
     .single();
 
   if (error) {
     if (error.code === '23505') {
-      return { error: 'You have already requested this trip' };
+      const { data: existingRequest, error: updateError } = await supabase
+        .from('trip_requests')
+        .update({
+          status: 'accepted',
+          seats_requested: seatsRequested,
+          message,
+          pickup_point: pickupPoint,
+          dropoff_point: dropoffPoint,
+          accepted_at: new Date().toISOString(),
+        })
+        .eq('trip_id', tripId)
+        .eq('passenger_id', profile.id)
+        .select()
+        .single();
+
+      if (updateError) {
+        return { error: updateError.message };
+      }
+
+      revalidatePath(`/trips/${tripId}`);
+      return { success: true, request: existingRequest };
     }
     return { error: error.message };
   }

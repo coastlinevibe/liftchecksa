@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { ArrowLeft, Calendar, CheckCircle, Clock, MapPin, Send, Shield, Users, XCircle } from 'lucide-react';
+import { ArrowLeft, Calendar, CheckCircle, Clock, MapPin, Send, Shield, Users } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 
 type TripRequestStatus = 'pending' | 'accepted' | 'rejected' | 'cancelled';
@@ -74,61 +74,6 @@ function formatRequestedAt(value?: string | null) {
     hour: '2-digit',
     minute: '2-digit',
   }).format(new Date(value));
-}
-
-async function updateRequestStatus(formData: FormData) {
-  'use server';
-
-  const requestId = String(formData.get('requestId') || '');
-  const tripId = String(formData.get('tripId') || '');
-  const status = String(formData.get('status') || '');
-
-  if (!requestId || !tripId || !['accepted', 'rejected'].includes(status)) {
-    redirect(`/dashboard/driver/trip-requests/${tripId || ''}`);
-  }
-
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect('/login');
-  }
-
-  const { data: driverProfile } = await supabase
-    .from('driver_profiles')
-    .select('id, user_id')
-    .eq('user_id', user.id)
-    .single();
-
-  if (!driverProfile) {
-    redirect('/dashboard/driver');
-  }
-
-  const { data: trip } = await supabase
-    .from('trips')
-    .select('id')
-    .eq('id', tripId)
-    .eq('driver_id', driverProfile.id)
-    .single();
-
-  if (!trip) {
-    redirect('/dashboard/driver');
-  }
-
-  const timestampColumn = status === 'accepted' ? 'accepted_at' : 'rejected_at';
-  await supabase
-    .from('trip_requests')
-    .update({
-      status,
-      [timestampColumn]: new Date().toISOString(),
-    })
-    .eq('id', requestId)
-    .eq('trip_id', tripId);
-
-  revalidatePath(`/dashboard/driver/trip-requests/${tripId}`);
-  redirect(`/dashboard/driver/trip-requests/${tripId}`);
 }
 
 async function sendDriverChatMessage(formData: FormData) {
@@ -293,8 +238,7 @@ export default async function TripRequestsPage({
 }) {
   const { tripId } = await params;
   const { trip, requests, chatMessages, driverProfileId, passengersById } = await getDriverTripRequests(tripId);
-  const pendingRequests = requests.filter((request) => request.status === 'pending');
-  const handledRequests = requests.filter((request) => request.status !== 'pending');
+  const confirmedBookings = requests.filter((request) => request.status === 'accepted');
   const seatsBooked = Math.max((trip.seats_total || 0) - (trip.seats_available || 0), 0);
   const conversationsByPassenger = new Map<string, ChatMessage[]>();
 
@@ -365,19 +309,10 @@ export default async function TripRequestsPage({
         />
 
         <RequestSection
-          title={`Pending Requests (${pendingRequests.length})`}
-          emptyText="No pending booking requests yet."
-          requests={pendingRequests}
+          title={`Confirmed Bookings (${confirmedBookings.length})`}
+          emptyText="Passenger bookings will appear here after they confirm seats."
+          requests={confirmedBookings}
           passengersById={passengersById}
-          tripId={trip.id}
-        />
-
-        <RequestSection
-          title={`Handled Requests (${handledRequests.length})`}
-          emptyText="Accepted and rejected requests will appear here."
-          requests={handledRequests}
-          passengersById={passengersById}
-          tripId={trip.id}
         />
       </div>
     </div>
@@ -490,13 +425,11 @@ function RequestSection({
   emptyText,
   requests,
   passengersById,
-  tripId,
 }: {
   title: string;
   emptyText: string;
   requests: TripRequest[];
   passengersById: Map<string, PassengerProfile>;
-  tripId: string;
 }) {
   return (
     <div className="mb-4">
@@ -508,7 +441,6 @@ function RequestSection({
               key={request.id}
               request={request}
               passenger={passengersById.get(request.passenger_id)}
-              tripId={tripId}
             />
           ))}
         </div>
@@ -524,11 +456,9 @@ function RequestSection({
 function RequestCard({
   request,
   passenger,
-  tripId,
 }: {
   request: TripRequest;
   passenger?: PassengerProfile;
-  tripId: string;
 }) {
   const passengerName = passenger
     ? `${passenger.first_name || 'Passenger'} ${passenger.surname || ''}`.trim()
@@ -562,12 +492,10 @@ function RequestCard({
               <Clock className="w-3 h-3" />
               <span>{formatRequestedAt(request.requested_at)}</span>
             </div>
-          </div>
-
-          <div className="bg-slate-50 rounded-lg p-2 mb-2">
-            <p className="text-xs text-slate-700">
-              {request.message || 'No message added with this booking request.'}
-            </p>
+            <div className="flex items-center gap-1 text-emerald-600">
+              <CheckCircle className="w-3 h-3" />
+              <span>Booked</span>
+            </div>
           </div>
 
           <div className="space-y-1 text-xs text-slate-600">
@@ -576,33 +504,6 @@ function RequestCard({
           </div>
         </div>
       </div>
-
-      {request.status === 'pending' ? (
-        <div className="flex gap-2">
-          <form action={updateRequestStatus} className="flex-1">
-            <input type="hidden" name="requestId" value={request.id} />
-            <input type="hidden" name="tripId" value={tripId} />
-            <input type="hidden" name="status" value="accepted" />
-            <button className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2">
-              <CheckCircle className="w-4 h-4" />
-              Accept
-            </button>
-          </form>
-          <form action={updateRequestStatus} className="flex-1">
-            <input type="hidden" name="requestId" value={request.id} />
-            <input type="hidden" name="tripId" value={tripId} />
-            <input type="hidden" name="status" value="rejected" />
-            <button className="w-full bg-red-500 hover:bg-red-600 text-white py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2">
-              <XCircle className="w-4 h-4" />
-              Reject
-            </button>
-          </form>
-        </div>
-      ) : (
-        <div className={request.status === 'accepted' ? 'text-emerald-600' : 'text-red-600'}>
-          <span className="text-sm font-semibold capitalize">{request.status}</span>
-        </div>
-      )}
     </div>
   );
 }
