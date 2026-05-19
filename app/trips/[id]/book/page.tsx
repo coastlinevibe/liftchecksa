@@ -57,7 +57,8 @@ export default async function BookSeatPage({
     const result = await requestTripSeat(id, undefined, defaultPickupPoint, defaultDropoffPoint, seatCount);
 
     if ('error' in result) {
-      redirect(`/trips/${id}?booking_error=${encodeURIComponent(result.error)}`);
+      const bookingError = result.error || 'Booking request failed.';
+      redirect(`/trips/${id}?booking_error=${encodeURIComponent(bookingError)}`);
     }
 
     redirect(`/trips/${id}?booked=1`);

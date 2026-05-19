@@ -39,7 +39,7 @@ async function getMemberData() {
   // Get member profile
   const { data: profile } = await supabase
     .from('profiles')
-    .select('first_name, surname, role, membership_type, membership_status, membership_expires_at, zii_status')
+    .select('id, first_name, surname, role, membership_type, membership_status, membership_expires_at, zii_status')
     .eq('user_id', user.id)
     .single();
 
@@ -135,7 +135,7 @@ export default async function MemberDashboard() {
   
   // Check payment status
   const needsPaymentProof = !membershipActive && !!data.payment && !paymentProof;
-  const awaitingVerification = !membershipActive && !!paymentProof && data.payment.status === 'pending';
+  const awaitingVerification = !membershipActive && !!paymentProof && data.payment?.status === 'pending';
   const isVerified = membershipActive || data.payment?.status === 'approved';
 
   return (
@@ -201,11 +201,11 @@ export default async function MemberDashboard() {
                 </p>
                 <div className="bg-white rounded-lg p-3 mb-3">
                   <div className="text-xs text-slate-600 mb-1">Payment Reference</div>
-                  <div className="text-lg font-bold text-slate-900 font-mono">{data.payment.payment_reference}</div>
+                  <div className="text-lg font-bold text-slate-900 font-mono">{data.payment?.payment_reference}</div>
                 </div>
                 <div className="bg-white rounded-lg p-3 mb-3">
                   <div className="text-xs text-slate-600 mb-1">Amount</div>
-                  <div className="text-lg font-bold text-slate-900">R{data.payment.amount}</div>
+                  <div className="text-lg font-bold text-slate-900">R{data.payment?.amount}</div>
                 </div>
                 <div className="bg-white rounded-lg p-3 mb-3">
                   <div className="text-xs text-slate-600 mb-1">Banking Details</div>

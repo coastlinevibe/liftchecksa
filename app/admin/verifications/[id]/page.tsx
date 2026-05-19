@@ -261,7 +261,6 @@ export default async function VerificationReviewPage({ params }: { params: Promi
           driverProfileId={driverProfile.id}
           userId={driverProfile.user_id}
           paymentId={payment?.id}
-          hasVehicles={vehicles.length > 0}
         />
 
         {/* Vehicles Section */}

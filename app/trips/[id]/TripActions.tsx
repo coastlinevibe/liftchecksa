@@ -48,14 +48,13 @@ export default function TripActions({
               Book a seat
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => handleInteraction('message-driver')}
-            className="w-full bg-white border-2 border-slate-200 hover:border-emerald-500 text-slate-900 py-3 rounded-lg text-sm font-semibold flex items-center justify-center gap-2"
-          >
-            <MessageSquare className="w-4 h-4" />
-            Message Driver
-          </button>
+           <Link
+             href={`/messages/${tripId}`}
+             className="w-full bg-white border-2 border-slate-200 hover:border-emerald-500 text-slate-900 py-3 rounded-lg text-sm font-semibold flex items-center justify-center gap-2"
+           >
+             <MessageSquare className="w-4 h-4" />
+             Message Driver
+           </Link>
         </div>
       </div>
     </>

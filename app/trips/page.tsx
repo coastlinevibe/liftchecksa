@@ -264,7 +264,7 @@ export default async function TripsPage({
                     </div>
                   </div>
 
-                  {(trip.pickup_points?.length > 0 || trip.dropoff_points?.length > 0 || trip.luggage_rules) && (
+                  {((trip.pickup_points?.length ?? 0) > 0 || (trip.dropoff_points?.length ?? 0) > 0 || trip.luggage_rules) && (
                     <div className="mt-2 space-y-1 text-xs text-slate-600">
                       {formatList(trip.pickup_points) ? (
                         <div>

@@ -123,7 +123,7 @@ export default async function DriverDashboard() {
   const paymentProof = data.payment?.proof_url || data.payment?.proof_image;
   const membershipActive = data.profile?.membership_status === 'active' || data.payment?.status === 'approved';
   const needsPaymentProof = !membershipActive && !!data.payment && !paymentProof;
-  const awaitingVerification = !membershipActive && !!paymentProof && data.payment.status === 'pending';
+  const awaitingVerification = !membershipActive && !!paymentProof && data.payment?.status === 'pending';
   const isVerified =
     data.driverProfile?.verification_status === 'approved' &&
     (membershipActive || data.payment?.status === 'approved');
