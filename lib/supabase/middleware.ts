@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { type NextRequest, NextResponse } from 'next/server'
+import { DEFAULT_SUPABASE_KEY, DEFAULT_SUPABASE_URL } from './config'
 
 export function createClient(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -8,14 +9,11 @@ export function createClient(request: NextRequest) {
     },
   })
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL
   const supabaseKey =
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!supabaseUrl || !supabaseKey) {
-    return { supabase: null, response: supabaseResponse }
-  }
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+    DEFAULT_SUPABASE_KEY
 
   const supabase = createServerClient(
     supabaseUrl,

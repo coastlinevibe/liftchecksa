@@ -2,6 +2,7 @@
 
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
+import { DEFAULT_SUPABASE_KEY, DEFAULT_SUPABASE_URL } from '@/lib/supabase/config';
 import { revalidatePath } from 'next/cache';
 
 type PublishedTripCard = {
@@ -153,14 +154,11 @@ export async function getDriverTrips() {
 }
 
 export async function getAvailableTrips() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL;
   const supabaseKey =
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseKey) {
-    return { error: 'Missing Supabase configuration' };
-  }
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+    DEFAULT_SUPABASE_KEY;
 
   const supabase = createSupabaseClient(supabaseUrl, supabaseKey, {
     auth: {
