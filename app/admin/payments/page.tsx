@@ -3,6 +3,27 @@ import { ArrowLeft } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import PaymentCard from './PaymentCard';
 
+type PendingPayment = {
+  id: string;
+  user_id: string;
+  plan_type: string;
+  amount: number | string;
+  payment_reference: string;
+  proof_url?: string | null;
+  proof_image?: string | null;
+  created_at: string;
+  profiles?: {
+    first_name?: string | null;
+    surname?: string | null;
+    phone?: string | null;
+    email?: string | null;
+  } | null;
+};
+
+function extractPaymentProofPath(proofSource: string) {
+  return proofSource.replace(/^\/?(payment-proofs\/)?/, '');
+}
+
 async function getPendingPayments() {
   const supabase = await createClient();
 
@@ -17,16 +38,29 @@ async function getPendingPayments() {
 
   // Fetch profiles separately
   const paymentsWithProfiles = await Promise.all(
-    payments.map(async (payment) => {
+    payments.map(async (payment: PendingPayment) => {
       const { data: profile } = await supabase
         .from('profiles')
         .select('first_name, surname, phone, email')
         .eq('user_id', payment.user_id)
         .single();
 
+      const proofSource = payment.proof_url || payment.proof_image;
+      let signedPaymentProofUrl = proofSource;
+      if (proofSource) {
+        const path = extractPaymentProofPath(proofSource);
+        if (path) {
+          const { data: signedData } = await supabase.storage
+            .from('payment-proofs')
+            .createSignedUrl(path, 3600);
+          if (signedData) signedPaymentProofUrl = signedData.signedUrl;
+        }
+      }
+
       return {
         ...payment,
-        profiles: profile
+        profiles: profile,
+        proof_url: signedPaymentProofUrl
       };
     })
   );
@@ -53,7 +87,7 @@ export default async function AdminPaymentsPage() {
       <div className="px-4 py-4 max-w-6xl mx-auto">
         {payments.length > 0 ? (
           <div className="space-y-3">
-            {payments.map((payment: any) => (
+            {payments.map((payment: PendingPayment) => (
               <PaymentCard key={payment.id} payment={payment} />
             ))}
           </div>
