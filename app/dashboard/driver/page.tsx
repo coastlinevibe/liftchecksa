@@ -4,6 +4,23 @@ import LogoutButton from '@/components/LogoutButton';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 
+type DriverTripSummary = {
+  id: string;
+  origin: string;
+  destination: string;
+  departure_date: string;
+  departure_time?: string;
+  seats_total: number;
+  seats_available: number;
+  cost_share_amount: number | string;
+  status?: string;
+};
+
+type DriverVehicleSummary = {
+  is_active?: boolean | null;
+  verification_status?: string | null;
+};
+
 async function getDriverData() {
   const supabase = await createClient();
   
@@ -127,7 +144,9 @@ export default async function DriverDashboard() {
   const isVerified =
     data.driverProfile?.verification_status === 'approved' &&
     (membershipActive || data.payment?.status === 'approved');
-  const approvedVehicles = data.vehicles.filter((vehicle: any) => vehicle.is_active !== false && vehicle.verification_status === 'approved');
+  const approvedVehicles = data.vehicles.filter(
+    (vehicle: DriverVehicleSummary) => vehicle.is_active !== false && vehicle.verification_status === 'approved'
+  );
   const canCreateTrips = isVerified && approvedVehicles.length > 0;
 
   return (
@@ -216,11 +235,11 @@ export default async function DriverDashboard() {
               </div>
               <div className="flex-1">
                 <h3 className="text-base font-bold text-blue-900 mb-1">Verification In Progress</h3>
-                <p className="text-sm text-blue-800 mb-2">
+                          <p className="text-sm text-blue-800 mb-2">
                   Your payment proof has been submitted and is being reviewed by our admin team.
                 </p>
                 <p className="text-xs text-blue-700">
-                  You'll be notified once your account is verified. This usually takes 24-48 hours.
+                  You&apos;ll be notified once your account is verified. This usually takes 24-48 hours.
                 </p>
               </div>
             </div>
@@ -270,7 +289,7 @@ export default async function DriverDashboard() {
           <h2 className="text-sm font-semibold text-slate-700 mb-3">Active Trips</h2>
           {data.activeTrips.length > 0 ? (
             <div className="space-y-3">
-              {data.activeTrips.map((trip: any) => {
+              {data.activeTrips.map((trip: DriverTripSummary) => {
                 const seatsBooked = trip.seats_total - trip.seats_available;
                 const isFull = trip.seats_available === 0;
                 
@@ -303,23 +322,24 @@ export default async function DriverDashboard() {
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                      <div className="flex items-center gap-1 text-xs text-slate-600">
-                        <Users className="w-3.5 h-3.5" />
-                        <span>{seatsBooked} of {trip.seats_total} seats booked</span>
-                      </div>
-                      {isFull ? (
-                        <div className="px-3 py-1.5 bg-emerald-500 text-white rounded-lg text-xs font-semibold">
-                          Full
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                        <div className="flex items-center gap-1 text-xs text-slate-600">
+                          <Users className="w-3.5 h-3.5" />
+                          <span>{seatsBooked} of {trip.seats_total} seats booked</span>
                         </div>
-                      ) : (
+                      <div className="flex items-center gap-2">
+                        {isFull ? (
+                          <div className="px-3 py-1.5 bg-emerald-500 text-white rounded-lg text-xs font-semibold">
+                            Full
+                          </div>
+                        ) : null}
                         <Link
-                          href={`/trips/${trip.id}`}
+                          href={`/dashboard/driver/trips/${trip.id}`}
                           className="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-semibold hover:bg-emerald-100"
                         >
                           View Details
                         </Link>
-                      )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -338,9 +358,9 @@ export default async function DriverDashboard() {
           <h2 className="text-sm font-semibold text-slate-700 mb-3">Recent Completed Trips</h2>
           {data.completedTrips.length > 0 ? (
             <div className="space-y-2">
-              {data.completedTrips.map((trip: any) => {
+              {data.completedTrips.map((trip: DriverTripSummary) => {
                 const seatsBooked = trip.seats_total - trip.seats_available;
-                const earnings = seatsBooked * trip.cost_share_amount;
+                const earnings = seatsBooked * Number(trip.cost_share_amount);
                 
                 return (
                   <div key={trip.id} className="bg-white border border-slate-200 rounded-lg p-3">

@@ -4,6 +4,7 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 import { DEFAULT_SUPABASE_KEY, DEFAULT_SUPABASE_URL } from '@/lib/supabase/config';
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 
 type PublishedTripCard = {
   id?: string;
@@ -151,6 +152,69 @@ export async function getDriverTrips() {
   }
 
   return { trips };
+}
+
+export async function getDriverTripById(tripId: string) {
+  const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    redirect('/login');
+  }
+
+  const { data: driverProfile } = await supabase
+    .from('driver_profiles')
+    .select('id, user_id, completed_trips, rating_average, rating_count, verification_status')
+    .eq('user_id', user.id)
+    .single();
+
+  if (!driverProfile) {
+    redirect('/dashboard/driver');
+  }
+
+  const [{ data: trip, error: tripError }, { data: vehicles }] = await Promise.all([
+    supabase
+      .from('trips')
+      .select(`
+        *,
+        vehicles (
+          id,
+          make,
+          model,
+          colour,
+          licence_plate,
+          year,
+          vehicle_photo_url,
+          verification_status,
+          is_active
+        )
+      `)
+      .eq('id', tripId)
+      .eq('driver_id', driverProfile.id)
+      .single(),
+    supabase
+      .from('vehicles')
+      .select('id, make, model, colour, licence_plate, year, vehicle_photo_url, verification_status, is_active')
+      .eq('driver_id', driverProfile.id)
+      .order('created_at', { ascending: false }),
+  ]);
+
+  if (tripError || !trip) {
+    redirect('/dashboard/driver');
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('first_name, surname, profile_photo_url')
+    .eq('user_id', user.id)
+    .single();
+
+  return {
+    profile,
+    driverProfile,
+    trip,
+    vehicles: vehicles || [],
+  };
 }
 
 export async function getAvailableTrips() {
@@ -389,6 +453,124 @@ export async function requestTripSeat(
   revalidatePath(`/trips/${tripId}`);
 
   return { success: true, request };
+}
+
+function parseListValue(value: FormDataEntryValue | null) {
+  if (typeof value !== 'string') return undefined;
+
+  const items = value
+    .split(/[\n,]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return items.length > 0 ? items : undefined;
+}
+
+export async function updateDriverTrip(formData: FormData) {
+  const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    redirect('/login');
+  }
+
+  const tripId = formData.get('tripId');
+  if (typeof tripId !== 'string' || !tripId) {
+    redirect('/dashboard/driver?trip_error=Missing%20trip%20ID');
+  }
+
+  const { data: driverProfile } = await supabase
+    .from('driver_profiles')
+    .select('id')
+    .eq('user_id', user.id)
+    .single();
+
+  if (!driverProfile) {
+    redirect('/dashboard/driver');
+  }
+
+  const { data: currentTrip, error: currentTripError } = await supabase
+    .from('trips')
+    .select('id, seats_total, seats_available')
+    .eq('id', tripId)
+    .eq('driver_id', driverProfile.id)
+    .single();
+
+  if (currentTripError || !currentTrip) {
+    redirect('/dashboard/driver');
+  }
+
+  const origin = String(formData.get('origin') || '').trim();
+  const destination = String(formData.get('destination') || '').trim();
+  const departureDate = String(formData.get('departureDate') || '').trim();
+  const departureTime = String(formData.get('departureTime') || '').trim();
+  const costShareAmount = Number(String(formData.get('costShareAmount') || '').trim());
+  const seatsTotal = Number(String(formData.get('seatsTotal') || '').trim());
+  const vehicleId = String(formData.get('vehicleId') || '').trim();
+  const routeCorridor = String(formData.get('routeCorridor') || '').trim() || null;
+  const luggageRules = String(formData.get('luggageRules') || '').trim() || null;
+  const notes = String(formData.get('notes') || '').trim() || null;
+  const passengerRules = String(formData.get('passengerRules') || '').trim() || null;
+  const status = String(formData.get('status') || '').trim();
+  const pickupPoints = parseListValue(formData.get('pickupPoints'));
+  const dropoffPoints = parseListValue(formData.get('dropoffPoints'));
+
+  if (!origin || !destination || !departureDate || !departureTime || !vehicleId || !Number.isFinite(costShareAmount) || !Number.isInteger(seatsTotal)) {
+    redirect(`/dashboard/driver/trips/${tripId}?update_error=${encodeURIComponent('Please complete all required fields.')}`);
+  }
+
+  const { data: vehicle } = await supabase
+    .from('vehicles')
+    .select('id, verification_status, is_active')
+    .eq('id', vehicleId)
+    .eq('driver_id', driverProfile.id)
+    .single();
+
+  if (!vehicle || vehicle.is_active === false || vehicle.verification_status !== 'approved') {
+    redirect(`/dashboard/driver/trips/${tripId}?update_error=${encodeURIComponent('Select an approved active vehicle.')}`);
+  }
+
+  const bookedSeats = Math.max((currentTrip.seats_total || 0) - (currentTrip.seats_available || 0), 0);
+  if (seatsTotal < bookedSeats) {
+    redirect(`/dashboard/driver/trips/${tripId}?update_error=${encodeURIComponent('Seats cannot be lower than the number already booked.')}`);
+  }
+
+  const seatsAvailable = Math.max(seatsTotal - bookedSeats, 0);
+  const allowedStatuses = new Set(['draft', 'published', 'full', 'completed', 'cancelled']);
+  const nextStatus = allowedStatuses.has(status) ? status : 'published';
+
+  const { error } = await supabase
+    .from('trips')
+    .update({
+      origin,
+      destination,
+      route_corridor: routeCorridor,
+      departure_date: departureDate,
+      departure_time: departureTime,
+      seats_total: seatsTotal,
+      seats_available: seatsAvailable,
+      cost_share_amount: costShareAmount,
+      luggage_rules: luggageRules,
+      pickup_points: pickupPoints,
+      dropoff_points: dropoffPoints,
+      notes,
+      passenger_rules: passengerRules,
+      status: nextStatus,
+      vehicle_id: vehicleId,
+    })
+    .eq('id', tripId)
+    .eq('driver_id', driverProfile.id);
+
+  if (error) {
+    redirect(`/dashboard/driver/trips/${tripId}?update_error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath('/dashboard/driver');
+  revalidatePath(`/dashboard/driver/trips/${tripId}`);
+  revalidatePath(`/trips/${tripId}`);
+  revalidatePath('/trips');
+
+  redirect(`/dashboard/driver/trips/${tripId}?updated=1`);
 }
 
 export async function getDriverVehicles() {
