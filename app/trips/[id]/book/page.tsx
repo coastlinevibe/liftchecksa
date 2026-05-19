@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect, notFound } from 'next/navigation';
-import { ArrowLeft, Calendar, Car, Clock, MapPin, MessageSquare, Send, Shield, Users } from 'lucide-react';
+import { ArrowLeft, Calendar, Car, Clock, MapPin, MessageSquare, Shield, Users } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { getTripById, requestTripSeat } from '@/lib/trips/actions';
 
@@ -32,29 +32,17 @@ export default async function BookSeatPage({
     : 'Vehicle not listed';
   const defaultPickupPoint = trip.pickup_points?.[0] || trip.origin;
   const defaultDropoffPoint = trip.dropoff_points?.[0] || trip.destination;
-  const memberProfile = await supabase
-    .from('profiles')
-    .select('id, first_name, surname')
-    .eq('user_id', user.id)
-    .maybeSingle();
-  const memberProfileId = memberProfile.data?.id;
-  const chatMessages = (
-    await supabase
-      .from('trip_chats')
-      .select('id, sender_id, receiver_id, message, created_at')
-      .eq('trip_id', id)
-      .order('created_at', { ascending: true })
-  ).data || [];
 
   async function bookSeatAction(formData: FormData) {
     'use server';
 
     const seatCount = Number(formData.get('seatCount') || 1);
+    const message = String(formData.get('message') || '').trim() || undefined;
     if (![1, 2].includes(seatCount)) {
       redirect(`/trips/${id}/book?booking_error=Choose 1 or 2 seats.`);
     }
 
-    const result = await requestTripSeat(id, undefined, defaultPickupPoint, defaultDropoffPoint, seatCount);
+    const result = await requestTripSeat(id, message, defaultPickupPoint, defaultDropoffPoint, seatCount);
 
     if ('error' in result) {
       const bookingError = result.error || 'Booking request failed.';
@@ -62,66 +50,6 @@ export default async function BookSeatPage({
     }
 
     redirect(`/trips/${id}?booked=1`);
-  }
-
-  async function sendChatMessageAction(formData: FormData) {
-    'use server';
-
-    const text = String(formData.get('message') || '').trim();
-    if (!text) {
-      redirect(`/trips/${id}/book`);
-    }
-
-    const actionSupabase = await createClient();
-    const { data: { user: actionUser } } = await actionSupabase.auth.getUser();
-    if (!actionUser) {
-      redirect(`/login?redirect=${encodeURIComponent(`/trips/${id}/book`)}`);
-    }
-
-    const { data: actionMemberProfile } = await actionSupabase
-      .from('profiles')
-      .select('id')
-      .eq('user_id', actionUser.id)
-      .single();
-
-    const { data: tripRecord } = await actionSupabase
-      .from('trips')
-      .select('driver_id')
-      .eq('id', id)
-      .single();
-
-    const { data: actionDriverProfile } = tripRecord?.driver_id
-      ? await actionSupabase
-          .from('driver_profiles')
-          .select('user_id')
-          .eq('id', tripRecord.driver_id)
-          .single()
-      : { data: null };
-
-    const { data: actionDriverMemberProfile } = actionDriverProfile?.user_id
-      ? await actionSupabase
-          .from('profiles')
-          .select('id')
-          .eq('user_id', actionDriverProfile.user_id)
-          .single()
-      : { data: null };
-
-    if (!actionMemberProfile?.id || !actionDriverMemberProfile?.id) {
-      redirect(`/trips/${id}/book?booking_error=Chat%20details%20could%20not%20be%20loaded.`);
-    }
-
-    const { error } = await actionSupabase.from('trip_chats').insert({
-      trip_id: id,
-      sender_id: actionMemberProfile.id,
-      receiver_id: actionDriverMemberProfile.id,
-      message: text,
-    });
-
-    if (error) {
-      redirect(`/trips/${id}/book?booking_error=${encodeURIComponent(error.message)}`);
-    }
-
-    redirect(`/trips/${id}/book`);
   }
 
   return (
@@ -212,45 +140,10 @@ export default async function BookSeatPage({
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
-          <div className="text-sm font-semibold text-slate-900">Pre-booking chat</div>
-          <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
-            {chatMessages.length > 0 ? (
-              chatMessages.map((chat) => {
-                const isMine = chat.sender_id === memberProfileId;
-                return (
-                  <div key={chat.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${isMine ? 'bg-emerald-500 text-white rounded-br-md' : 'bg-slate-100 text-slate-900 rounded-bl-md'}`}>
-                      {chat.message}
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <div className="rounded-lg bg-slate-50 border border-slate-200 p-3 text-xs text-slate-600">
-                Start the conversation here. Agree on anything unusual, then confirm the booking below.
-              </div>
-            )}
+          <div className="text-sm font-semibold text-slate-900">Booking note</div>
+          <div className="rounded-lg bg-slate-50 border border-slate-200 p-3 text-xs text-slate-600">
+            This note is sent with your booking request and appears in the driver&apos;s trip requests.
           </div>
-
-          <form action={sendChatMessageAction} className="space-y-2">
-            <label htmlFor="chatMessage" className="block text-sm font-semibold text-slate-900">
-              Message to driver
-            </label>
-            <textarea
-              id="chatMessage"
-              name="message"
-              rows={3}
-              placeholder={`Message ${trip.profiles?.first_name || 'driver'}...`}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
-            <button
-              type="submit"
-              className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-500 bg-white px-4 py-3 text-sm font-semibold text-emerald-600 hover:bg-emerald-50"
-            >
-              <Send className="w-4 h-4" />
-              Send message
-            </button>
-          </form>
         </div>
 
         <form action={bookSeatAction} className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
@@ -262,6 +155,19 @@ export default async function BookSeatPage({
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
             <div className="text-xs font-semibold text-slate-500 mb-1">Drop-off point</div>
             <div className="text-sm font-semibold text-slate-900">{defaultDropoffPoint}</div>
+          </div>
+
+          <div>
+            <label htmlFor="bookingMessage" className="block text-sm font-semibold text-slate-900 mb-2">
+              Message to driver
+            </label>
+            <textarea
+              id="bookingMessage"
+              name="message"
+              rows={3}
+              placeholder={`Message ${trip.profiles?.first_name || 'driver'}...`}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
           </div>
 
           <div>

@@ -335,6 +335,12 @@ export default async function DriverDashboard() {
                           </div>
                         ) : null}
                         <Link
+                          href={`/dashboard/driver/trip-requests/${trip.id}`}
+                          className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-semibold hover:bg-blue-100"
+                        >
+                          Requests
+                        </Link>
+                        <Link
                           href={`/dashboard/driver/trips/${trip.id}`}
                           className="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-semibold hover:bg-emerald-100"
                         >
