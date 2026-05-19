@@ -3,7 +3,12 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
-  const { supabase, response } = createClient(request);
+  const client = createClient(request);
+  if (!client.supabase) {
+    return client.response;
+  }
+  const supabase = client.supabase;
+  const response = client.response;
   const { data: { user } } = await supabase.auth.getUser();
 
   async function getUserLandingPath() {
