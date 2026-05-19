@@ -3,6 +3,7 @@
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 import { DEFAULT_SUPABASE_KEY, DEFAULT_SUPABASE_URL } from '@/lib/supabase/config';
+import { resolveTripMediaUrls, resolveTripsMediaUrls } from '@/lib/supabase/storage';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
@@ -236,31 +237,33 @@ export async function getAvailableTrips() {
     .rpc('get_published_trip_cards');
 
   if (!tripCardsError && tripCards) {
+    const trips = (tripCards as PublishedTripCard[]).map((trip) => ({
+      ...trip,
+      profiles: {
+        first_name: trip.driver_first_name,
+        surname: trip.driver_surname,
+        profile_photo_url: trip.driver_profile_photo_url,
+      },
+      driver_profiles: {
+        rating_average: trip.driver_rating_average,
+        rating_count: trip.driver_rating_count,
+        completed_trips: trip.driver_completed_trips,
+        verification_status: trip.driver_verification_status,
+      },
+      vehicles: trip.vehicle_make
+        ? {
+            make: trip.vehicle_make,
+            model: trip.vehicle_model,
+            colour: trip.vehicle_colour,
+            licence_plate: trip.vehicle_licence_plate,
+            vehicle_photo_url: trip.vehicle_photo_url,
+            verification_status: trip.vehicle_verification_status,
+          }
+        : null,
+    }));
+
     return {
-      trips: (tripCards as PublishedTripCard[]).map((trip) => ({
-        ...trip,
-        profiles: {
-          first_name: trip.driver_first_name,
-          surname: trip.driver_surname,
-          profile_photo_url: trip.driver_profile_photo_url,
-        },
-        driver_profiles: {
-          rating_average: trip.driver_rating_average,
-          rating_count: trip.driver_rating_count,
-          completed_trips: trip.driver_completed_trips,
-          verification_status: trip.driver_verification_status,
-        },
-        vehicles: trip.vehicle_make
-          ? {
-              make: trip.vehicle_make,
-              model: trip.vehicle_model,
-              colour: trip.vehicle_colour,
-              licence_plate: trip.vehicle_licence_plate,
-              vehicle_photo_url: trip.vehicle_photo_url,
-              verification_status: trip.vehicle_verification_status,
-            }
-          : null,
-      })),
+      trips: await resolveTripsMediaUrls(supabase, trips),
     };
   }
 
@@ -309,17 +312,19 @@ export async function getAvailableTrips() {
   const profilesByUserId = new Map((profiles || []).map((profile) => [profile.user_id, profile]));
   const vehiclesById = new Map((vehicles || []).map((vehicle) => [vehicle.id, vehicle]));
 
-  return {
-    trips: trips.map((trip) => {
-      const driverProfile = driverProfilesById.get(trip.driver_id);
+  const normalizedTrips = trips.map((trip) => {
+    const driverProfile = driverProfilesById.get(trip.driver_id);
 
-      return {
-        ...trip,
-        driver_profiles: driverProfile || null,
-        profiles: driverProfile ? profilesByUserId.get(driverProfile.user_id) || null : null,
-        vehicles: trip.vehicle_id ? vehiclesById.get(trip.vehicle_id) || null : null,
-      };
-    }),
+    return {
+      ...trip,
+      driver_profiles: driverProfile || null,
+      profiles: driverProfile ? profilesByUserId.get(driverProfile.user_id) || null : null,
+      vehicles: trip.vehicle_id ? vehiclesById.get(trip.vehicle_id) || null : null,
+    };
+  });
+
+  return {
+    trips: await resolveTripsMediaUrls(supabase, normalizedTrips),
   };
 }
 
@@ -391,14 +396,16 @@ export async function getTripById(tripId: string) {
       }
     : null;
 
-  return {
-    trip: {
+  const tripWithRelations = {
       ...publishedTrip,
       ...trip,
       driver_profiles: driverProfiles,
       profiles: profile,
       vehicles: vehicle,
-    },
+    };
+
+  return {
+    trip: await resolveTripMediaUrls(supabase, tripWithRelations),
   };
 }
 

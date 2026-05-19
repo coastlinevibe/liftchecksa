@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { MessageSquare } from 'lucide-react';
 import AuthPrompt from '@/components/AuthPrompt';
 
 export default function TripActions({
@@ -25,7 +24,7 @@ export default function TripActions({
     <>
       {showAuthPrompt && (
         <AuthPrompt
-          message="Sign up to request a seat and message the driver"
+          message="Sign up to request a seat"
           returnUrl={`/trips/${tripId}`}
         />
       )}
@@ -48,13 +47,6 @@ export default function TripActions({
               Book a seat
             </button>
           )}
-           <Link
-             href={`/messages/${tripId}`}
-             className="w-full bg-white border-2 border-slate-200 hover:border-emerald-500 text-slate-900 py-3 rounded-lg text-sm font-semibold flex items-center justify-center gap-2"
-           >
-             <MessageSquare className="w-4 h-4" />
-             Message Driver
-           </Link>
         </div>
       </div>
     </>

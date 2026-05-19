@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect, notFound } from 'next/navigation';
-import { ArrowLeft, Calendar, Clock, MapPin, MessageSquare, Send, Shield, Users } from 'lucide-react';
+import { ArrowLeft, Calendar, Car, Clock, MapPin, MessageSquare, Send, Shield, Users } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { getTripById, requestTripSeat } from '@/lib/trips/actions';
 
@@ -146,14 +146,36 @@ export default async function BookSeatPage({
 
         <div className="bg-white rounded-xl border border-slate-200 p-4">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center">
-              <Shield className="w-6 h-6 text-emerald-600" />
+            <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0">
+              {trip.profiles?.profile_photo_url ? (
+                <img
+                  src={trip.profiles.profile_photo_url}
+                  alt={`${driverName} profile photo`}
+                  className="h-full w-full object-cover object-center"
+                />
+              ) : (
+                <Shield className="w-6 h-6 text-emerald-600" />
+              )}
             </div>
             <div>
               <div className="text-sm font-semibold text-slate-900">{driverName}</div>
               <div className="text-xs text-slate-600">{vehicleLabel}</div>
             </div>
           </div>
+
+          {trip.vehicles?.vehicle_photo_url ? (
+            <div className="mb-4 overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
+              <img
+                src={trip.vehicles.vehicle_photo_url}
+                alt={`${vehicleLabel} vehicle photo`}
+                className="h-40 w-full object-cover object-center"
+              />
+            </div>
+          ) : (
+            <div className="mb-4 flex h-32 items-center justify-center rounded-lg border border-slate-200 bg-slate-50">
+              <Car className="h-8 w-8 text-slate-400" />
+            </div>
+          )}
 
           <div className="grid gap-2 text-sm">
             <div className="flex items-start gap-2 rounded-lg bg-slate-50 p-3">
