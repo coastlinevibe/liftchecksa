@@ -45,5 +45,19 @@ export async function GET(
     return new NextResponse('Not found', { status: 404 });
   }
 
-  return NextResponse.redirect(signedProofUrl, { status: 302 });
+  const imageResponse = await fetch(signedProofUrl);
+  if (!imageResponse.ok) {
+    return new NextResponse('Not found', { status: 404 });
+  }
+
+  const contentType = imageResponse.headers.get('content-type') || 'application/octet-stream';
+  const buffer = await imageResponse.arrayBuffer();
+
+  return new Response(buffer, {
+    status: 200,
+    headers: {
+      'Content-Type': contentType,
+      'Cache-Control': 'private, max-age=3600',
+    },
+  });
 }
