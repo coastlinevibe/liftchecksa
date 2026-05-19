@@ -10,7 +10,7 @@ function extractStoragePath(url: string, bucket: string) {
   return '';
 }
 
-export async function resolvePublicStorageUrl(
+export async function resolveSignedStorageUrl(
   supabase: Awaited<ReturnType<typeof createSupabaseClient>>,
   bucket: string,
   url?: string | null
@@ -20,6 +20,6 @@ export async function resolvePublicStorageUrl(
   const path = extractStoragePath(url, bucket);
   if (!path) return url;
 
-  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-  return data.publicUrl || url;
+  const { data } = await supabase.storage.from(bucket).createSignedUrl(path, 3600);
+  return data?.signedUrl || url;
 }

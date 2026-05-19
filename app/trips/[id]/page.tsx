@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { getTripById } from '@/lib/trips/actions';
-import { resolvePublicStorageUrl } from '@/lib/supabase/storage';
+import { resolveSignedStorageUrl } from '@/lib/supabase/storage';
 import TripActions from './TripActions';
 
 type ReviewCard = {
@@ -62,8 +62,8 @@ export default async function TripDetailsPage({
   }
 
   const [resolvedDriverPhotoUrl, resolvedVehiclePhotoUrl] = await Promise.all([
-    resolvePublicStorageUrl(supabase, 'profile-photos', trip.profiles?.profile_photo_url),
-    resolvePublicStorageUrl(supabase, 'vehicle-photos', trip.vehicles?.vehicle_photo_url),
+    resolveSignedStorageUrl(supabase, 'profile-photos', trip.profiles?.profile_photo_url),
+    resolveSignedStorageUrl(supabase, 'vehicle-photos', trip.vehicles?.vehicle_photo_url),
   ]);
 
   const { data: ratings } = await supabase

@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Search, MapPin, Calendar, Users, Star, Shield, ChevronRight, Car } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { getAvailableTrips } from '@/lib/trips/actions';
-import { resolvePublicStorageUrl } from '@/lib/supabase/storage';
+import { resolveSignedStorageUrl } from '@/lib/supabase/storage';
 
 type SearchParams = {
   origin?: string | string[];
@@ -116,7 +116,7 @@ export default async function TripsPage({
       profiles: trip.profiles?.profile_photo_url
         ? {
             ...trip.profiles,
-            profile_photo_url: await resolvePublicStorageUrl(
+            profile_photo_url: await resolveSignedStorageUrl(
               supabase,
               'profile-photos',
               trip.profiles.profile_photo_url
