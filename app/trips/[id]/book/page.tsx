@@ -269,7 +269,7 @@ export default async function BookSeatPage({
             className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-600"
           >
             <MessageSquare className="w-4 h-4" />
-            Confirm booking request
+            Book now
           </button>
         </form>
       </div>
