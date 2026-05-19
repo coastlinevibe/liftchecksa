@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { ArrowLeft, Calendar, CheckCircle, Clock, MapPin, Shield, Users, XCircle } from 'lucide-react';
+import { ArrowLeft, Calendar, CheckCircle, Clock, MapPin, Send, Shield, Users, XCircle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 
 type TripRequestStatus = 'pending' | 'accepted' | 'rejected' | 'cancelled';
@@ -22,6 +22,21 @@ type PassengerProfile = {
   first_name?: string | null;
   surname?: string | null;
   zii_status?: string | null;
+};
+
+type ChatMessage = {
+  id: string;
+  trip_id: string;
+  sender_id: string;
+  receiver_id: string;
+  message: string;
+  created_at?: string | null;
+};
+
+type ChatConversation = {
+  participantId: string;
+  passenger?: PassengerProfile;
+  messages: ChatMessage[];
 };
 
 type DriverTrip = {
@@ -83,7 +98,7 @@ async function updateRequestStatus(formData: FormData) {
 
   const { data: driverProfile } = await supabase
     .from('driver_profiles')
-    .select('id')
+    .select('id, user_id')
     .eq('user_id', user.id)
     .single();
 
@@ -111,6 +126,85 @@ async function updateRequestStatus(formData: FormData) {
     })
     .eq('id', requestId)
     .eq('trip_id', tripId);
+
+  revalidatePath(`/dashboard/driver/trip-requests/${tripId}`);
+  redirect(`/dashboard/driver/trip-requests/${tripId}`);
+}
+
+async function sendDriverChatMessage(formData: FormData) {
+  'use server';
+
+  const tripId = String(formData.get('tripId') || '');
+  const receiverId = String(formData.get('receiverId') || '');
+  const message = String(formData.get('message') || '').trim();
+
+  if (!tripId || !receiverId || !message) {
+    redirect(`/dashboard/driver/trip-requests/${tripId || ''}`);
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect('/login');
+  }
+
+  const { data: driverProfile } = await supabase
+    .from('driver_profiles')
+    .select('id')
+    .eq('user_id', user.id)
+    .single();
+
+  if (!driverProfile) {
+    redirect('/dashboard/driver');
+  }
+
+  const { data: driverMemberProfile } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('user_id', user.id)
+    .single();
+
+  const { data: trip } = await supabase
+    .from('trips')
+    .select('id')
+    .eq('id', tripId)
+    .eq('driver_id', driverProfile.id)
+    .single();
+
+  if (!driverMemberProfile || !trip) {
+    redirect('/dashboard/driver');
+  }
+
+  const [{ data: existingChat }, { data: existingRequest }] = await Promise.all([
+    supabase
+      .from('trip_chats')
+      .select('id')
+      .eq('trip_id', tripId)
+      .or(`sender_id.eq.${receiverId},receiver_id.eq.${receiverId}`)
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('trip_requests')
+      .select('id')
+      .eq('trip_id', tripId)
+      .eq('passenger_id', receiverId)
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  if (!existingChat && !existingRequest) {
+    redirect(`/dashboard/driver/trip-requests/${tripId}`);
+  }
+
+  await supabase.from('trip_chats').insert({
+    trip_id: tripId,
+    sender_id: driverMemberProfile.id,
+    receiver_id: receiverId,
+    message,
+  });
 
   revalidatePath(`/dashboard/driver/trip-requests/${tripId}`);
   redirect(`/dashboard/driver/trip-requests/${tripId}`);
@@ -153,7 +247,27 @@ async function getDriverTripRequests(tripId: string) {
     .eq('trip_id', tripId)
     .order('requested_at', { ascending: false });
 
-  const passengerIds = [...new Set((requests || []).map((request) => request.passenger_id).filter(Boolean))];
+  const { data: driverMemberProfile } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('user_id', user.id)
+    .single();
+
+  const { data: chatMessages } = await supabase
+    .from('trip_chats')
+    .select('id, trip_id, sender_id, receiver_id, message, created_at')
+    .eq('trip_id', tripId)
+    .order('created_at', { ascending: true });
+
+  const chatParticipantIds = (chatMessages || [])
+    .flatMap((message) => [message.sender_id, message.receiver_id])
+    .filter((profileId) => profileId && profileId !== driverMemberProfile?.id);
+  const passengerIds = [
+    ...new Set([
+      ...(requests || []).map((request) => request.passenger_id).filter(Boolean),
+      ...chatParticipantIds,
+    ]),
+  ];
   const { data: passengers } = passengerIds.length
     ? await supabase
         .from('profiles')
@@ -166,6 +280,8 @@ async function getDriverTripRequests(tripId: string) {
   return {
     trip: trip as DriverTrip,
     requests: (requests || []) as TripRequest[],
+    chatMessages: (chatMessages || []) as ChatMessage[],
+    driverProfileId: driverMemberProfile?.id || '',
     passengersById,
   };
 }
@@ -176,10 +292,29 @@ export default async function TripRequestsPage({
   params: Promise<{ tripId: string }>;
 }) {
   const { tripId } = await params;
-  const { trip, requests, passengersById } = await getDriverTripRequests(tripId);
+  const { trip, requests, chatMessages, driverProfileId, passengersById } = await getDriverTripRequests(tripId);
   const pendingRequests = requests.filter((request) => request.status === 'pending');
   const handledRequests = requests.filter((request) => request.status !== 'pending');
   const seatsBooked = Math.max((trip.seats_total || 0) - (trip.seats_available || 0), 0);
+  const conversationsByPassenger = new Map<string, ChatMessage[]>();
+
+  for (const message of chatMessages) {
+    const participantId = message.sender_id === driverProfileId ? message.receiver_id : message.sender_id;
+    if (!participantId || participantId === driverProfileId) continue;
+
+    conversationsByPassenger.set(participantId, [
+      ...(conversationsByPassenger.get(participantId) || []),
+      message,
+    ]);
+  }
+
+  const conversations: ChatConversation[] = Array.from(conversationsByPassenger.entries()).map(
+    ([participantId, messages]) => ({
+      participantId,
+      passenger: passengersById.get(participantId),
+      messages,
+    })
+  );
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -223,6 +358,12 @@ export default async function TripRequestsPage({
           </div>
         </div>
 
+        <ChatSection
+          conversations={conversations}
+          driverProfileId={driverProfileId}
+          tripId={trip.id}
+        />
+
         <RequestSection
           title={`Pending Requests (${pendingRequests.length})`}
           emptyText="No pending booking requests yet."
@@ -239,6 +380,107 @@ export default async function TripRequestsPage({
           tripId={trip.id}
         />
       </div>
+    </div>
+  );
+}
+
+function ChatSection({
+  conversations,
+  driverProfileId,
+  tripId,
+}: {
+  conversations: ChatConversation[];
+  driverProfileId: string;
+  tripId: string;
+}) {
+  return (
+    <div className="mb-4">
+      <h2 className="text-sm font-semibold text-slate-700 mb-3">
+        Interested Chats ({conversations.length})
+      </h2>
+      {conversations.length > 0 ? (
+        <div className="space-y-3">
+          {conversations.map((conversation) => (
+            <ChatCard
+              key={conversation.participantId}
+              conversation={conversation}
+              driverProfileId={driverProfileId}
+              tripId={tripId}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="bg-white border border-slate-200 rounded-xl p-4 text-sm text-slate-500">
+          Passenger chats for this trip will appear here before they book.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ChatCard({
+  conversation,
+  driverProfileId,
+  tripId,
+}: {
+  conversation: ChatConversation;
+  driverProfileId: string;
+  tripId: string;
+}) {
+  const passengerName = conversation.passenger
+    ? `${conversation.passenger.first_name || 'Passenger'} ${conversation.passenger.surname || ''}`.trim()
+    : 'Passenger';
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-9 h-9 bg-gradient-to-br from-emerald-400 to-blue-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
+          {passengerName[0]?.toUpperCase() || 'P'}
+        </div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm font-bold text-slate-900 truncate">{passengerName}</span>
+            {conversation.passenger?.zii_status === 'active' ? (
+              <Shield className="w-3.5 h-3.5 text-emerald-500" />
+            ) : null}
+          </div>
+          <div className="text-xs text-slate-500">Pre-booking conversation</div>
+        </div>
+      </div>
+
+      <div className="space-y-2 max-h-64 overflow-y-auto mb-3">
+        {conversation.messages.map((message) => {
+          const isMine = message.sender_id === driverProfileId;
+          return (
+            <div key={message.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
+              <div
+                className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${
+                  isMine
+                    ? 'bg-emerald-500 text-white rounded-br-md'
+                    : 'bg-slate-100 text-slate-900 rounded-bl-md'
+                }`}
+              >
+                {message.message}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <form action={sendDriverChatMessage} className="space-y-2">
+        <input type="hidden" name="tripId" value={tripId} />
+        <input type="hidden" name="receiverId" value={conversation.participantId} />
+        <textarea
+          name="message"
+          rows={2}
+          placeholder={`Reply to ${passengerName}...`}
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        />
+        <button className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-500 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-600 hover:bg-emerald-50">
+          <Send className="w-4 h-4" />
+          Send reply
+        </button>
+      </form>
     </div>
   );
 }

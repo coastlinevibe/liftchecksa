@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Plus, Calendar, Users, MapPin, Clock, Settings } from 'lucide-react';
+import { Bell, Plus, Calendar, Users, MapPin, Clock, Settings } from 'lucide-react';
 import LogoutButton from '@/components/LogoutButton';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
@@ -14,6 +14,7 @@ type DriverTripSummary = {
   seats_available: number;
   cost_share_amount: number | string;
   status?: string;
+  chat_count?: number;
 };
 
 type DriverVehicleSummary = {
@@ -34,7 +35,7 @@ async function getDriverData() {
   // Check whether this user should actually be on the member or admin dashboard
   const { data: profile } = await supabase
     .from('profiles')
-    .select('first_name, surname, role, membership_status')
+    .select('id, first_name, surname, role, membership_status')
     .eq('user_id', user.id)
     .single();
 
@@ -91,6 +92,25 @@ async function getDriverData() {
     .order('departure_date', { ascending: true })
     .limit(5);
 
+  const activeTripIds = (activeTrips || []).map((trip) => trip.id);
+  const { data: receivedChats } = profile?.id && activeTripIds.length > 0
+    ? await supabase
+        .from('trip_chats')
+        .select('trip_id')
+        .eq('receiver_id', profile.id)
+        .in('trip_id', activeTripIds)
+    : { data: [] };
+
+  const chatCountsByTrip = new Map<string, number>();
+  for (const chat of receivedChats || []) {
+    chatCountsByTrip.set(chat.trip_id, (chatCountsByTrip.get(chat.trip_id) || 0) + 1);
+  }
+
+  const activeTripsWithChats = (activeTrips || []).map((trip) => ({
+    ...trip,
+    chat_count: chatCountsByTrip.get(trip.id) || 0,
+  }));
+
   // Get completed trips - use driver_profiles.id
   const { data: completedTrips } = await supabase
     .from('trips')
@@ -118,7 +138,7 @@ async function getDriverData() {
     profile,
     driverProfile,
     payment,
-    activeTrips: activeTrips || [],
+    activeTrips: activeTripsWithChats,
     completedTrips: completedTrips || [],
     vehicles: vehicles || [],
     totalEarnings,
@@ -327,6 +347,12 @@ export default async function DriverDashboard() {
                         <div className="flex items-center gap-1 text-xs text-slate-600">
                           <Users className="w-3.5 h-3.5" />
                           <span>{seatsBooked} of {trip.seats_total} seats booked</span>
+                          {(trip.chat_count || 0) > 0 ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-600">
+                              <Bell className="w-3 h-3" />
+                              {trip.chat_count}
+                            </span>
+                          ) : null}
                         </div>
                       <div className="flex items-center gap-2">
                         {isFull ? (
@@ -336,9 +362,10 @@ export default async function DriverDashboard() {
                         ) : null}
                         <Link
                           href={`/dashboard/driver/trip-requests/${trip.id}`}
-                          className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-semibold hover:bg-blue-100"
+                          className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-semibold hover:bg-blue-100 inline-flex items-center gap-1"
                         >
-                          Requests
+                          {(trip.chat_count || 0) > 0 ? <Bell className="w-3 h-3" /> : null}
+                          Chats
                         </Link>
                         <Link
                           href={`/dashboard/driver/trips/${trip.id}`}
