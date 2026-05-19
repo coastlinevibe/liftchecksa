@@ -2,23 +2,24 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { ArrowLeft, Upload, Copy, CheckCircle, Building, CreditCard, AlertCircle, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
+type PaymentRecord = {
+  id: string;
+  payment_reference?: string | null;
+  amount?: number | string | null;
+  plan_type?: string | null;
+};
+
 export default function PaymentUploadPage() {
-  const router = useRouter();
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
   const [paymentProof, setPaymentProof] = useState<File | null>(null);
   const [proofPreview, setProofPreview] = useState<string>('');
-  const [paymentData, setPaymentData] = useState<any>(null);
-
-  useEffect(() => {
-    loadPendingPayment();
-  }, []);
+  const [paymentData, setPaymentData] = useState<PaymentRecord | null>(null);
 
   const loadPendingPayment = async () => {
     const supabase = createClient();
@@ -39,6 +40,11 @@ export default function PaymentUploadPage() {
       setPaymentData(data);
     }
   };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadPendingPayment();
+  }, []);
 
   const handleProofChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -118,7 +124,7 @@ export default function PaymentUploadPage() {
       }
 
       setLoading(false);
-    } catch (err) {
+    } catch {
       setError('An unexpected error occurred');
       setLoading(false);
     }
@@ -133,7 +139,7 @@ export default function PaymentUploadPage() {
           </div>
           <h1 className="text-2xl font-bold text-slate-900 mb-2">Payment Proof Submitted!</h1>
           <p className="text-sm text-slate-600 mb-4">
-            We'll review your payment within 24 hours
+            We&apos;ll review your payment within 24 hours
           </p>
           <Link href="/" className="inline-block px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-sm font-semibold">
             Back to Home
@@ -196,15 +202,20 @@ export default function PaymentUploadPage() {
               <div className="flex items-start gap-3">
                 <CreditCard className="w-5 h-5 text-slate-600 mt-0.5" />
                 <div className="flex-1">
-                  <div className="text-xs text-slate-500 mb-1">Account Number</div>
-                  <div className="text-sm font-semibold text-slate-900">51129386380</div>
+                  <div className="text-xs text-slate-500 mb-1">Company Name</div>
+                  <div className="text-sm font-semibold text-slate-900">LiftCheck Safety</div>
                 </div>
               </div>
             </div>
 
             <div className="bg-slate-50 rounded-lg p-3">
-              <div className="text-xs text-slate-500 mb-1">Account Name</div>
-              <div className="text-sm font-semibold text-slate-900">LiftCheck Safety</div>
+              <div className="flex items-start gap-3">
+                <CreditCard className="w-5 h-5 text-slate-600 mt-0.5" />
+                <div className="flex-1">
+                  <div className="text-xs text-slate-500 mb-1">Account Number</div>
+                  <div className="text-sm font-semibold text-slate-900">51129386380</div>
+                </div>
+              </div>
             </div>
 
             <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
@@ -333,7 +344,7 @@ export default function PaymentUploadPage() {
             <div className="flex items-start gap-2">
               <CheckCircle className="w-4 h-4 text-emerald-500 mt-0.5" />
               <div className="text-xs text-slate-700">
-                You'll receive an email confirmation once your account is activated
+                You&apos;ll receive an email confirmation once your account is activated
               </div>
             </div>
           </div>

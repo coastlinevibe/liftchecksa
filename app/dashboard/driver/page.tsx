@@ -212,7 +212,8 @@ export default async function DriverDashboard() {
                 </div>
                 <div className="bg-white rounded-lg p-3 mb-3">
                   <div className="text-xs text-slate-600 mb-1">Banking Details</div>
-                  <div className="text-sm font-semibold text-slate-900">Tyme Bank</div>
+                  <div className="text-sm font-semibold text-slate-900">LiftCheck Safety</div>
+                  <div className="text-sm text-slate-700">Tyme Bank</div>
                   <div className="text-sm text-slate-700">Account: 51129386380</div>
                 </div>
                 <Link
