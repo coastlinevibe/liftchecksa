@@ -12,7 +12,7 @@ export default function PaymentCard({ payment }: { payment: any }) {
   const [error, setError] = useState('');
 
   const profile = payment.profiles;
-  const proofUrl = payment.proof_image || payment.proof_url;
+  const proofUrl = payment.proof_url || payment.proof_image;
   const timeAgo = new Date(payment.created_at).toLocaleDateString('en-ZA', { 
     year: 'numeric', 
     month: '2-digit', 

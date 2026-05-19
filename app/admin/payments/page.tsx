@@ -60,7 +60,8 @@ async function getPendingPayments() {
       return {
         ...payment,
         profiles: profile,
-        proof_url: signedPaymentProofUrl
+        proof_url: signedPaymentProofUrl,
+        proof_image: signedPaymentProofUrl
       };
     })
   );
