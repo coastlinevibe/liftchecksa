@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import { Search, MapPin, Calendar, Users, Star, Shield, ChevronRight, Car } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
@@ -78,6 +79,30 @@ function formatList(value: unknown) {
   return '';
 }
 
+function extractStoragePath(url: string, bucket: string) {
+  const publicMatch = url.match(/\/storage\/v1\/object\/public\/([^?]+)/);
+  if (publicMatch?.[1]) return publicMatch[1].replace(new RegExp(`^${bucket}\\/`), '');
+
+  const signedMatch = url.match(/\/storage\/v1\/object\/sign\/([^?]+)/);
+  if (signedMatch?.[1]) return signedMatch[1].replace(new RegExp(`^${bucket}\\/`), '');
+
+  return '';
+}
+
+async function resolveSignedStorageUrl(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  bucket: string,
+  url?: string | null
+) {
+  if (!url) return '';
+
+  const path = extractStoragePath(url, bucket);
+  if (!path) return url;
+
+  const { data } = await supabase.storage.from(bucket).createSignedUrl(path, 3600);
+  return data?.signedUrl || url;
+}
+
 export default async function TripsPage({
   searchParams,
 }: {
@@ -90,6 +115,7 @@ export default async function TripsPage({
   let isAuthenticated = false;
   let allTrips: TripListItem[] = [];
   let loadError = '';
+  const supabase = await createClient();
 
   try {
     const tripsResult = await getAvailableTrips();
@@ -100,7 +126,6 @@ export default async function TripsPage({
   }
 
   try {
-    const supabase = await createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -109,7 +134,23 @@ export default async function TripsPage({
     isAuthenticated = false;
   }
 
-  const filteredTrips = allTrips.filter((trip) => {
+  const resolvedTrips = await Promise.all(
+    allTrips.map(async (trip) => ({
+      ...trip,
+      profiles: trip.profiles?.profile_photo_url
+        ? {
+            ...trip.profiles,
+            profile_photo_url: await resolveSignedStorageUrl(
+              supabase,
+              'profile-photos',
+              trip.profiles.profile_photo_url
+            ),
+          }
+        : trip.profiles,
+    }))
+  );
+
+  const filteredTrips = resolvedTrips.filter((trip) => {
     const originMatch = !originQuery || trip.origin?.toLowerCase().includes(originQuery);
     const destinationMatch = !destinationQuery || trip.destination?.toLowerCase().includes(destinationQuery);
     return originMatch && destinationMatch;
@@ -245,7 +286,18 @@ export default async function TripsPage({
                 >
                   <div className="flex gap-3 mb-3">
                     <div className="w-12 h-12 bg-slate-200 rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center">
-                      <Car className="w-6 h-6 text-emerald-600" />
+                      {trip.profiles?.profile_photo_url ? (
+                        <Image
+                          src={trip.profiles.profile_photo_url}
+                          alt={`${driverName} profile photo`}
+                          width={48}
+                          height={48}
+                          className="w-full h-full object-cover object-center"
+                          unoptimized
+                        />
+                      ) : (
+                        <Car className="w-6 h-6 text-emerald-600" />
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
