@@ -1,0 +1,66 @@
+<svg width="300" height="200" viewBox="0 0 300 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background elements -->
+  <circle cx="250" cy="50" r="30" fill="#10b981" opacity="0.1"/>
+  <circle cx="50" cy="150" r="40" fill="#10b981" opacity="0.1"/>
+  
+  <!-- Road -->
+  <path d="M0 140 Q150 130 300 140" stroke="#334155" stroke-width="60" fill="none"/>
+  <path d="M20 140 L50 140 M80 140 L110 140 M140 140 L170 140 M200 140 L230 140 M260 140 L290 140" stroke="#475569" stroke-width="3" stroke-dasharray="5,10"/>
+  
+  <!-- Car -->
+  <g transform="translate(100, 90)">
+    <!-- Car body -->
+    <ellipse cx="50" cy="55" rx="45" ry="8" fill="#064e3b" opacity="0.3"/>
+    <rect x="10" y="30" width="80" height="25" rx="5" fill="#10b981"/>
+    <path d="M25 30 L30 15 L70 15 L75 30 Z" fill="#10b981"/>
+    
+    <!-- Windows -->
+    <path d="M32 18 L35 28 L50 28 L50 18 Z" fill="#d1fae5" opacity="0.7"/>
+    <path d="M52 18 L52 28 L67 28 L68 18 Z" fill="#d1fae5" opacity="0.7"/>
+    
+    <!-- Wheels -->
+    <circle cx="25" cy="55" r="8" fill="#1e293b"/>
+    <circle cx="25" cy="55" r="5" fill="#475569"/>
+    <circle cx="75" cy="55" r="8" fill="#1e293b"/>
+    <circle cx="75" cy="55" r="5" fill="#475569"/>
+    
+    <!-- Details -->
+    <rect x="15" y="35" width="8" height="4" rx="2" fill="#fbbf24" opacity="0.8"/>
+    <rect x="77" y="35" width="8" height="4" rx="2" fill="#ef4444" opacity="0.8"/>
+  </g>
+  
+  <!-- Person 1 (waiting) -->
+  <g transform="translate(30, 80)">
+    <circle cx="0" cy="0" r="8" fill="#fbbf24"/>
+    <rect x="-6" y="8" width="12" height="18" rx="3" fill="#10b981"/>
+    <rect x="-6" y="26" width="5" height="12" rx="2" fill="#059669"/>
+    <rect x="1" y="26" width="5" height="12" rx="2" fill="#059669"/>
+    <!-- Phone in hand -->
+    <rect x="8" y="10" width="6" height="10" rx="1" fill="#1e293b"/>
+    <rect x="9" y="11" width="4" height="7" rx="0.5" fill="#10b981" opacity="0.5"/>
+  </g>
+  
+  <!-- Person 2 (driver) -->
+  <g transform="translate(140, 75)">
+    <circle cx="0" cy="0" r="7" fill="#fbbf24"/>
+    <rect x="-5" y="7" width="10" height="8" rx="2" fill="#10b981"/>
+  </g>
+  
+  <!-- Checkmark badge -->
+  <g transform="translate(250, 100)">
+    <circle cx="0" cy="0" r="20" fill="#10b981"/>
+    <circle cx="0" cy="0" r="16" fill="#064e3b"/>
+    <path d="M-8 0 L-3 6 L8 -6" stroke="#10b981" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  
+  <!-- Location pins -->
+  <g transform="translate(220, 50)">
+    <path d="M0 0 C0 -8 -6 -12 -6 -18 C-6 -22 -3 -25 0 -25 C3 -25 6 -22 6 -18 C6 -12 0 -8 0 0 Z" fill="#10b981"/>
+    <circle cx="0" cy="-18" r="3" fill="#064e3b"/>
+  </g>
+  
+  <g transform="translate(70, 40)">
+    <path d="M0 0 C0 -8 -6 -12 -6 -18 C-6 -22 -3 -25 0 -25 C3 -25 6 -22 6 -18 C6 -12 0 -8 0 0 Z" fill="#10b981"/>
+    <circle cx="0" cy="-18" r="3" fill="#064e3b"/>
+  </g>
+</svg>

@@ -1,65 +1,314 @@
-import Image from "next/image";
+import Link from 'next/link';
+import Image from 'next/image';
+import { Shield, CheckCircle, Users, MessageSquare, Search, Car } from 'lucide-react';
+import GPSHeroBackground from './components/GPSHeroBackground';
+import { Button } from '@/components/ui/button';
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <div className="min-h-screen bg-slate-900">
+      {/* GPS Animated Hero */}
+      <GPSHeroBackground>
+        <div className="px-3 py-12 pb-[280px] max-w-md mx-auto">
+          {/* Hero Content */}
+          <div className="text-center">
+            <h1 className="text-4xl font-extrabold text-white mb-3 drop-shadow-2xl tracking-tight uppercase">LIFTCHECK S.A</h1>
+            <p className="text-base text-slate-900 mb-2 font-bold drop-shadow-lg bg-white/95 inline-block px-3 py-0.5 rounded-lg">
+              Check the driver before you pay.
+            </p>
+            <p className="text-sm text-slate-900 drop-shadow-lg font-bold mt-3 leading-relaxed">
+              Verified drivers and passengers<br />
+              for safer lift sharing in South Africa.
+            </p>
+          </div>
+        </div>
+      </GPSHeroBackground>
+
+      {/* Buttons - Outside animation */}
+      <div className="px-3 -mt-8 max-w-md mx-auto relative z-30">
+        <div className="flex gap-3 justify-center -translate-y-[30px]">
+          <Link href="/trips">
+            <Button
+              className="h-14 text-lg px-8 from-white to-white/95 text-emerald-600 border-2 border-emerald-600/20 bg-gradient-to-t shadow-xl shadow-white/50 ring-4 ring-offset ring-slate-900/30 transition-[filter] duration-200 hover:brightness-110 active:brightness-100 flex items-center gap-2"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+              <Search strokeWidth={2} className="size-7" />
+              Find a Lift
+            </Button>
+          </Link>
+          <Link href="/register?type=driver">
+            <Button
+              className="h-14 text-lg px-8 from-emerald-600 to-emerald-600/90 text-white border-2 border-white/10 bg-gradient-to-t shadow-xl shadow-emerald-600/70 ring-4 ring-offset ring-slate-900/30 transition-[filter] duration-200 hover:brightness-120 active:brightness-100 flex items-center gap-2"
             >
-              Learning
-            </a>{" "}
-            center.
+              <Car strokeWidth={2} className="size-7" />
+              Offer a Lift
+            </Button>
+          </Link>
+        </div>
+      </div>
+
+      <div className="px-3 py-4 max-w-md mx-auto -mt-[10px]">
+
+        {/* Safety Promise - Minimal */}
+        <div className="bg-slate-800/50 rounded-lg p-3 mb-3 border border-slate-700/50">
+          <div className="flex items-center gap-2 mb-1">
+            <Shield className="w-4 h-4 text-emerald-400" />
+            <h2 className="text-sm font-bold text-white">Safety Promise</h2>
+          </div>
+          <p className="text-xs text-slate-300 leading-tight">
+            Check the driver, vehicle and trip before you pay or travel.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        {/* Features - Ultra Compact 2x2 */}
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          <div className="bg-slate-800/50 rounded-lg p-2.5 border border-slate-700/50">
+            <CheckCircle className="w-6 h-6 text-emerald-400 mb-1.5" />
+            <h3 className="text-xs font-semibold text-white mb-0.5">Verified Drivers</h3>
+            <p className="text-[10px] text-slate-400 leading-tight">
+              ID, licence and vehicle checked
+            </p>
+          </div>
+
+          <div className="bg-slate-800/50 rounded-lg p-2.5 border border-slate-700/50">
+            <Shield className="w-6 h-6 text-emerald-400 mb-1.5" />
+            <h3 className="text-xs font-semibold text-white mb-0.5">Match Check</h3>
+            <p className="text-[10px] text-slate-400 leading-tight">
+              Confirm driver, vehicle and plate
+            </p>
+          </div>
+
+          <div className="bg-slate-800/50 rounded-lg p-2.5 border border-slate-700/50">
+            <MessageSquare className="w-6 h-6 text-emerald-400 mb-1.5" />
+            <h3 className="text-xs font-semibold text-white mb-0.5">In-App Chat</h3>
+            <p className="text-[10px] text-slate-400 leading-tight">
+              Safe messaging with images
+            </p>
+          </div>
+
+          <div className="bg-slate-800/50 rounded-lg p-2.5 border border-slate-700/50">
+            <Users className="w-6 h-6 text-emerald-400 mb-1.5" />
+            <h3 className="text-xs font-semibold text-white mb-0.5">Bluetooth Verify</h3>
+            <p className="text-[10px] text-slate-400 leading-tight">
+              Offline verification, no data
+            </p>
+          </div>
         </div>
-      </main>
+
+        {/* How It Works - Minimal */}
+        <div className="bg-slate-800/50 rounded-lg p-3 mb-3 border border-slate-700/50">
+          <h2 className="text-sm font-bold text-white text-center mb-2.5">How It Works</h2>
+          <div className="space-y-2">
+            <div className="flex gap-2.5 items-start">
+              <div className="bg-emerald-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
+                1
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xs font-semibold text-white mb-0.5">Driver Posts Lift</h3>
+                <p className="text-[10px] text-slate-400 leading-tight">
+                  Verified driver shares link to Facebook/WhatsApp groups
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-2.5 items-start">
+              <div className="bg-emerald-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
+                2
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xs font-semibold text-white mb-0.5">Check Before You Pay</h3>
+                <p className="text-[10px] text-slate-400 leading-tight">
+                  View driver ID card, vehicle details and ratings
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-2.5 items-start">
+              <div className="bg-emerald-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
+                3
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xs font-semibold text-white mb-0.5">Confirm Before You Ride</h3>
+                <p className="text-[10px] text-slate-400 leading-tight">
+                  Match driver face, vehicle and plate with Bluetooth Verify
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Pricing - Ultra Compact */}
+        <div id="pricing" className="mb-4 scroll-mt-20">
+          <h2 className="text-sm font-bold text-white text-center mb-2.5">Simple Pricing</h2>
+          <div className="space-y-2">
+            <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+              <div className="flex justify-between items-center mb-1.5">
+                <h3 className="text-xs font-semibold text-white">Member Basic</h3>
+                <div className="text-base font-bold text-emerald-400">R36/yr</div>
+              </div>
+              <p className="text-[10px] text-slate-400 mb-2 leading-tight">
+                Verified profile • Bluetooth Verify • Driver checks • Chat • Ratings
+              </p>
+              <Link 
+                href="/register?type=member&plan=basic"
+                className="block bg-emerald-500 hover:bg-emerald-600 text-white text-center py-2 rounded-lg text-xs font-semibold"
+              >
+                Get Started
+              </Link>
+            </div>
+
+            <div className="bg-slate-800/50 rounded-lg p-3 border-2 border-emerald-500 relative">
+              <div className="absolute -top-1.5 right-3 bg-emerald-500 text-white px-2 py-0.5 rounded-full text-[10px] font-semibold">
+                Popular
+              </div>
+              <div className="flex justify-between items-center mb-1.5">
+                <h3 className="text-xs font-semibold text-white">Member Plus</h3>
+                <div className="text-base font-bold text-emerald-400">R96/yr</div>
+              </div>
+              <p className="text-[10px] text-slate-400 mb-2 leading-tight">
+                Everything in Basic • Trip Share • Route alerts • Trusted drivers
+              </p>
+              <Link 
+                href="/register?type=member&plan=plus"
+                className="block bg-emerald-500 hover:bg-emerald-600 text-white text-center py-2 rounded-lg text-xs font-semibold"
+              >
+                Get Started
+              </Link>
+            </div>
+
+            <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+              <div className="flex justify-between items-center mb-1.5">
+                <h3 className="text-xs font-semibold text-white">Verified Provider</h3>
+                <div className="text-base font-bold text-emerald-400">R300/yr</div>
+              </div>
+              <p className="text-[10px] text-slate-400 mb-2 leading-tight">
+                Verified badge • Create trips • Share links • Build reputation
+              </p>
+              <Link 
+                href="/register?type=driver"
+                className="block bg-white hover:bg-slate-100 text-slate-900 text-center py-2 rounded-lg text-xs font-semibold"
+              >
+                Become a Provider
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* CTA - Minimal */}
+        <div className="text-center mb-4">
+          <h2 className="text-sm font-bold text-white mb-1">Ready to travel safer?</h2>
+          <p className="text-xs text-slate-300 mb-3">
+            Join verified drivers and members across South Africa
+          </p>
+          <Link 
+            href="/register"
+            className="inline-block bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-2.5 rounded-lg text-xs font-semibold"
+          >
+            Get Started Now
+          </Link>
+        </div>
+
+        {/* FAQ Section */}
+        <div id="about" className="mb-4 scroll-mt-20">
+          <h2 className="text-sm font-bold text-white text-center mb-3">Frequently Asked Questions</h2>
+          
+          <div className="space-y-2">
+            {/* FAQ Item 1 */}
+            <details className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden group">
+              <summary className="px-3 py-2.5 cursor-pointer list-none flex items-center justify-between text-xs font-semibold text-white hover:bg-slate-800/70">
+                <span>What is LiftCheck S.A?</span>
+                <span className="text-emerald-400 group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <div className="px-3 pb-3 pt-1 text-[10px] text-slate-300 leading-relaxed">
+                LiftCheck S.A is a safety verification platform for lift clubs in South Africa. We help you check driver credentials, vehicle details, and ratings before you pay or travel. We work alongside your existing Facebook and WhatsApp lift groups.
+              </div>
+            </details>
+
+            {/* FAQ Item 2 */}
+            <details className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden group">
+              <summary className="px-3 py-2.5 cursor-pointer list-none flex items-center justify-between text-xs font-semibold text-white hover:bg-slate-800/70">
+                <span>How does Bluetooth Verification work?</span>
+                <span className="text-emerald-400 group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <div className="px-3 pb-3 pt-1 text-[10px] text-slate-300 leading-relaxed">
+                Bluetooth Verification lets you confirm the driver's identity when you meet in person, without using mobile data. Both you and the driver tap "Verify" in the app, and your phones exchange encrypted tokens via Bluetooth to confirm the match.
+              </div>
+            </details>
+
+            {/* FAQ Item 3 */}
+            <details className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden group">
+              <summary className="px-3 py-2.5 cursor-pointer list-none flex items-center justify-between text-xs font-semibold text-white hover:bg-slate-800/70">
+                <span>Do I need to pay upfront?</span>
+                <span className="text-emerald-400 group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <div className="px-3 pb-3 pt-1 text-[10px] text-slate-300 leading-relaxed">
+                No! You can browse all available trips for free. Only sign up when you're ready to request a seat. Payment to drivers happens according to your agreement with them - LiftCheck doesn't handle trip payments, only annual membership fees.
+              </div>
+            </details>
+
+            {/* FAQ Item 4 */}
+            <details className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden group">
+              <summary className="px-3 py-2.5 cursor-pointer list-none flex items-center justify-between text-xs font-semibold text-white hover:bg-slate-800/70">
+                <span>What's the difference between Member Basic and Plus?</span>
+                <span className="text-emerald-400 group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <div className="px-3 pb-3 pt-1 text-[10px] text-slate-300 leading-relaxed">
+                Member Basic (R36/yr) gives you verified profile, driver checks, chat, and ratings. Member Plus (R96/yr) adds Trip Share (send live location to family), route alerts, and a trusted drivers list for frequent travelers.
+              </div>
+            </details>
+
+            {/* FAQ Item 5 */}
+            <details className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden group">
+              <summary className="px-3 py-2.5 cursor-pointer list-none flex items-center justify-between text-xs font-semibold text-white hover:bg-slate-800/70">
+                <span>How do drivers get verified?</span>
+                <span className="text-emerald-400 group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <div className="px-3 pb-3 pt-1 text-[10px] text-slate-300 leading-relaxed">
+                Drivers upload their ID, driver's license, and vehicle registration. Our admin team manually reviews each document. Once approved, they get a verified badge and can create trips. This process typically takes 24-48 hours.
+              </div>
+            </details>
+
+            {/* FAQ Item 6 */}
+            <details className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden group">
+              <summary className="px-3 py-2.5 cursor-pointer list-none flex items-center justify-between text-xs font-semibold text-white hover:bg-slate-800/70">
+                <span>Can I use this with my Facebook lift group?</span>
+                <span className="text-emerald-400 group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <div className="px-3 pb-3 pt-1 text-[10px] text-slate-300 leading-relaxed">
+                Yes! LiftCheck is designed to work alongside your existing groups. Drivers create trips on LiftCheck, then share the trip link to Facebook or WhatsApp. Members can check the driver's credentials before committing.
+              </div>
+            </details>
+
+            {/* FAQ Item 7 */}
+            <details className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden group">
+              <summary className="px-3 py-2.5 cursor-pointer list-none flex items-center justify-between text-xs font-semibold text-white hover:bg-slate-800/70">
+                <span>What if I have a problem with a driver?</span>
+                <span className="text-emerald-400 group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <div className="px-3 pb-3 pt-1 text-[10px] text-slate-300 leading-relaxed">
+                You can report issues directly in the app. Our admin team reviews all reports within 24 hours. Serious violations result in account suspension. You can also rate drivers after each trip to help other members.
+              </div>
+            </details>
+
+            {/* FAQ Item 8 */}
+            <details className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden group">
+              <summary className="px-3 py-2.5 cursor-pointer list-none flex items-center justify-between text-xs font-semibold text-white hover:bg-slate-800/70">
+                <span>Is my personal information safe?</span>
+                <span className="text-emerald-400 group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <div className="px-3 pb-3 pt-1 text-[10px] text-slate-300 leading-relaxed">
+                Yes. We use bank-level encryption for all data. Your phone number and full name are only visible to drivers you've requested trips with. License plate numbers are hidden until you sign up and request a specific trip.
+              </div>
+            </details>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <footer className="border-t border-slate-700/50 py-3">
+        <p className="text-center text-slate-500 text-[10px]">
+          &copy; 2026 LiftCheck S.A. Verified lift club safety for South Africa.
+        </p>
+      </footer>
     </div>
   );
 }

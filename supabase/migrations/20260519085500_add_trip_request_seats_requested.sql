@@ -1,0 +1,2 @@
+ALTER TABLE trip_requests
+ADD COLUMN IF NOT EXISTS seats_requested INTEGER NOT NULL DEFAULT 1;
