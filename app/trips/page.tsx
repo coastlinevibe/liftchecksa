@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Search, MapPin, Calendar, Users, Star, Shield, ChevronRight, Car } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { getAvailableTrips } from '@/lib/trips/actions';
+import { resolvePublicStorageUrl } from '@/lib/supabase/storage';
 
 type SearchParams = {
   origin?: string | string[];
@@ -78,30 +79,6 @@ function formatList(value: unknown) {
   return '';
 }
 
-function extractStoragePath(url: string, bucket: string) {
-  const publicMatch = url.match(/\/storage\/v1\/object\/public\/([^?]+)/);
-  if (publicMatch?.[1]) return publicMatch[1].replace(new RegExp(`^${bucket}\\/`), '');
-
-  const signedMatch = url.match(/\/storage\/v1\/object\/sign\/([^?]+)/);
-  if (signedMatch?.[1]) return signedMatch[1].replace(new RegExp(`^${bucket}\\/`), '');
-
-  return '';
-}
-
-async function resolveSignedStorageUrl(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  bucket: string,
-  url?: string | null
-) {
-  if (!url) return '';
-
-  const path = extractStoragePath(url, bucket);
-  if (!path) return url;
-
-  const { data } = await supabase.storage.from(bucket).createSignedUrl(path, 3600);
-  return data?.signedUrl || url;
-}
-
 export default async function TripsPage({
   searchParams,
 }: {
@@ -139,7 +116,7 @@ export default async function TripsPage({
       profiles: trip.profiles?.profile_photo_url
         ? {
             ...trip.profiles,
-            profile_photo_url: await resolveSignedStorageUrl(
+            profile_photo_url: await resolvePublicStorageUrl(
               supabase,
               'profile-photos',
               trip.profiles.profile_photo_url
