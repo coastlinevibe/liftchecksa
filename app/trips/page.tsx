@@ -45,6 +45,9 @@ function firstValue(value?: string | string[]) {
 
 function formatTripDate(dateValue: string) {
   const date = new Date(`${dateValue}T12:00:00`);
+  if (Number.isNaN(date.getTime())) {
+    return dateValue || 'TBA';
+  }
   return new Intl.DateTimeFormat('en-ZA', {
     weekday: 'short',
     day: 'numeric',
@@ -53,6 +56,7 @@ function formatTripDate(dateValue: string) {
 }
 
 function formatTripTime(timeValue: string) {
+  if (!timeValue) return 'TBA';
   return timeValue ? timeValue.slice(0, 5) : '';
 }
 
@@ -83,11 +87,20 @@ export default async function TripsPage({
   const originQuery = firstValue(resolvedSearchParams?.origin).trim().toLowerCase();
   const destinationQuery = firstValue(resolvedSearchParams?.destination).trim().toLowerCase();
 
-  const [supabase, tripsResult] = await Promise.all([createClient(), getAvailableTrips()]);
-  const { data: { user } } = await supabase.auth.getUser();
-  const isAuthenticated = !!user;
+  let isAuthenticated = false;
+  let allTrips: TripListItem[] = [];
+  let loadError = '';
 
-  const allTrips = (tripsResult as { trips?: TripListItem[]; error?: string }).trips || [];
+  try {
+    const [supabase, tripsResult] = await Promise.all([createClient(), getAvailableTrips()]);
+    const { data: { user } } = await supabase.auth.getUser();
+    isAuthenticated = !!user;
+    allTrips = (tripsResult as { trips?: TripListItem[]; error?: string }).trips || [];
+    loadError = (tripsResult as { trips?: TripListItem[]; error?: string }).error || '';
+  } catch (error) {
+    loadError = error instanceof Error ? error.message : 'Trips are temporarily unavailable.';
+  }
+
   const filteredTrips = allTrips.filter((trip) => {
     const originMatch = !originQuery || trip.origin?.toLowerCase().includes(originQuery);
     const destinationMatch = !destinationQuery || trip.destination?.toLowerCase().includes(destinationQuery);
@@ -154,6 +167,12 @@ export default async function TripsPage({
       </div>
 
       <div className="px-4 py-4 max-w-md mx-auto">
+        {loadError ? (
+          <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+            Trips are loading with a fallback view right now. Some live data may be missing.
+          </div>
+        ) : null}
+
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold text-slate-700">Popular Routes</h2>
           <span className="text-[11px] text-slate-500">{allTrips.length} live trips</span>
