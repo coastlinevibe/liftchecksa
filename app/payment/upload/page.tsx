@@ -88,13 +88,16 @@ export default function PaymentUploadPage() {
 
       const ext = paymentProof.name.split('.').pop() || 'png';
       const safeExt = ext.toLowerCase();
-      const fileName = `${user.id}/${paymentData.payment_reference}-${Date.now()}.${safeExt}`;
+      const uniqueSuffix = typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const fileName = `${user.id}/${paymentData.payment_reference}-${uniqueSuffix}.${safeExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from('payment-proofs')
         .upload(fileName, paymentProof, {
           contentType: paymentProof.type || 'application/octet-stream',
-          upsert: true,
+          upsert: false,
         });
 
       if (uploadError) {
