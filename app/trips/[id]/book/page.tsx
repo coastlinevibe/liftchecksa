@@ -68,7 +68,7 @@ export default async function BookSeatPage({
       redirect(`/trips/${id}?booking_error=${encodeURIComponent(bookingError)}`);
     }
 
-    redirect(`/trips/${id}?booked=1`);
+    redirect(`/trips/${id}/booking-confirmed?request=${result.request.id}`);
   }
 
   async function sendChatMessageAction(formData: FormData) {

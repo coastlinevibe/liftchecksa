@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { ArrowLeft, Calendar, CheckCircle, Clock, MapPin, Send, Shield, Users } from 'lucide-react';
+import { ArrowLeft, Calendar, CheckCircle, Clock, MapPin, Save, Send, Shield, Users } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 
 type TripRequestStatus = 'pending' | 'accepted' | 'rejected' | 'cancelled';
@@ -37,6 +37,7 @@ type ChatConversation = {
   participantId: string;
   passenger?: PassengerProfile;
   messages: ChatMessage[];
+  agreementNotes?: string | null;
 };
 
 type DriverTrip = {
@@ -48,6 +49,11 @@ type DriverTrip = {
   seats_total: number;
   seats_available: number;
   cost_share_amount: number | string;
+};
+
+type AgreementNote = {
+  passenger_id: string;
+  notes?: string | null;
 };
 
 function formatDate(dateString: string) {
@@ -155,6 +161,90 @@ async function sendDriverChatMessage(formData: FormData) {
   redirect(`/dashboard/driver/trip-requests/${tripId}`);
 }
 
+async function saveAgreementNotes(formData: FormData) {
+  'use server';
+
+  const tripId = String(formData.get('tripId') || '');
+  const passengerId = String(formData.get('passengerId') || '');
+  const notes = String(formData.get('notes') || '').trim();
+
+  if (!tripId || !passengerId) {
+    redirect(`/dashboard/driver/trip-requests/${tripId || ''}`);
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect('/login');
+  }
+
+  const [{ data: driverProfile }, { data: driverMemberProfile }] = await Promise.all([
+    supabase
+      .from('driver_profiles')
+      .select('id')
+      .eq('user_id', user.id)
+      .single(),
+    supabase
+      .from('profiles')
+      .select('id')
+      .eq('user_id', user.id)
+      .single(),
+  ]);
+
+  if (!driverProfile || !driverMemberProfile) {
+    redirect('/dashboard/driver');
+  }
+
+  const { data: trip } = await supabase
+    .from('trips')
+    .select('id')
+    .eq('id', tripId)
+    .eq('driver_id', driverProfile.id)
+    .single();
+
+  if (!trip) {
+    redirect('/dashboard/driver');
+  }
+
+  const [{ data: existingChat }, { data: existingRequest }] = await Promise.all([
+    supabase
+      .from('trip_chats')
+      .select('id')
+      .eq('trip_id', tripId)
+      .or(`sender_id.eq.${passengerId},receiver_id.eq.${passengerId}`)
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('trip_requests')
+      .select('id')
+      .eq('trip_id', tripId)
+      .eq('passenger_id', passengerId)
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  if (!existingChat && !existingRequest) {
+    redirect(`/dashboard/driver/trip-requests/${tripId}`);
+  }
+
+  await supabase.from('trip_agreements').upsert(
+    {
+      trip_id: tripId,
+      passenger_id: passengerId,
+      notes,
+      updated_by: driverMemberProfile.id,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'trip_id,passenger_id' }
+  );
+
+  revalidatePath(`/dashboard/driver/trip-requests/${tripId}`);
+  redirect(`/dashboard/driver/trip-requests/${tripId}`);
+}
+
 async function getDriverTripRequests(tripId: string) {
   const supabase = await createClient();
   const {
@@ -204,6 +294,11 @@ async function getDriverTripRequests(tripId: string) {
     .eq('trip_id', tripId)
     .order('created_at', { ascending: true });
 
+  const { data: agreementNotes } = await supabase
+    .from('trip_agreements')
+    .select('passenger_id, notes')
+    .eq('trip_id', tripId);
+
   const chatParticipantIds = (chatMessages || [])
     .flatMap((message) => [message.sender_id, message.receiver_id])
     .filter((profileId) => profileId && profileId !== driverMemberProfile?.id);
@@ -221,6 +316,9 @@ async function getDriverTripRequests(tripId: string) {
     : { data: [] };
 
   const passengersById = new Map((passengers || []).map((passenger) => [passenger.id, passenger]));
+  const agreementNotesByPassengerId = new Map(
+    ((agreementNotes || []) as AgreementNote[]).map((agreement) => [agreement.passenger_id, agreement.notes || ''])
+  );
 
   return {
     trip: trip as DriverTrip,
@@ -228,6 +326,7 @@ async function getDriverTripRequests(tripId: string) {
     chatMessages: (chatMessages || []) as ChatMessage[],
     driverProfileId: driverMemberProfile?.id || '',
     passengersById,
+    agreementNotesByPassengerId,
   };
 }
 
@@ -237,7 +336,7 @@ export default async function TripRequestsPage({
   params: Promise<{ tripId: string }>;
 }) {
   const { tripId } = await params;
-  const { trip, requests, chatMessages, driverProfileId, passengersById } = await getDriverTripRequests(tripId);
+  const { trip, requests, chatMessages, driverProfileId, passengersById, agreementNotesByPassengerId } = await getDriverTripRequests(tripId);
   const confirmedBookings = requests.filter((request) => request.status === 'accepted');
   const seatsBooked = Math.max((trip.seats_total || 0) - (trip.seats_available || 0), 0);
   const conversationsByPassenger = new Map<string, ChatMessage[]>();
@@ -257,6 +356,7 @@ export default async function TripRequestsPage({
       participantId,
       passenger: passengersById.get(participantId),
       messages,
+      agreementNotes: agreementNotesByPassengerId.get(participantId) || '',
     })
   );
 
@@ -414,6 +514,25 @@ function ChatCard({
         <button className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-500 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-600 hover:bg-emerald-50">
           <Send className="w-4 h-4" />
           Send reply
+        </button>
+      </form>
+
+      <form action={saveAgreementNotes} className="mt-3 space-y-2 border-t border-slate-100 pt-3">
+        <input type="hidden" name="tripId" value={tripId} />
+        <input type="hidden" name="passengerId" value={conversation.participantId} />
+        <label className="block text-sm font-semibold text-slate-900">
+          Agreement notes
+        </label>
+        <textarea
+          name="notes"
+          rows={3}
+          defaultValue={conversation.agreementNotes || ''}
+          placeholder="Add any agreed changes for this passenger..."
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        />
+        <button className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600">
+          <Save className="w-4 h-4" />
+          Save agreement notes
         </button>
       </form>
     </div>
