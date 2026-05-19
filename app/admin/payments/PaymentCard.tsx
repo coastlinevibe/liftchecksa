@@ -27,7 +27,11 @@ export default function PaymentCard({ payment }: { payment: PaymentCardPayment }
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const profile = payment.profiles;
+  const profile = payment.profiles ?? {
+    first_name: 'Unknown',
+    surname: 'User',
+    phone: '',
+  };
   const hasProof = Boolean(payment.proof_url || payment.proof_image);
   const proofUrl = `/admin/payments/${payment.id}/proof`;
   const timeAgo = new Date(payment.created_at).toLocaleDateString('en-ZA', { 
