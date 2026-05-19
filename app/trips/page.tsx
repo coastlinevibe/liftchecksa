@@ -92,13 +92,21 @@ export default async function TripsPage({
   let loadError = '';
 
   try {
-    const [supabase, tripsResult] = await Promise.all([createClient(), getAvailableTrips()]);
-    const { data: { user } } = await supabase.auth.getUser();
-    isAuthenticated = !!user;
+    const tripsResult = await getAvailableTrips();
     allTrips = (tripsResult as { trips?: TripListItem[]; error?: string }).trips || [];
     loadError = (tripsResult as { trips?: TripListItem[]; error?: string }).error || '';
   } catch (error) {
     loadError = error instanceof Error ? error.message : 'Trips are temporarily unavailable.';
+  }
+
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    isAuthenticated = !!user;
+  } catch {
+    isAuthenticated = false;
   }
 
   const filteredTrips = allTrips.filter((trip) => {
