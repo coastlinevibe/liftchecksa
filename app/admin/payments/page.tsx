@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
-import { resolveSignedStorageUrl } from '@/lib/supabase/storage';
 import PaymentCard from './PaymentCard';
 
 type PendingPayment = {
@@ -42,18 +41,9 @@ async function getPendingPayments() {
         .eq('user_id', payment.user_id)
         .single();
 
-      const proofSource = payment.proof_url || payment.proof_image;
-      const signedPaymentProofUrl = await resolveSignedStorageUrl(
-        supabase,
-        'payment-proofs',
-        proofSource
-      );
-
       return {
         ...payment,
-        profiles: profile,
-        proof_url: signedPaymentProofUrl,
-        proof_image: signedPaymentProofUrl
+        profiles: profile
       };
     })
   );

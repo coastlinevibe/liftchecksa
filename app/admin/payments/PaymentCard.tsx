@@ -5,14 +5,31 @@ import { useRouter } from 'next/navigation';
 import { CheckCircle, XCircle, Eye, AlertCircle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
-export default function PaymentCard({ payment }: { payment: any }) {
+type PaymentCardPayment = {
+  id: string;
+  user_id: string;
+  plan_type: string;
+  amount: number | string;
+  payment_reference: string;
+  proof_url?: string | null;
+  proof_image?: string | null;
+  created_at: string;
+  profiles?: {
+    first_name?: string | null;
+    surname?: string | null;
+    phone?: string | null;
+  } | null;
+};
+
+export default function PaymentCard({ payment }: { payment: PaymentCardPayment }) {
   const router = useRouter();
   const [showProof, setShowProof] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const profile = payment.profiles;
-  const proofUrl = payment.proof_url || payment.proof_image;
+  const hasProof = Boolean(payment.proof_url || payment.proof_image);
+  const proofUrl = `/admin/payments/${payment.id}/proof`;
   const timeAgo = new Date(payment.created_at).toLocaleDateString('en-ZA', { 
     year: 'numeric', 
     month: '2-digit', 
@@ -28,7 +45,7 @@ export default function PaymentCard({ payment }: { payment: any }) {
 
       // Calculate expiry date based on plan
       const now = new Date();
-      let expiresAt = new Date(now);
+      const expiresAt = new Date(now);
       
       if (payment.plan_type.includes('monthly')) {
         expiresAt.setMonth(expiresAt.getMonth() + 1);
@@ -63,8 +80,8 @@ export default function PaymentCard({ payment }: { payment: any }) {
 
       alert('Payment approved!');
       router.refresh();
-    } catch (err: any) {
-      setError(err.message || 'An error occurred');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
     }
@@ -88,8 +105,8 @@ export default function PaymentCard({ payment }: { payment: any }) {
 
       alert('Payment rejected');
       router.refresh();
-    } catch (err: any) {
-      setError(err.message || 'An error occurred');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
     }
@@ -137,7 +154,7 @@ export default function PaymentCard({ payment }: { payment: any }) {
       </div>
 
       {/* Proof of Payment */}
-      {proofUrl && (
+      {hasProof && (
         <div className="mb-3">
           <button
             onClick={() => setShowProof(!showProof)}
@@ -147,7 +164,7 @@ export default function PaymentCard({ payment }: { payment: any }) {
             {showProof ? 'Hide' : 'View'} Proof of Payment
           </button>
           
-          {showProof && proofUrl && (
+          {showProof && (
             <div className="bg-slate-100 rounded-lg p-4">
               <img 
                 src={proofUrl} 
