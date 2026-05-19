@@ -1,4 +1,3 @@
-import Image from 'next/image';
 import Link from 'next/link';
 import { Search, MapPin, Calendar, Users, Star, Shield, ChevronRight, Car } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
@@ -285,19 +284,17 @@ export default async function TripsPage({
                   className="block bg-white border border-slate-200 rounded-xl p-3 hover:border-emerald-500 transition-all"
                 >
                   <div className="flex gap-3 mb-3">
-                    <div className="w-12 h-12 bg-slate-200 rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center">
-                      {trip.profiles?.profile_photo_url ? (
-                        <Image
-                          src={trip.profiles.profile_photo_url}
-                          alt={`${driverName} profile photo`}
-                          width={48}
-                          height={48}
-                          className="w-full h-full object-cover object-center"
-                          unoptimized
-                        />
-                      ) : (
+                    <div
+                      className="w-12 h-12 bg-slate-200 rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center bg-center bg-cover"
+                      style={
+                        trip.profiles?.profile_photo_url
+                          ? { backgroundImage: `url(${trip.profiles.profile_photo_url})` }
+                          : undefined
+                      }
+                    >
+                      {!trip.profiles?.profile_photo_url ? (
                         <Car className="w-6 h-6 text-emerald-600" />
-                      )}
+                      ) : null}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
