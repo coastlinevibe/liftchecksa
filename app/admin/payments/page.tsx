@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
+import { resolveSignedStorageUrl } from '@/lib/supabase/storage';
 import PaymentCard from './PaymentCard';
 
 type PendingPayment = {
@@ -19,10 +20,6 @@ type PendingPayment = {
     email?: string | null;
   } | null;
 };
-
-function extractPaymentProofPath(proofSource: string) {
-  return proofSource.replace(/^\/?(payment-proofs\/)?/, '');
-}
 
 async function getPendingPayments() {
   const supabase = await createClient();
@@ -46,16 +43,11 @@ async function getPendingPayments() {
         .single();
 
       const proofSource = payment.proof_url || payment.proof_image;
-      let signedPaymentProofUrl = proofSource;
-      if (proofSource) {
-        const path = extractPaymentProofPath(proofSource);
-        if (path) {
-          const { data: signedData } = await supabase.storage
-            .from('payment-proofs')
-            .createSignedUrl(path, 3600);
-          if (signedData) signedPaymentProofUrl = signedData.signedUrl;
-        }
-      }
+      const signedPaymentProofUrl = await resolveSignedStorageUrl(
+        supabase,
+        'payment-proofs',
+        proofSource
+      );
 
       return {
         ...payment,

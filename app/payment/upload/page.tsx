@@ -106,11 +106,7 @@ export default function PaymentUploadPage() {
         return;
       }
 
-      const { data: publicData } = supabase.storage
-        .from('payment-proofs')
-        .getPublicUrl(fileName);
-
-      const proofUrl = publicData.publicUrl;
+      const proofUrl = fileName;
 
       const { error: updateError } = await supabase
         .from('payments')

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeft, User, FileText, Camera, AlertCircle, Car } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
+import { resolveSignedStorageUrl } from '@/lib/supabase/storage';
 import { notFound } from 'next/navigation';
 import ApproveRejectButtons from './ApproveRejectButtons';
 import VehicleApproveButtons from './VehicleApproveButtons';
@@ -68,17 +69,11 @@ async function getVerificationData(id: string) {
 
   // Get signed URL for payment proof if exists
   const proofSource = payment?.proof_url || payment?.proof_image;
-  let signedPaymentProofUrl = proofSource;
-  if (proofSource) {
-    // Handle both formats: "payment-proofs/path" and "/payment-proofs/path"
-    const path = proofSource.replace(/^\/?(payment-proofs\/)?/, '');
-    if (path) {
-      const { data: signedData } = await supabase.storage
-        .from('payment-proofs')
-        .createSignedUrl(path, 3600);
-      if (signedData) signedPaymentProofUrl = signedData.signedUrl;
-    }
-  }
+  const signedPaymentProofUrl = await resolveSignedStorageUrl(
+    supabase,
+    'payment-proofs',
+    proofSource
+  );
 
   // Get vehicles
   const { data: vehicles } = await supabase

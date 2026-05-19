@@ -1,13 +1,21 @@
 import { createClient as createSupabaseClient } from '@/lib/supabase/server';
 
 function extractStoragePath(url: string, bucket: string) {
-  const publicMatch = url.match(/\/storage\/v1\/object\/public\/([^?]+)/);
-  if (publicMatch?.[1]) return publicMatch[1].replace(new RegExp(`^${bucket}\\/`), '');
+  let normalized = url;
 
-  const signedMatch = url.match(/\/storage\/v1\/object\/sign\/([^?]+)/);
-  if (signedMatch?.[1]) return signedMatch[1].replace(new RegExp(`^${bucket}\\/`), '');
+  try {
+    if (/^https?:\/\//i.test(url)) {
+      normalized = new URL(url).pathname;
+    }
+  } catch {
+    normalized = url;
+  }
 
-  return '';
+  normalized = normalized.replace(/^\/+/, '');
+  normalized = normalized.replace(new RegExp(`^storage/v1/object/(?:public|sign)/${bucket}/`), '');
+  normalized = normalized.replace(new RegExp(`^${bucket}/`), '');
+
+  return normalized;
 }
 
 export async function resolveSignedStorageUrl(
