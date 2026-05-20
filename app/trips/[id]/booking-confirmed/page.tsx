@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { ArrowLeft, Calendar, Car, CheckCircle, Clock, MapPin, MessageSquare, Users } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { getTripById } from '@/lib/trips/actions';
+import TripBookingPaymentStep from '@/components/TripBookingPaymentStep';
 
 function formatTripDate(dateValue: string) {
   const date = new Date(`${dateValue}T12:00:00`);
@@ -54,7 +55,7 @@ export default async function BookingConfirmedPage({
 
   const requestQuery = supabase
     .from('trip_requests')
-    .select('id, seats_requested, pickup_point, dropoff_point, requested_at, accepted_at')
+    .select('id, seats_requested, pickup_point, dropoff_point, requested_at, accepted_at, payment_method, payment_status, payment_proof_url, payment_submitted_at')
     .eq('trip_id', id)
     .eq('passenger_id', profile.id)
     .eq('status', 'accepted');
@@ -78,6 +79,9 @@ export default async function BookingConfirmedPage({
   const vehicleLabel = trip.vehicles
     ? `${trip.vehicles.make} ${trip.vehicles.model}${trip.vehicles.year ? ` ${trip.vehicles.year}` : ''}`.trim()
     : 'Vehicle not listed';
+  const paymentReady =
+    booking.payment_method === 'coa' ||
+    (booking.payment_method === 'pop' && booking.payment_status === 'submitted' && !!booking.payment_proof_url);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -174,9 +178,22 @@ export default async function BookingConfirmedPage({
           </div>
         ) : null}
 
+        <TripBookingPaymentStep
+          bookingId={booking.id}
+          tripId={id}
+          currentPaymentMethod={booking.payment_method}
+          currentPaymentStatus={booking.payment_status}
+          currentPaymentProofUrl={booking.payment_proof_url}
+        />
+
         <Link
-          href={`/match-check/${id}`}
-          className="block w-full rounded-lg bg-emerald-500 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-emerald-600"
+          href={paymentReady ? `/match-check/${id}` : '#'}
+          aria-disabled={!paymentReady}
+          className={`block w-full rounded-lg px-4 py-3 text-center text-sm font-semibold ${
+            paymentReady
+              ? 'bg-emerald-500 text-white hover:bg-emerald-600'
+              : 'cursor-not-allowed bg-slate-200 text-slate-500 pointer-events-none'
+          }`}
         >
           Open Match Check
         </Link>

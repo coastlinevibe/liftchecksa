@@ -437,49 +437,22 @@ export async function requestTripSeat(
     return { error: 'Active membership required' };
   }
 
-  const { data: request, error } = await supabase
-    .from('trip_requests')
-    .insert({
-      trip_id: tripId,
-      passenger_id: profile.id,
-      status: 'accepted',
-      seats_requested: seatsRequested,
-      message,
-      pickup_point: pickupPoint,
-      dropoff_point: dropoffPoint,
-      accepted_at: new Date().toISOString(),
-    })
-    .select()
-    .single();
+  const { data: request, error } = await supabase.rpc('reserve_trip_seat', {
+    p_trip_id: tripId,
+    p_message: message || null,
+    p_pickup_point: pickupPoint || null,
+    p_dropoff_point: dropoffPoint || null,
+    p_seats_requested: seatsRequested,
+  });
 
   if (error) {
-    if (error.code === '23505') {
-      const { data: existingRequest, error: updateError } = await supabase
-        .from('trip_requests')
-        .update({
-          status: 'accepted',
-          seats_requested: seatsRequested,
-          message,
-          pickup_point: pickupPoint,
-          dropoff_point: dropoffPoint,
-          accepted_at: new Date().toISOString(),
-        })
-        .eq('trip_id', tripId)
-        .eq('passenger_id', profile.id)
-        .select()
-        .single();
-
-      if (updateError) {
-        return { error: updateError.message };
-      }
-
-      revalidatePath(`/trips/${tripId}`);
-      return { success: true, request: existingRequest };
-    }
     return { error: error.message };
   }
 
   revalidatePath(`/trips/${tripId}`);
+  revalidatePath('/dashboard/driver');
+  revalidatePath(`/dashboard/driver/trip-requests/${tripId}`);
+  revalidatePath(`/dashboard/driver/trips/${tripId}`);
 
   return { success: true, request };
 }

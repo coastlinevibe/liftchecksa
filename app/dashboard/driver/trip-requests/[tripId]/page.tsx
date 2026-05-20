@@ -16,6 +16,9 @@ type TripRequest = {
   pickup_point?: string | null;
   dropoff_point?: string | null;
   requested_at?: string | null;
+  payment_method?: string | null;
+  payment_status?: string | null;
+  payment_proof_url?: string | null;
 };
 
 type PassengerProfile = {
@@ -285,7 +288,7 @@ async function getDriverTripRequests(tripId: string) {
 
   const { data: requests } = await supabase
     .from('trip_requests')
-    .select('id, passenger_id, status, seats_requested, message, pickup_point, dropoff_point, requested_at')
+    .select('id, passenger_id, status, seats_requested, message, pickup_point, dropoff_point, requested_at, payment_method, payment_status, payment_proof_url')
     .eq('trip_id', tripId)
     .order('requested_at', { ascending: false });
 
@@ -647,6 +650,13 @@ function RequestCard({
           <div className="space-y-1 text-xs text-slate-600">
             {request.pickup_point ? <div><strong>Pickup:</strong> {request.pickup_point}</div> : null}
             {request.dropoff_point ? <div><strong>Drop-off:</strong> {request.dropoff_point}</div> : null}
+            {request.payment_method ? (
+              <div>
+                <strong>Payment:</strong>{' '}
+                {request.payment_method === 'coa' ? 'Cash on Arrival' : 'Proof of Payment'}
+                {request.payment_status ? ` · ${request.payment_status}` : ''}
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
