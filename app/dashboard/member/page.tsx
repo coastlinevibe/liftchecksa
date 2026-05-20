@@ -52,13 +52,14 @@ async function getMemberData() {
     .limit(1)
     .single();
 
-  // Get upcoming trip requests (accepted)
-  const { data: upcomingRequests } = await supabase
+  // Get accepted trip requests for this passenger
+  const { data: acceptedRequests } = await supabase
     .from('trip_requests')
     .select(`
       id,
       trip_id,
       status,
+      requested_at,
       trips (
         id,
         origin,
@@ -78,8 +79,7 @@ async function getMemberData() {
     `)
     .eq('passenger_id', profile?.id)
     .eq('status', 'accepted')
-    .gte('trips.departure_date', new Date().toISOString().split('T')[0])
-    .order('trips.departure_date', { ascending: true })
+    .order('requested_at', { ascending: false })
     .limit(5);
 
   // Get saved routes
@@ -111,7 +111,7 @@ async function getMemberData() {
   return {
     profile,
     payment,
-    upcomingRequests: upcomingRequests || [],
+    acceptedRequests: acceptedRequests || [],
     savedRoutes: savedRoutes || [],
     trustedDrivers: trustedDrivers || [],
   };
@@ -137,6 +137,9 @@ export default async function MemberDashboard() {
   const needsPaymentProof = !membershipActive && !!data.payment && !paymentProof;
   const awaitingVerification = !membershipActive && !!paymentProof && data.payment?.status === 'pending';
   const isVerified = membershipActive || data.payment?.status === 'approved';
+  const todayIso = new Date().toISOString().split('T')[0];
+  const upcomingRequests = data.acceptedRequests.filter((request: any) => request.trips?.departure_date >= todayIso);
+  const pastRequests = data.acceptedRequests.filter((request: any) => request.trips?.departure_date < todayIso);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -273,9 +276,9 @@ export default async function MemberDashboard() {
           <>
         <div className="mb-6">
           <h2 className="text-sm font-semibold text-slate-700 mb-3">Upcoming Trips</h2>
-          {data.upcomingRequests.length > 0 ? (
+          {upcomingRequests.length > 0 ? (
             <div className="space-y-3">
-              {data.upcomingRequests.map((request: any) => {
+              {upcomingRequests.map((request: any) => {
                 const trip = request.trips;
                 const driverProfile = trip?.driver_profiles?.profiles;
                 
@@ -330,6 +333,69 @@ export default async function MemberDashboard() {
             <div className="bg-white border border-slate-200 rounded-xl p-6 text-center">
               <p className="text-sm text-slate-500">No upcoming trips</p>
               <p className="text-xs text-slate-400 mt-1">Find a lift to get started</p>
+            </div>
+          )}
+        </div>
+
+        <div className="mb-6">
+          <h2 className="text-sm font-semibold text-slate-700 mb-3">Booked Trips</h2>
+          {pastRequests.length > 0 ? (
+            <div className="space-y-3">
+              {pastRequests.map((request: any) => {
+                const trip = request.trips;
+                const driverProfile = trip?.driver_profiles?.profiles;
+
+                return (
+                  <div key={request.id} className="bg-white border border-slate-200 rounded-xl p-3">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <MapPin className="w-3.5 h-3.5 text-emerald-500" />
+                          <span className="text-sm font-semibold text-slate-900">
+                            {trip.origin} â†’ {trip.destination}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-slate-600">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            <span>{formatDate(trip.departure_date)} â€¢ {trip.departure_time}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="px-2 py-1 bg-emerald-50 text-emerald-600 rounded text-xs font-semibold">
+                        Booked
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 pt-2 border-t border-slate-100">
+                      <div className="w-8 h-8 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full" />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-1 text-xs">
+                          <span className="font-semibold text-slate-900">
+                            {driverProfile?.first_name} {driverProfile?.surname?.charAt(0)}.
+                          </span>
+                          <Shield className="w-3 h-3 text-emerald-500" />
+                        </div>
+                        <div className="flex items-center gap-1 text-xs text-slate-600">
+                          <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                          <span>{trip.driver_profiles?.rating_average?.toFixed(1) || '0.0'}</span>
+                        </div>
+                      </div>
+                      <Link
+                        href={`/trips/${trip.id}/booking-confirmed?request=${request.id}`}
+                        className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold hover:bg-slate-200"
+                      >
+                        View Receipt
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="bg-white border border-slate-200 rounded-xl p-6 text-center">
+              <p className="text-sm text-slate-500">No booked trips yet</p>
+              <p className="text-xs text-slate-400 mt-1">Your confirmed bookings will appear here</p>
             </div>
           )}
         </div>

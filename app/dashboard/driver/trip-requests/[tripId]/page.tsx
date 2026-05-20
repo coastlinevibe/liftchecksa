@@ -305,23 +305,11 @@ async function getDriverTripRequests(tripId: string) {
     .select('passenger_id, notes')
     .eq('trip_id', tripId);
 
-  const chatParticipantIds = (chatMessages || [])
-    .flatMap((message) => [message.sender_id, message.receiver_id])
-    .filter((profileId) => profileId && profileId !== driverMemberProfile?.id);
-  const passengerIds = [
-    ...new Set([
-      ...(requests || []).map((request) => request.passenger_id).filter(Boolean),
-      ...chatParticipantIds,
-    ]),
-  ];
-  const { data: passengers } = passengerIds.length
-    ? await supabase
-        .from('profiles')
-        .select('id, first_name, surname, zii_status')
-        .in('id', passengerIds)
-    : { data: [] };
+  const { data: passengers } = await supabase.rpc('get_trip_passengers', {
+    p_trip_id: tripId,
+  }) as { data: PassengerProfile[] | null };
 
-  const passengersById = new Map((passengers || []).map((passenger) => [passenger.id, passenger]));
+  const passengersById = new Map<string, PassengerProfile>((passengers || []).map((passenger) => [passenger.id, passenger]));
   const agreementNotesByPassengerId = new Map(
     ((agreementNotes || []) as AgreementNote[]).map((agreement) => [agreement.passenger_id, agreement.notes || ''])
   );
