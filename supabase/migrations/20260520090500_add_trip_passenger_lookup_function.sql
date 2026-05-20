@@ -45,7 +45,7 @@ BEGIN
     WHERE trip_id = p_trip_id
       AND (sender_id = v_driver_user_profile_id OR receiver_id = v_driver_user_profile_id)
   )
-  SELECT p.id, p.first_name, p.surname, p.zii_status
+  SELECT p.id, p.first_name::text, p.surname::text, p.zii_status::text
   FROM profiles p
   JOIN participant_ids participant ON participant.profile_id = p.id;
 END;
