@@ -10,20 +10,22 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_driver_profile_id uuid;
+  v_driver_row_id uuid;
+  v_driver_user_profile_id uuid;
 BEGIN
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION 'Not authenticated';
   END IF;
 
-  SELECT driver_profiles.id
-  INTO v_driver_profile_id
+  SELECT driver_profiles.id, profiles.id
+  INTO v_driver_row_id, v_driver_user_profile_id
   FROM trips
   JOIN driver_profiles ON driver_profiles.id = trips.driver_id
+  JOIN profiles ON profiles.user_id = driver_profiles.user_id
   WHERE trips.id = p_trip_id
     AND driver_profiles.user_id = auth.uid();
 
-  IF v_driver_profile_id IS NULL THEN
+  IF v_driver_row_id IS NULL OR v_driver_user_profile_id IS NULL THEN
     RAISE EXCEPTION 'Not authorized';
   END IF;
 
@@ -36,12 +38,12 @@ BEGIN
     UNION
 
     SELECT DISTINCT CASE
-      WHEN sender_id = v_driver_profile_id THEN receiver_id
+      WHEN sender_id = v_driver_user_profile_id THEN receiver_id
       ELSE sender_id
     END AS profile_id
     FROM trip_chats
     WHERE trip_id = p_trip_id
-      AND (sender_id = v_driver_profile_id OR receiver_id = v_driver_profile_id)
+      AND (sender_id = v_driver_user_profile_id OR receiver_id = v_driver_user_profile_id)
   )
   SELECT p.id, p.first_name, p.surname, p.zii_status
   FROM profiles p

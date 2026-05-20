@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 
 export type TripChatMessage = {
   id: string;
+  trip_id?: string;
   sender_id: string;
   receiver_id: string;
   message: string;
@@ -14,7 +15,7 @@ export type TripChatMessage = {
 type TripChatThreadProps = {
   tripId: string;
   currentProfileId: string;
-  peerProfileId: string;
+  peerProfileId?: string | null;
   initialMessages: TripChatMessage[];
   emptyStateText: string;
 };
@@ -28,6 +29,7 @@ export default function TripChatThread({
 }: TripChatThreadProps) {
   const supabase = useMemo(() => createClient(), []);
   const [messages, setMessages] = useState<TripChatMessage[]>(initialMessages);
+  const [resolvedPeerProfileId, setResolvedPeerProfileId] = useState<string | null>(peerProfileId || null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -35,10 +37,33 @@ export default function TripChatThread({
   }, [initialMessages]);
 
   useEffect(() => {
-    if (!tripId || !currentProfileId || !peerProfileId) return;
+    setResolvedPeerProfileId(peerProfileId || null);
+  }, [peerProfileId]);
+
+  useEffect(() => {
+    if (resolvedPeerProfileId || !currentProfileId) return;
+
+    const inferred = initialMessages.find(
+      (message) => message.sender_id !== currentProfileId && message.sender_id
+    );
+    if (inferred?.sender_id) {
+      setResolvedPeerProfileId(inferred.sender_id);
+      return;
+    }
+
+    const fallback = initialMessages.find(
+      (message) => message.receiver_id !== currentProfileId && message.receiver_id
+    );
+    if (fallback?.receiver_id) {
+      setResolvedPeerProfileId(fallback.receiver_id);
+    }
+  }, [currentProfileId, initialMessages, resolvedPeerProfileId]);
+
+  useEffect(() => {
+    if (!tripId || !currentProfileId) return;
 
     const channel = supabase
-      .channel(`trip-chat:${tripId}:${currentProfileId}:${peerProfileId}`)
+      .channel(`trip-chat:${tripId}:${currentProfileId}:${resolvedPeerProfileId || 'any'}`)
       .on(
         'postgres_changes',
         {
@@ -49,11 +74,24 @@ export default function TripChatThread({
         },
         (payload) => {
           const nextMessage = payload.new as TripChatMessage;
-          const relatesToThread =
-            (nextMessage.sender_id === currentProfileId && nextMessage.receiver_id === peerProfileId) ||
-            (nextMessage.sender_id === peerProfileId && nextMessage.receiver_id === currentProfileId);
+          const threadPeerId = resolvedPeerProfileId;
+          const relatesToThread = threadPeerId
+            ? (
+                (nextMessage.sender_id === currentProfileId && nextMessage.receiver_id === threadPeerId) ||
+                (nextMessage.sender_id === threadPeerId && nextMessage.receiver_id === currentProfileId)
+              )
+            : nextMessage.trip_id === tripId &&
+              (nextMessage.sender_id === currentProfileId || nextMessage.receiver_id === currentProfileId);
 
           if (!relatesToThread) return;
+
+          if (!threadPeerId) {
+            const otherParticipant =
+              nextMessage.sender_id === currentProfileId ? nextMessage.receiver_id : nextMessage.sender_id;
+            if (otherParticipant && otherParticipant !== currentProfileId) {
+              setResolvedPeerProfileId(otherParticipant);
+            }
+          }
 
           setMessages((currentMessages) => {
             if (currentMessages.some((message) => message.id === nextMessage.id)) {
@@ -69,7 +107,7 @@ export default function TripChatThread({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentProfileId, peerProfileId, supabase, tripId]);
+  }, [currentProfileId, resolvedPeerProfileId, supabase, tripId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
