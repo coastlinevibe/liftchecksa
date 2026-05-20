@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { ArrowLeft, Calendar, CheckCircle, Clock, MapPin, Save, Send, Shield, Users } from 'lucide-react';
+import TripChatThread, { type TripChatMessage } from '@/components/TripChatThread';
 import { createClient } from '@/lib/supabase/server';
 
 type TripRequestStatus = 'pending' | 'accepted' | 'rejected' | 'cancelled';
@@ -507,23 +508,14 @@ function ChatCard({
         </div>
       </div>
 
-      <div className="space-y-2 max-h-64 overflow-y-auto mb-3">
-        {conversation.messages.map((message) => {
-          const isMine = message.sender_id === driverProfileId;
-          return (
-            <div key={message.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
-              <div
-                className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${
-                  isMine
-                    ? 'bg-emerald-500 text-white rounded-br-md'
-                    : 'bg-slate-100 text-slate-900 rounded-bl-md'
-                }`}
-              >
-                {message.message}
-              </div>
-            </div>
-          );
-        })}
+      <div className="mb-3">
+        <TripChatThread
+          tripId={tripId}
+          currentProfileId={driverProfileId}
+          peerProfileId={conversation.participantId}
+          initialMessages={conversation.messages as TripChatMessage[]}
+          emptyStateText="No messages yet. Start the conversation below."
+        />
       </div>
 
       <form action={sendDriverChatMessage} className="space-y-2">

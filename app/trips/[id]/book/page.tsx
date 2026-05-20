@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect, notFound } from 'next/navigation';
 import { ArrowLeft, Calendar, Car, Clock, MapPin, MessageSquare, Send, Shield, Users } from 'lucide-react';
+import TripChatThread, { type TripChatMessage } from '@/components/TripChatThread';
 import { createClient } from '@/lib/supabase/server';
 import { getTripById, requestTripSeat } from '@/lib/trips/actions';
 
@@ -40,6 +41,18 @@ export default async function BookSeatPage({
     : 'Vehicle not listed';
   const defaultPickupPoint = trip.pickup_points?.[0] || trip.origin;
   const defaultDropoffPoint = trip.dropoff_points?.[0] || trip.destination;
+  const { data: driverMember } = await supabase
+    .from('driver_profiles')
+    .select('user_id')
+    .eq('id', trip.driver_id)
+    .single();
+  const { data: driverPassengerProfile } = driverMember?.user_id
+    ? await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', driverMember.user_id)
+        .maybeSingle()
+    : { data: null };
   const { data: memberProfile } = await supabase
     .from('profiles')
     .select('id')
@@ -181,30 +194,13 @@ export default async function BookSeatPage({
 
         <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
           <div className="text-sm font-semibold text-slate-900">Chat before booking</div>
-          <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
-            {chatMessages && chatMessages.length > 0 ? (
-              chatMessages.map((chat) => {
-                const isMine = chat.sender_id === memberProfile?.id;
-                return (
-                  <div key={chat.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
-                    <div
-                      className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${
-                        isMine
-                          ? 'bg-emerald-500 text-white rounded-br-md'
-                          : 'bg-slate-100 text-slate-900 rounded-bl-md'
-                      }`}
-                    >
-                      {chat.message}
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <div className="rounded-lg bg-slate-50 border border-slate-200 p-3 text-xs text-slate-600">
-                Ask the driver anything you need to agree on before booking.
-              </div>
-            )}
-          </div>
+          <TripChatThread
+            tripId={id}
+            currentProfileId={memberProfile?.id || ''}
+            peerProfileId={driverPassengerProfile?.id || ''}
+            initialMessages={(chatMessages || []) as TripChatMessage[]}
+            emptyStateText="Ask the driver anything you need to agree on before booking."
+          />
 
           <form action={sendChatMessageAction} className="space-y-2">
             <label htmlFor="chatMessage" className="block text-sm font-semibold text-slate-900">
