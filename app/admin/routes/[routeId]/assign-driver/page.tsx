@@ -71,6 +71,11 @@ export default async function AssignDriverPage({
   const driverProfileById = new Map((driverProfiles || []).map((driverProfile) => [driverProfile.id, driverProfile]));
   const profileByUserId = new Map((profiles || []).map((profile) => [profile.user_id, profile]));
 
+  async function assignDriverAction(formData: FormData) {
+    'use server';
+    await assignDriverToRouteFromForm(formData);
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="border-b border-slate-200 bg-white">
@@ -85,7 +90,7 @@ export default async function AssignDriverPage({
       </div>
 
       <div className="mx-auto max-w-4xl px-4 py-4">
-        <form action={assignDriverToRouteFromForm} className="space-y-4">
+        <form action={assignDriverAction} className="space-y-4">
           <input type="hidden" name="route_id" value={routeId} />
 
           <div className="rounded-xl border border-slate-200 bg-white p-4">
