@@ -21,8 +21,8 @@ export default async function DriverRoutesPage() {
     }
   }
 
-  const assignments = 'assignments' in dashboard ? dashboard.assignments : [];
-  const pendingRequests = 'pendingRequests' in dashboard ? dashboard.pendingRequests : [];
+  const assignments = 'assignments' in dashboard ? dashboard.assignments ?? [] : [];
+  const pendingRequests = 'pendingRequests' in dashboard ? dashboard.pendingRequests ?? [] : [];
 
   return (
     <div className="min-h-screen bg-slate-50">
