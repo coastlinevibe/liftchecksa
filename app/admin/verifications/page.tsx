@@ -15,7 +15,7 @@ async function getPendingVerifications() {
       id_status,
       vehicle_status,
       id_document_url,
-      profiles!inner(
+      profiles(
         first_name,
         surname,
         phone,
@@ -99,9 +99,9 @@ export default async function AdminVerificationsPage() {
         {applications.driverApplications.length > 0 ? (
           <div className="space-y-3">
             {applications.driverApplications.map((application: any) => {
-              const profile = application.profiles;
-              const hasIdDoc = profile.id_document_url || application.id_document_url;
-              const hasSelfie = profile.profile_photo_url;
+              const profile = application.profiles || null;
+              const hasIdDoc = profile?.id_document_url || application.id_document_url;
+              const hasSelfie = profile?.profile_photo_url;
               const timeAgo = new Date(application.created_at).toLocaleDateString();
 
               return (
@@ -119,16 +119,16 @@ export default async function AdminVerificationsPage() {
                     
                     <div className="flex-1">
                       <div className="text-lg font-bold text-slate-900 mb-1">
-                        {profile.first_name} {profile.surname}
+                        {profile ? `${profile.first_name} ${profile.surname}` : 'Profile missing'}
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-sm mb-3">
                         <div>
                           <span className="text-slate-600">Phone:</span>
-                          <span className="font-semibold text-slate-900 ml-1">{profile.phone}</span>
+                          <span className="font-semibold text-slate-900 ml-1">{profile?.phone || 'Unavailable'}</span>
                         </div>
                         <div>
                           <span className="text-slate-600">Email:</span>
-                          <span className="font-semibold text-slate-900 ml-1">{profile.email}</span>
+                          <span className="font-semibold text-slate-900 ml-1">{profile?.email || 'Unavailable'}</span>
                         </div>
                         <div>
                           <span className="text-slate-600">Applied:</span>
@@ -145,6 +145,11 @@ export default async function AdminVerificationsPage() {
                           <Camera className="w-3 h-3" />
                           Selfie: {hasSelfie ? 'Uploaded' : 'Missing'}
                         </span>
+                        {!profile ? (
+                          <span className="text-xs px-2 py-1 rounded bg-amber-100 text-amber-700">
+                            Linked profile missing
+                          </span>
+                        ) : null}
                       </div>
                     </div>
 

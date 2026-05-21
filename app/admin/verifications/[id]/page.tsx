@@ -28,11 +28,7 @@ async function getVerificationData(id: string) {
     .from('profiles')
     .select('first_name, surname, phone, email, profile_photo_url, id_document_url, home_province')
     .eq('user_id', driverProfile.user_id)
-    .single();
-
-  if (!profile) {
-    return null;
-  }
+    .maybeSingle();
 
   // Get signed URLs for images (valid for 1 hour)
   let signedSelfieUrl = profile.profile_photo_url;
@@ -101,7 +97,7 @@ async function getVerificationData(id: string) {
     driverProfile: { 
       ...driverProfile, 
       profiles: {
-        ...profile,
+        ...(profile || {}),
         profile_photo_url: signedSelfieUrl,
         id_document_url: signedIdDocUrl
       }
@@ -121,8 +117,8 @@ export default async function VerificationReviewPage({ params }: { params: Promi
 
   const { driverProfile, payment, vehicles } = data;
   const profile = driverProfile.profiles;
-  const idDocUrl = profile.id_document_url || driverProfile.id_document_url;
-  const selfieUrl = profile.profile_photo_url;
+  const idDocUrl = profile?.id_document_url || driverProfile.id_document_url;
+  const selfieUrl = profile?.profile_photo_url;
 
   // Validate URLs
   const isValidUrl = (url: string | null | undefined) => {
@@ -164,18 +160,18 @@ export default async function VerificationReviewPage({ params }: { params: Promi
             )}
             <div className="flex-1">
               <div className="text-lg font-bold text-slate-900 mb-1">
-                {profile.first_name} {profile.surname}
+                {profile?.first_name || profile?.surname ? `${profile.first_name || ''} ${profile.surname || ''}`.trim() : 'Profile missing'}
               </div>
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div>
                   <span className="text-slate-600">Phone:</span>
-                  <span className="font-semibold text-slate-900 ml-1">{profile.phone}</span>
+                  <span className="font-semibold text-slate-900 ml-1">{profile?.phone || 'Unavailable'}</span>
                 </div>
                 <div>
                   <span className="text-slate-600">Email:</span>
-                  <span className="font-semibold text-slate-900 ml-1">{profile.email}</span>
+                  <span className="font-semibold text-slate-900 ml-1">{profile?.email || 'Unavailable'}</span>
                 </div>
-                {profile.home_province && (
+                {profile?.home_province && (
                   <div>
                     <span className="text-slate-600">Province:</span>
                     <span className="font-semibold text-slate-900 ml-1">{profile.home_province}</span>
@@ -190,6 +186,11 @@ export default async function VerificationReviewPage({ params }: { params: Promi
               </div>
             </div>
           </div>
+          {!profile ? (
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              This driver application is missing its linked profile row. Review the application carefully before taking action.
+            </div>
+          ) : null}
         </div>
 
         {/* Selfie */}
