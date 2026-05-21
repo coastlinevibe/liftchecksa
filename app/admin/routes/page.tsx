@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowRight, Plus } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Plus } from 'lucide-react';
 import { getOfficialRoutes } from '@/lib/routes/actions';
 
 function badgeClass(status: string) {
@@ -15,6 +15,12 @@ export default async function AdminRoutesPage() {
     <div className="min-h-screen bg-slate-50">
       <div className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-6xl px-4 py-4">
+          <div className="mb-3">
+            <Link href="/admin" className="inline-flex items-center text-sm text-slate-600 hover:text-slate-900">
+              <ArrowLeft className="mr-1 h-4 w-4" />
+              Back to admin
+            </Link>
+          </div>
           <div className="flex items-center justify-between gap-3">
             <div>
               <h1 className="text-xl font-bold text-slate-900">Official Routes</h1>
