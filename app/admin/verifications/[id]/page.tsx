@@ -31,10 +31,10 @@ async function getVerificationData(id: string) {
     .maybeSingle();
 
   // Get signed URLs for images (valid for 1 hour)
-  let signedSelfieUrl = profile.profile_photo_url;
-  let signedIdDocUrl = profile.id_document_url || driverProfile.id_document_url;
+  let signedSelfieUrl = profile?.profile_photo_url;
+  let signedIdDocUrl = profile?.id_document_url || driverProfile.id_document_url;
 
-  if (profile.profile_photo_url) {
+  if (profile?.profile_photo_url) {
     const path = profile.profile_photo_url.split('/profile-photos/')[1];
     if (path) {
       const { data: signedData } = await supabase.storage
@@ -160,7 +160,9 @@ export default async function VerificationReviewPage({ params }: { params: Promi
             )}
             <div className="flex-1">
               <div className="text-lg font-bold text-slate-900 mb-1">
-                {profile?.first_name || profile?.surname ? `${profile.first_name || ''} ${profile.surname || ''}`.trim() : 'Profile missing'}
+                {profile?.first_name || profile?.surname
+                  ? `${profile?.first_name || ''} ${profile?.surname || ''}`.trim()
+                  : 'Profile missing'}
               </div>
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div>
