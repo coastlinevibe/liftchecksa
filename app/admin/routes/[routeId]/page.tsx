@@ -46,10 +46,16 @@ export default async function AdminRouteDetailPage({
     <div className="min-h-screen bg-slate-50">
       <div className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-6xl px-4 py-4">
-          <Link href="/admin/routes" className="mb-2 inline-flex items-center text-sm text-slate-600">
-            <ArrowLeft className="mr-1 h-4 w-4" />
-            Back to routes
-          </Link>
+          <div className="mb-2 flex flex-wrap items-center gap-3 text-sm">
+            <Link href="/admin" className="inline-flex items-center text-slate-600 hover:text-slate-900">
+              <ArrowLeft className="mr-1 h-4 w-4" />
+              Back to admin
+            </Link>
+            <span className="text-slate-300">/</span>
+            <Link href="/admin/routes" className="inline-flex items-center text-slate-600 hover:text-slate-900">
+              Routes
+            </Link>
+          </div>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="mb-1 flex items-center gap-2">

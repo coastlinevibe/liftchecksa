@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect, notFound } from 'next/navigation';
-import { ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Route } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { assignDriverToRouteFromForm, getRouteDetail } from '@/lib/routes/actions';
 
@@ -90,6 +90,23 @@ export default async function AssignDriverPage({
       </div>
 
       <div className="mx-auto max-w-4xl px-4 py-4">
+        <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4">
+          <div className="flex items-start gap-3">
+            <div className="rounded-lg bg-emerald-50 p-2 text-emerald-600">
+              <Route className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-slate-900">{detail.route.name}</div>
+              <div className="text-xs text-slate-600">
+                {detail.route.start_area} &rarr; {detail.route.end_area}
+              </div>
+              <div className="mt-1 text-xs text-slate-500">
+                {detail.stops.length} stops • {detail.route.status}
+              </div>
+            </div>
+          </div>
+        </div>
+
         <form action={assignDriverAction} className="space-y-4">
           <input type="hidden" name="route_id" value={routeId} />
 
