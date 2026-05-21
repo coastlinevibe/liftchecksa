@@ -3,8 +3,14 @@ import Image from 'next/image';
 import { Shield, CheckCircle, Users, MessageSquare, Search, Car } from 'lucide-react';
 import GPSHeroBackground from './components/GPSHeroBackground';
 import { Button } from '@/components/ui/button';
+import { PILOT_ROUTE_MODE } from '@/lib/feature-flags';
 
 export default function Home() {
+  const primaryHref = PILOT_ROUTE_MODE ? '/routes' : '/trips';
+  const primaryLabel = PILOT_ROUTE_MODE ? 'Browse Routes' : 'Find a Lift';
+  const secondaryHref = PILOT_ROUTE_MODE ? '/register?type=driver' : '/register?type=driver';
+  const secondaryLabel = PILOT_ROUTE_MODE ? 'Join as Driver' : 'Offer a Lift';
+
   return (
     <div className="min-h-screen bg-slate-900">
       {/* GPS Animated Hero */}
@@ -20,6 +26,11 @@ export default function Home() {
               Verified drivers and passengers<br />
               for safer lift sharing in South Africa.
             </p>
+            {PILOT_ROUTE_MODE ? (
+              <div className="mx-auto mt-4 max-w-[280px] rounded-xl border border-emerald-200 bg-white/95 px-3 py-2 text-xs font-semibold text-emerald-700">
+                Pilot mode uses verified official routes only.
+              </div>
+            ) : null}
           </div>
         </div>
       </GPSHeroBackground>
@@ -27,20 +38,20 @@ export default function Home() {
       {/* Buttons - Outside animation */}
       <div className="px-3 -mt-8 max-w-md mx-auto relative z-30">
         <div className="flex gap-3 justify-center -translate-y-[30px]">
-          <Link href="/trips">
+          <Link href={primaryHref}>
             <Button
               className="h-14 text-lg px-8 from-white to-white/95 text-emerald-600 border-2 border-emerald-600/20 bg-gradient-to-t shadow-xl shadow-white/50 ring-4 ring-offset ring-slate-900/30 transition-[filter] duration-200 hover:brightness-110 active:brightness-100 flex items-center gap-2"
             >
               <Search strokeWidth={2} className="size-7" />
-              Find a Lift
+              {primaryLabel}
             </Button>
           </Link>
-          <Link href="/register?type=driver">
+          <Link href={secondaryHref}>
             <Button
               className="h-14 text-lg px-8 from-emerald-600 to-emerald-600/90 text-white border-2 border-white/10 bg-gradient-to-t shadow-xl shadow-emerald-600/70 ring-4 ring-offset ring-slate-900/30 transition-[filter] duration-200 hover:brightness-120 active:brightness-100 flex items-center gap-2"
             >
               <Car strokeWidth={2} className="size-7" />
-              Offer a Lift
+              {secondaryLabel}
             </Button>
           </Link>
         </div>
@@ -55,7 +66,7 @@ export default function Home() {
             <h2 className="text-sm font-bold text-white">Safety Promise</h2>
           </div>
           <p className="text-xs text-slate-300 leading-tight">
-            Check the driver, vehicle and trip before you pay or travel.
+            Check the driver, vehicle and route before you pay or travel.
           </p>
         </div>
 

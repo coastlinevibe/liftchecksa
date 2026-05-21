@@ -4,6 +4,7 @@ import LogoutButton from '@/components/LogoutButton';
 import { createClient } from '@/lib/supabase/server';
 import { formatMembershipExpiry, getMembershipExpiry } from '@/lib/membership';
 import { redirect } from 'next/navigation';
+import { PILOT_ROUTE_MODE } from '@/lib/feature-flags';
 
 async function getMemberData() {
   const supabase = await createClient();
@@ -190,6 +191,12 @@ export default async function MemberDashboard() {
       </div>
 
       <div className="px-4 py-4 max-w-md mx-auto">
+        {PILOT_ROUTE_MODE ? (
+          <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+            Pilot mode uses verified official routes only. Search routes instead of open trips.
+          </div>
+        ) : null}
+
         {/* Payment Proof Required Banner */}
         {needsPaymentProof && (
           <div className="bg-amber-50 border-2 border-amber-400 rounded-xl p-4 mb-4">
@@ -250,11 +257,11 @@ export default async function MemberDashboard() {
         {/* Quick Search - Only show if verified */}
         {isVerified && (
           <Link
-            href="/trips"
+            href={PILOT_ROUTE_MODE ? '/routes' : '/trips'}
             className="block w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-lg text-sm font-semibold mb-4 flex items-center justify-center gap-2"
           >
             <Search className="w-4 h-4" />
-            Find a Lift
+            {PILOT_ROUTE_MODE ? 'Find a Route' : 'Find a Lift'}
           </Link>
         )}
 

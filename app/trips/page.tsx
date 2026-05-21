@@ -3,6 +3,7 @@ import { Search, MapPin, Calendar, Users, Star, Shield, ChevronRight, Car } from
 import { createClient } from '@/lib/supabase/server';
 import { getAvailableTrips } from '@/lib/trips/actions';
 import { resolveSignedStorageUrl } from '@/lib/supabase/storage';
+import { PILOT_ROUTE_MODE } from '@/lib/feature-flags';
 
 type SearchParams = {
   origin?: string | string[];
@@ -155,7 +156,14 @@ export default async function TripsPage({
     <div className="min-h-screen bg-slate-50">
       <div className="bg-white border-b border-slate-200 sticky top-0 z-10">
         <div className="px-4 py-4 max-w-md mx-auto">
-          <h1 className="text-xl font-bold text-slate-900 mb-3">Find a Lift</h1>
+          <h1 className="text-xl font-bold text-slate-900 mb-3">
+            {PILOT_ROUTE_MODE ? 'Legacy Trips' : 'Find a Lift'}
+          </h1>
+          {PILOT_ROUTE_MODE ? (
+            <p className="mb-3 text-xs text-slate-600">
+              Open trip posting is disabled. Use official routes for new pilot bookings.
+            </p>
+          ) : null}
 
           <form method="get" action="/trips" className="space-y-2">
             <div className="relative">
@@ -192,6 +200,12 @@ export default async function TripsPage({
       </div>
 
       <div className="px-4 py-4 max-w-md mx-auto">
+        {PILOT_ROUTE_MODE ? (
+          <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900">
+            Pilot mode uses verified official routes only. Open trip posting is being phased out.
+          </div>
+        ) : null}
+
         {loadError ? (
           <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
             Trips are loading with a fallback view right now. Some live data may be missing.
@@ -341,7 +355,7 @@ export default async function TripsPage({
                     <div className="text-xs text-slate-600">
                       <span className="font-semibold">{vehicleLabel}</span>
                       {vehicleColour ? ` - ${vehicleColour}` : ''}
-                      {isAuthenticated && plate ? ` - ${plate}` : ''}
+                      {!PILOT_ROUTE_MODE && isAuthenticated && plate ? ` - ${plate}` : ''}
                     </div>
                   </div>
                 </Link>

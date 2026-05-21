@@ -3,6 +3,7 @@
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 import { DEFAULT_SUPABASE_KEY, DEFAULT_SUPABASE_URL } from '@/lib/supabase/config';
+import { PILOT_ROUTE_MODE } from '@/lib/feature-flags';
 import { resolveTripMediaUrls, resolveTripsMediaUrls } from '@/lib/supabase/storage';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
@@ -45,6 +46,10 @@ export async function createTrip(formData: {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     return { error: 'Not authenticated' };
+  }
+
+  if (PILOT_ROUTE_MODE) {
+    return { error: 'Pilot mode uses verified official routes only.' };
   }
 
   // Get driver profile

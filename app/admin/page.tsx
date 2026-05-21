@@ -37,7 +37,6 @@ async function getAdminStats() {
     { data: recentDrivers },
     { data: driverVerificationRows },
     { data: vehicleVerificationRows },
-    { data: documentVerificationRows },
     { data: reportRows },
     { count: activeBluetoothVerifications },
     { count: tripsThisMonth },
@@ -57,7 +56,6 @@ async function getAdminStats() {
     supabase.from('driver_profiles').select('id, user_id, verification_status, completed_trips, rating_average, created_at').order('created_at', { ascending: false }).limit(5),
     supabase.from('driver_profiles').select('verification_status, created_at, updated_at').in('verification_status', ['approved', 'rejected', 'expired']),
     supabase.from('vehicles').select('verification_status, created_at, updated_at').in('verification_status', ['approved', 'rejected', 'expired']),
-    supabase.from('verifications').select('status, created_at, reviewed_at').not('reviewed_at', 'is', null),
     supabase.from('reports').select('status'),
     supabase.from('zii_tokens').select('*', { count: 'exact', head: true }).eq('token_status', 'active').gte('expires_at', nowIso),
     supabase.from('trips').select('*', { count: 'exact', head: true }).gte('created_at', monthStart.toISOString()),
@@ -93,11 +91,6 @@ async function getAdminStats() {
       status: row.verification_status,
       createdAt: row.created_at,
       reviewedAt: row.updated_at,
-    })),
-    ...(documentVerificationRows || []).map((row: any) => ({
-      status: row.status,
-      createdAt: row.created_at,
-      reviewedAt: row.reviewed_at,
     })),
   ].filter((row: any) => row.reviewedAt);
 
@@ -276,6 +269,19 @@ export default async function AdminDashboard() {
             <p className="text-xs text-red-800">Scam reports requiring action</p>
           </Link>
         </div>
+
+        <Link
+          href="/admin/routes"
+          className="mb-6 block rounded-xl border-2 border-emerald-300 bg-emerald-50 p-4 transition hover:border-emerald-400"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-bold text-emerald-900">Official Routes</div>
+              <p className="text-xs text-emerald-800">Create, review, and assign verified pilot routes.</p>
+            </div>
+            <CheckCircle className="h-5 w-5 text-emerald-600" />
+          </div>
+        </Link>
 
         <div className="grid gap-4 mb-4">
           <div className="bg-white rounded-xl border border-slate-200 p-4">

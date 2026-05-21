@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, MapPin, Calendar, Clock, Users, Car, Package, FileText, AlertCircle, CheckCircle } from 'lucide-react';
 import { createTrip, getDriverVehicles } from '@/lib/trips/actions';
+import { PILOT_ROUTE_MODE } from '@/lib/feature-flags';
 
 type VehicleOption = {
   id: string;
@@ -56,6 +57,35 @@ export default function CreateTripPage() {
 
     return () => window.clearTimeout(timer);
   }, []);
+
+  if (PILOT_ROUTE_MODE) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <div className="bg-white border-b border-slate-200">
+          <div className="px-4 py-4 max-w-md mx-auto">
+            <Link href="/dashboard/driver" className="inline-flex items-center text-slate-600 text-sm mb-2">
+              <ArrowLeft className="w-4 h-4 mr-1" />
+              Back to dashboard
+            </Link>
+            <h1 className="text-xl font-bold text-slate-900">Create New Trip</h1>
+          </div>
+        </div>
+
+        <div className="px-4 py-6 max-w-md mx-auto">
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+            Pilot mode uses verified official routes only. Open trip posting is disabled while the route pilot is active.
+          </div>
+
+          <Link
+            href="/dashboard/driver/routes"
+            className="mt-4 block rounded-lg bg-emerald-500 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-emerald-600"
+          >
+            Go to Assigned Routes
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

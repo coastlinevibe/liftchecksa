@@ -143,7 +143,14 @@ export async function signUp(formData: {
   return { success: true, paymentReference };
 }
 
-export async function signIn(email: string, password: string) {
+function safeRedirectPath(value?: string) {
+  if (!value) return '';
+  if (!value.startsWith('/')) return '';
+  if (value.startsWith('//')) return '';
+  return value;
+}
+
+export async function signIn(email: string, password: string, redirectTo?: string) {
   try {
     console.log('[Server] Starting signIn for:', email);
     const supabase = await createClient();
@@ -190,11 +197,12 @@ export async function signIn(email: string, password: string) {
       .maybeSingle();
     
     // Determine redirect URL based on role
-    let redirectUrl = '/dashboard/member';
-    
-    if (profile?.role === 'driver' || driverProfile) {
+    const safeTarget = safeRedirectPath(redirectTo);
+    let redirectUrl = safeTarget || '/dashboard/member';
+
+    if (!safeTarget && (profile?.role === 'driver' || driverProfile)) {
       redirectUrl = '/dashboard/driver';
-    } else if (profile?.role === 'platform_admin' || profile?.role === 'group_admin') {
+    } else if (!safeTarget && (profile?.role === 'platform_admin' || profile?.role === 'group_admin')) {
       redirectUrl = '/admin';
     }
 
