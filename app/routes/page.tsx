@@ -16,6 +16,22 @@ function formatStopList(stopNames: string[]) {
   return stopNames.join(' / ');
 }
 
+function formatTimeForSummary(timeValue?: string | null) {
+  if (!timeValue) return 'TBA';
+  const raw = timeValue.slice(0, 5);
+  const hour = Number(raw.split(':')[0]);
+  const suffix = Number.isFinite(hour) && hour >= 12 ? 'pm' : 'am';
+  return `${raw} ${suffix}`;
+}
+
+function formatDaysForSummary(days?: string[] | null) {
+  if (!days || days.length === 0) return 'Mon, Tue, Wed, Thu, Fri';
+  return days
+    .map((day) => day.slice(0, 3))
+    .map((day) => `${day.charAt(0).toUpperCase()}${day.slice(1).toLowerCase()}`)
+    .join(', ');
+}
+
 export default async function RoutesPage({
   searchParams,
 }: {
@@ -100,7 +116,14 @@ export default async function RoutesPage({
             const stopNames = route.route_stops.map((stop) => stop.stop_name);
             const routeStopsLabel = formatStopList(stopNames);
             const firstStop = route.route_stops[0];
-            const lastStop = route.route_stops[route.route_stops.length - 1];
+            const primaryAssignment = (route.assigned_drivers || []).find(
+              (assignment) => assignment.status === 'approved' || assignment.status === 'active'
+            ) || route.assigned_drivers?.[0];
+            const summaryDays = formatDaysForSummary(primaryAssignment?.days_active || []);
+            const startTime = formatTimeForSummary(firstStop?.estimated_morning_time);
+            const returnTime = formatTimeForSummary(firstStop?.estimated_return_time);
+            const seatsAvailable = primaryAssignment?.seats_available ?? 0;
+            const weeklyPrice = primaryAssignment?.weekly_price ? `R${primaryAssignment.weekly_price}` : 'TBA';
 
             return (
               <Link
@@ -117,6 +140,17 @@ export default async function RoutesPage({
                     <p className="text-sm text-slate-600">
                       {route.start_area} &rarr; {route.end_area}
                     </p>
+                    <p className="mt-1 text-xs text-slate-600">
+                      {summaryDays} - {startTime} start | {returnTime} return
+                    </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-700">
+                        Weekly: {weeklyPrice}
+                      </span>
+                      <span className="rounded-full bg-blue-100 px-2.5 py-1 font-semibold text-blue-700">
+                        {seatsAvailable} seats available
+                      </span>
+                    </div>
                   </div>
                   <Shield className="h-4 w-4 flex-shrink-0 text-emerald-500" />
                 </div>
@@ -124,10 +158,6 @@ export default async function RoutesPage({
                 <div className="rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
                   <div className="font-semibold text-slate-800">Route stops</div>
                   <div className="mt-1">{routeStopsLabel}</div>
-                  <div className="mt-2">
-                    {firstStop?.estimated_morning_time ? `AM ${firstStop.estimated_morning_time}` : 'AM TBA'}
-                    {lastStop?.estimated_return_time ? ` | PM ${lastStop.estimated_return_time}` : ' | PM TBA'}
-                  </div>
                 </div>
               </Link>
             );
