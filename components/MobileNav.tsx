@@ -11,8 +11,8 @@ export default function MobileNav() {
 
   const navItems = [
     { href: '/', label: 'Home', icon: Home },
-    { href: '/trips', label: 'Trips', icon: Search },
-    { href: '/dashboard/driver/create-trip', label: 'Add', icon: Plus },
+    { href: '/routes', label: 'Routes', icon: Search },
+    { href: '/dashboard/driver/routes', label: 'My Routes', icon: Plus },
     { href: '/notifications', label: 'Notifications', icon: Bell },
     { href: '/settings', label: 'Profile', icon: User },
   ];

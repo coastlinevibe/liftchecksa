@@ -10,7 +10,7 @@ export default function DesktopNav() {
 
   const navItems = [
     { href: '/', label: 'Home', icon: Home },
-    { href: '/trips', label: 'Trips', icon: Car },
+    { href: '/routes', label: 'Routes', icon: Car },
     { href: '/#pricing', label: 'Pricing', icon: CreditCard },
     { href: '/#about', label: 'About', icon: Info },
     { href: '/login', label: 'Login', icon: Shield },
