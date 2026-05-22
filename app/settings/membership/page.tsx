@@ -3,12 +3,10 @@ import { redirect } from 'next/navigation';
 import { ArrowLeft, CreditCard, Receipt, Shield, Upload } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { getSettingsBackHref } from '../_lib';
-import { formatMembershipExpiry, getMembershipExpiry } from '@/lib/membership';
+import { formatMembershipExpiry, getMembershipExpiry, getPlanLabel } from '@/lib/membership';
 
 function membershipLabel(type?: string | null) {
-  if (type === 'plus') return 'Member Plus';
-  if (type?.startsWith('provider')) return 'Verified Provider';
-  return 'Member Basic';
+  return getPlanLabel(type);
 }
 
 export default async function MembershipPage() {
@@ -83,7 +81,7 @@ export default async function MembershipPage() {
           <div className="grid gap-2">
             <div className="flex items-center justify-between rounded-lg bg-slate-50 p-3">
               <span className="text-xs text-slate-600">Plan</span>
-              <span className="text-sm font-semibold text-slate-900">{planType || 'basic'}</span>
+              <span className="text-sm font-semibold text-slate-900">{membershipLabel(planType)}</span>
             </div>
             <div className="flex items-center justify-between rounded-lg bg-slate-50 p-3">
               <span className="text-xs text-slate-600">Expiry</span>

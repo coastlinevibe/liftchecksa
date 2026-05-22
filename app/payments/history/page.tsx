@@ -24,7 +24,7 @@ export default function PaymentHistoryPage() {
           <div className="flex items-center justify-between mb-3">
             <div>
               <div className="text-xs opacity-75 mb-1">Current Plan</div>
-              <div className="text-lg font-bold">Member Plus</div>
+              <div className="text-lg font-bold">Member 12 Months</div>
             </div>
             <div className="bg-white/20 backdrop-blur px-3 py-1 rounded-full text-xs font-semibold">
               Active
@@ -65,13 +65,13 @@ export default function PaymentHistoryPage() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <CheckCircle className="w-4 h-4 text-emerald-500" />
-                    <span className="text-sm font-semibold text-slate-900">Member Plus</span>
+                    <span className="text-sm font-semibold text-slate-900">Driver 12 Months</span>
                   </div>
-                  <div className="text-xs text-slate-600 mb-1">Payment Reference: LC-P-30491</div>
+                  <div className="text-xs text-slate-600 mb-1">Payment Reference: LC-D12-30491</div>
                   <div className="text-xs text-slate-500">Paid: 13 May 2026</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-base font-bold text-slate-900">R96.00</div>
+                  <div className="text-base font-bold text-slate-900">R300.00</div>
                   <div className="text-xs text-emerald-600">Approved</div>
                 </div>
               </div>
@@ -87,7 +87,7 @@ export default function PaymentHistoryPage() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <CheckCircle className="w-4 h-4 text-slate-400" />
-                    <span className="text-sm font-semibold text-slate-900">Member Basic</span>
+                    <span className="text-sm font-semibold text-slate-900">Member 12 Months</span>
                   </div>
                   <div className="text-xs text-slate-600 mb-1">Payment Reference: LC-M-10482</div>
                   <div className="text-xs text-slate-500">Paid: 13 May 2025</div>
@@ -114,13 +114,13 @@ export default function PaymentHistoryPage() {
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
                   <Clock className="w-4 h-4 text-amber-600" />
-                  <span className="text-sm font-semibold text-slate-900">Member Plus Renewal</span>
+                  <span className="text-sm font-semibold text-slate-900">Driver 12 Months Renewal</span>
                 </div>
                 <div className="text-xs text-slate-600 mb-1">Payment Reference: LC-P-30492</div>
                 <div className="text-xs text-slate-500">Submitted: 10 May 2026</div>
               </div>
               <div className="text-right">
-                <div className="text-base font-bold text-slate-900">R96.00</div>
+                <div className="text-base font-bold text-slate-900">R300.00</div>
                 <div className="text-xs text-amber-600">Under Review</div>
               </div>
             </div>

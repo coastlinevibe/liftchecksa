@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import LogoutButton from '@/components/LogoutButton';
 import NotificationPreferences from './notification-preferences';
 import { getSettingsBackHref } from './_lib';
-import { formatMembershipExpiry, getMembershipExpiry } from '@/lib/membership';
+import { formatMembershipExpiry, getMembershipExpiry, getPlanLabel } from '@/lib/membership';
 
 export default async function SettingsPage() {
   const supabase = await createClient();
@@ -45,10 +45,10 @@ export default async function SettingsPage() {
 
   const statusLabel =
     role === 'driver'
-      ? `Verified Provider • ${driverProfile?.verification_status === 'approved' ? 'Active' : 'Pending'}`
+      ? `${getPlanLabel(driverProfile?.provider_plan)} • ${driverProfile?.verification_status === 'approved' ? 'Active' : 'Pending'}`
       : role === 'group_admin'
         ? 'Group Admin • Active'
-        : `${profile?.membership_type === 'plus' ? 'Member Plus' : 'Member Basic'} • ${profile?.membership_status === 'active' ? 'Active' : 'Pending'}`;
+        : `${getPlanLabel(profile?.membership_type)} • ${profile?.membership_status === 'active' ? 'Active' : 'Pending'}`;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -172,7 +172,7 @@ export default async function SettingsPage() {
                 <div>
                   <div className="text-sm text-slate-900">Membership</div>
                   <div className="text-xs text-emerald-600">
-                    {profile?.membership_type === 'plus' ? 'Plus' : 'Basic'}
+                    {getPlanLabel(profile?.membership_type)}
                     {membershipExpiry ? ` • Expires ${formatMembershipExpiry(membershipExpiry)}` : ''}
                   </div>
                 </div>

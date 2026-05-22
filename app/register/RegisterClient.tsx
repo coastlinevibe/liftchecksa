@@ -9,15 +9,23 @@ import { createClient } from '@/lib/supabase/client';
 
 type Step = 'choose' | 'member' | 'driver' | 'group_admin';
 
+function getDriverPlanFromQuery(plan: string | null): 'provider_quarterly' | 'provider_annual' {
+  if (plan === 'quarterly' || plan === 'provider_quarterly' || plan === '3months') {
+    return 'provider_quarterly';
+  }
+  return 'provider_annual';
+}
+
 export default function RegisterClient() {
   const searchParams = useSearchParams();
   const initialType = searchParams.get('type');
+  const initialDriverPlan = getDriverPlanFromQuery(searchParams.get('plan'));
   const [step, setStep] = useState<Step>(
     initialType === 'member' || initialType === 'driver' || initialType === 'group_admin' ? initialType : 'choose'
   );
 
   if (step === 'member') return <MemberForm onBack={() => setStep('choose')} />;
-  if (step === 'driver') return <DriverForm onBack={() => setStep('choose')} />;
+  if (step === 'driver') return <DriverForm initialPlan={initialDriverPlan} onBack={() => setStep('choose')} />;
   if (step === 'group_admin') return <GroupAdminForm onBack={() => setStep('choose')} />;
 
   return (
@@ -37,14 +45,14 @@ export default function RegisterClient() {
             icon={<User className="w-6 h-6 text-emerald-600" />}
             title="I Need Lifts"
             subtitle="Find verified drivers and travel safely"
-            price="From R36/year"
+            price="12 months only"
             onClick={() => setStep('member')}
           />
           <ChoiceCard
             icon={<Car className="w-6 h-6 text-emerald-600" />}
             title="I Offer Lifts"
-            subtitle="Get verified and share your trips safely"
-            price="R300/year"
+            subtitle="Get verified and choose a 3 or 12 month plan"
+            price="3 or 12 months"
             onClick={() => setStep('driver')}
           />
           <ChoiceCard
@@ -96,7 +104,6 @@ function MemberForm({ onBack }: { onBack: () => void }) {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [paymentRef, setPaymentRef] = useState('');
-  const [plan, setPlan] = useState<'basic' | 'plus'>('basic');
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     firstName: '',
@@ -130,7 +137,7 @@ function MemberForm({ onBack }: { onBack: () => void }) {
       surname: formData.surname,
       phone: formData.phone,
       role: 'member',
-      membershipType: plan,
+      membershipType: 'basic',
       homeProvince: formData.homeProvince,
     });
     if (result.success && result.paymentReference) {
@@ -158,7 +165,7 @@ function MemberForm({ onBack }: { onBack: () => void }) {
               <div className="text-2xl font-bold text-emerald-900">{paymentRef}</div>
             </div>
             <div className="text-xs text-emerald-800">
-              <strong>Amount:</strong> R{plan === 'basic' ? '36' : '96'}.00
+              <strong>Amount:</strong> R36.00
             </div>
           </div>
         </div>
@@ -175,22 +182,8 @@ function MemberForm({ onBack }: { onBack: () => void }) {
         </button>
         <h1 className="text-2xl font-bold text-slate-900 mb-2">Member Sign Up</h1>
 
-        <div className="mb-4">
-          <label className="block text-xs font-semibold text-slate-700 mb-2">Choose Plan</label>
-          <div className="grid grid-cols-2 gap-2">
-            <PlanCard
-              active={plan === 'basic'}
-              title="Basic"
-              price="R36/yr"
-              onClick={() => setPlan('basic')}
-            />
-            <PlanCard
-              active={plan === 'plus'}
-              title="Plus"
-              price="R96/yr"
-              onClick={() => setPlan('plus')}
-            />
-          </div>
+        <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900">
+          Members now use one 12-month plan.
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3 mt-4">
@@ -214,11 +207,18 @@ function MemberForm({ onBack }: { onBack: () => void }) {
   );
 }
 
-function DriverForm({ onBack }: { onBack: () => void }) {
+function DriverForm({
+  onBack,
+  initialPlan,
+}: {
+  onBack: () => void;
+  initialPlan: 'provider_quarterly' | 'provider_annual';
+}) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [paymentRef, setPaymentRef] = useState('');
+  const [plan, setPlan] = useState<'provider_quarterly' | 'provider_annual'>(initialPlan);
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     firstName: '',
@@ -251,7 +251,7 @@ function DriverForm({ onBack }: { onBack: () => void }) {
       surname: formData.surname,
       phone: formData.phone,
       role: 'driver',
-      membershipType: 'provider_annual',
+      membershipType: plan,
     });
     if (result.success && result.paymentReference) {
       setPaymentRef(result.paymentReference);
@@ -277,7 +277,7 @@ function DriverForm({ onBack }: { onBack: () => void }) {
               <div className="text-2xl font-bold text-emerald-900">{paymentRef}</div>
             </div>
             <div className="text-xs text-emerald-800">
-              <strong>Amount:</strong> R300.00
+              <strong>Amount:</strong> R{plan === 'provider_quarterly' ? '120' : '300'}.00
             </div>
           </div>
         </div>
@@ -293,6 +293,28 @@ function DriverForm({ onBack }: { onBack: () => void }) {
           Back
         </button>
         <h1 className="text-2xl font-bold text-slate-900 mb-2">Driver Sign Up</h1>
+
+        <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900">
+          Choose a 3-month or 12-month verified provider plan.
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-xs font-semibold text-slate-700 mb-2">Choose Plan</label>
+          <div className="grid grid-cols-2 gap-2">
+            <PlanCard
+              active={plan === 'provider_quarterly'}
+              title="3 Months"
+              price="R120"
+              onClick={() => setPlan('provider_quarterly')}
+            />
+            <PlanCard
+              active={plan === 'provider_annual'}
+              title="12 Months"
+              price="R300"
+              onClick={() => setPlan('provider_annual')}
+            />
+          </div>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-3 mt-4">
           <TextField label="First Name" value={formData.firstName} onChange={(firstName) => setFormData({ ...formData, firstName })} />

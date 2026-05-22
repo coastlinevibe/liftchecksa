@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Upload, Copy, CheckCircle, Building, CreditCard, AlertCircle, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { getPlanDurationLabel, getPlanLabel } from '@/lib/membership';
 
 type PaymentRecord = {
   id: string;
@@ -159,6 +160,8 @@ export default function PaymentUploadPage() {
   }
 
   const planType = paymentData.plan_type ?? '';
+  const planLabel = getPlanLabel(planType);
+  const planDurationLabel = getPlanDurationLabel(planType);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -171,9 +174,7 @@ export default function PaymentUploadPage() {
           </Link>
           <h1 className="text-xl font-bold text-slate-900">Complete Payment</h1>
           <p className="text-xs text-slate-600">
-            {planType.includes('basic') ? 'Member Basic' : 
-             planType.includes('plus') ? 'Member Plus' : 
-             'Driver Plan'} - R{paymentData.amount}/year
+            {planLabel} - R{paymentData.amount} / {planDurationLabel}
           </p>
         </div>
       </div>

@@ -159,16 +159,17 @@ export default async function DriverDashboard() {
   
   // Check if payment proof is needed
   const paymentProof = data.payment?.proof_url || data.payment?.proof_image;
-  const membershipActive = data.profile?.membership_status === 'active' || data.payment?.status === 'approved';
-  const needsPaymentProof = !membershipActive && !!data.payment && !paymentProof;
-  const awaitingVerification = !membershipActive && !!paymentProof && data.payment?.status === 'pending';
-  const isVerified =
-    data.driverProfile?.verification_status === 'approved' &&
-    (membershipActive || data.payment?.status === 'approved');
+  const paymentApproved = data.payment?.status === 'approved';
+  const basicApproved = data.driverProfile?.verification_status === 'approved';
   const approvedVehicles = data.vehicles.filter(
     (vehicle: DriverVehicleSummary) => vehicle.is_active !== false && vehicle.verification_status === 'approved'
   );
-  const canCreateTrips = isVerified && approvedVehicles.length > 0;
+  const vehicleApproved = approvedVehicles.length > 0;
+  const isActiveDriver = paymentApproved && basicApproved && vehicleApproved;
+  const needsPaymentProof = !!data.payment && !paymentProof && !paymentApproved;
+  const awaitingPaymentReview = !!paymentProof && data.payment?.status === 'pending';
+  const awaitingBasicApproval = paymentApproved && !basicApproved;
+  const awaitingVehicleApproval = paymentApproved && basicApproved && !vehicleApproved;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -255,7 +256,7 @@ export default async function DriverDashboard() {
         )}
 
         {/* Awaiting Verification Banner */}
-        {awaitingVerification && (
+        {awaitingPaymentReview && (
           <div className="bg-blue-50 border-2 border-blue-300 rounded-xl p-4 mb-4">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 bg-blue-400 rounded-full flex items-center justify-center flex-shrink-0">
@@ -274,35 +275,49 @@ export default async function DriverDashboard() {
           </div>
         )}
 
-        {/* Verified - Show Full Dashboard */}
-        {isVerified ? (
+        {awaitingBasicApproval && (
+          <div className="bg-purple-50 border-2 border-purple-300 rounded-xl p-4 mb-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 bg-purple-400 rounded-full flex items-center justify-center flex-shrink-0">
+                <Clock className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-base font-bold text-purple-900 mb-1">Basic Registration Approved</h3>
+                <p className="text-sm text-purple-800">
+                  Your payment is approved. Complete vehicle registration and approval to activate the driver dashboard.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {awaitingVehicleApproval && (
+          <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 mb-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 bg-amber-400 rounded-full flex items-center justify-center flex-shrink-0">
+                <Calendar className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-base font-bold text-amber-900 mb-1">Vehicle Registration Pending</h3>
+                <p className="text-sm text-amber-800 mb-3">
+                  Payment and basic registration are approved. Your dashboard becomes active after vehicle approval.
+                </p>
+                <Link
+                  href="/dashboard/driver/vehicles"
+                  className="inline-flex items-center justify-center w-full bg-amber-500 hover:bg-amber-600 text-white py-3 rounded-lg text-sm font-semibold"
+                >
+                  Complete Vehicle Registration
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Active Driver Dashboard */}
+        {isActiveDriver ? (
           <>
             {/* Vehicle gate */}
-            {!canCreateTrips ? (
-              <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 mb-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 bg-amber-400 rounded-full flex items-center justify-center flex-shrink-0">
-                    <Calendar className="w-5 h-5 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-base font-bold text-amber-900 mb-1">
-                      {data.vehicles.length === 0 ? 'Add a vehicle first' : 'Vehicle under review'}
-                    </h3>
-                    <p className="text-sm text-amber-800 mb-3">
-                      {data.vehicles.length === 0
-                        ? 'You need to register a vehicle before you can create a trip.'
-                        : 'Your vehicle needs admin approval before trip creation is unlocked.'}
-                    </p>
-                    <Link
-                      href="/dashboard/driver/vehicles"
-                      className="inline-flex items-center justify-center w-full bg-amber-500 hover:bg-amber-600 text-white py-3 rounded-lg text-sm font-semibold"
-                    >
-                      {data.vehicles.length === 0 ? 'Register Vehicle' : 'View Vehicle Status'}
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            ) : PILOT_ROUTE_MODE ? (
+            {PILOT_ROUTE_MODE ? (
               <Link
                 href="/dashboard/driver/routes"
                 className="block w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-lg text-sm font-semibold mb-4 flex items-center justify-center gap-2"
@@ -438,14 +453,14 @@ export default async function DriverDashboard() {
         </div>
 
         {/* Disabled State for Unverified Users */}
-        {!isVerified && (
+        {!isActiveDriver && (
           <div className="bg-slate-100 border border-slate-300 rounded-xl p-6 text-center">
             <div className="w-16 h-16 bg-slate-300 rounded-full flex items-center justify-center mx-auto mb-3">
               <Calendar className="w-8 h-8 text-slate-500" />
             </div>
             <h3 className="text-base font-bold text-slate-700 mb-2">Account Not Active</h3>
             <p className="text-sm text-slate-600">
-              Complete payment verification to start creating trips and earning.
+              Complete payment, basic registration, and vehicle approval to activate your dashboard.
             </p>
           </div>
         )}

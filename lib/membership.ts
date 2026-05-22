@@ -25,6 +25,20 @@ function getPlanDurationMonths(planType?: string | null) {
   return 12;
 }
 
+export function getPlanDurationLabel(planType?: string | null) {
+  const durationMonths = getPlanDurationMonths(planType);
+  if (durationMonths === 1) return '1 month';
+  if (durationMonths === 3) return '3 months';
+  return '12 months';
+}
+
+export function getPlanLabel(planType?: string | null) {
+  if (planType?.includes('provider_quarterly') || planType === 'quarterly') return 'Driver 3 Months';
+  if (planType?.includes('provider_annual') || planType === 'annual') return 'Driver 12 Months';
+  if (planType?.includes('provider_monthly') || planType === 'monthly') return 'Driver 1 Month';
+  return 'Member 12 Months';
+}
+
 export function getMembershipExpiry(record?: MembershipRecord | null, payment?: PaymentRecord | null) {
   if (record?.membership_expires_at) {
     return record.membership_expires_at;

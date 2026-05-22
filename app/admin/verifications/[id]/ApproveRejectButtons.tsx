@@ -85,7 +85,7 @@ export default function ApproveRejectButtons({ driverProfileId, userId, paymentI
           if (paymentError) throw paymentError;
         }
 
-        alert('Driver approved and activated successfully!');
+        alert('Basic registration approved successfully!');
         router.push('/admin');
       } else {
         // Reject
@@ -120,7 +120,7 @@ export default function ApproveRejectButtons({ driverProfileId, userId, paymentI
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-4">
-      <h2 className="text-base font-bold text-slate-900 mb-3">Review Decision</h2>
+      <h2 className="text-base font-bold text-slate-900 mb-3">Basic Registration Review</h2>
       
       {error && (
         <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
@@ -142,7 +142,7 @@ export default function ApproveRejectButtons({ driverProfileId, userId, paymentI
             decision === 'approve' ? 'text-emerald-500' : 'text-slate-400'
           }`} />
           <div className="text-sm font-semibold text-slate-900">Approve</div>
-          <div className="text-xs text-slate-600 mt-1">All documents verified</div>
+          <div className="text-xs text-slate-600 mt-1">Payment proof reviewed</div>
         </button>
 
         <button
@@ -182,7 +182,7 @@ export default function ApproveRejectButtons({ driverProfileId, userId, paymentI
               : 'bg-red-500 hover:bg-red-600 text-white'
           }`}
         >
-          {loading ? 'Processing...' : decision === 'approve' ? 'Approve & Activate Driver' : 'Reject Application'}
+          {loading ? 'Processing...' : decision === 'approve' ? 'Approve Basic Registration' : 'Reject Application'}
         </button>
       )}
     </div>

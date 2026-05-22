@@ -1,9 +1,12 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeft, Camera, FileText, Car } from 'lucide-react';
+import { unstable_noStore as noStore } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 
 async function getPendingVerifications() {
+  noStore();
+
   const supabase = await createClient();
 
   const { data: driverApplications } = await supabase
@@ -12,6 +15,7 @@ async function getPendingVerifications() {
       id,
       created_at,
       verification_status,
+      provider_plan,
       id_status,
       vehicle_status,
       id_document_url,
@@ -118,6 +122,7 @@ export default async function AdminVerificationsPage() {
                     )}
                     
                     <div className="flex-1">
+                      <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1">Basic Registration</div>
                       <div className="text-lg font-bold text-slate-900 mb-1">
                         {profile ? `${profile.first_name} ${profile.surname}` : 'Profile missing'}
                       </div>
@@ -133,6 +138,33 @@ export default async function AdminVerificationsPage() {
                         <div>
                           <span className="text-slate-600">Applied:</span>
                           <span className="font-semibold text-slate-900 ml-1">{timeAgo}</span>
+                        </div>
+                      </div>
+
+          <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+                        <div className="rounded-lg bg-slate-50 px-3 py-2">
+                          <div className="text-slate-500 mb-0.5">Application ID</div>
+                          <div className="font-semibold text-slate-900">{application.id.slice(0, 8)}</div>
+                        </div>
+                        <div className="rounded-lg bg-slate-50 px-3 py-2">
+                          <div className="text-slate-500 mb-0.5">Plan</div>
+                          <div className="font-semibold text-slate-900">{application.provider_plan || 'annual'}</div>
+                        </div>
+                        <div className="rounded-lg bg-slate-50 px-3 py-2">
+                          <div className="text-slate-500 mb-0.5">ID Status</div>
+                          <div className="font-semibold text-slate-900">{application.id_status || 'pending'}</div>
+                        </div>
+                        <div className="rounded-lg bg-slate-50 px-3 py-2">
+                          <div className="text-slate-500 mb-0.5">Licence Status</div>
+                          <div className="font-semibold text-slate-900">{application.licence_status || 'pending'}</div>
+                        </div>
+                        <div className="rounded-lg bg-slate-50 px-3 py-2">
+                          <div className="text-slate-500 mb-0.5">Vehicle Status</div>
+                          <div className="font-semibold text-slate-900">{application.vehicle_status || 'pending'}</div>
+                        </div>
+                        <div className="rounded-lg bg-slate-50 px-3 py-2">
+                          <div className="text-slate-500 mb-0.5">Verification</div>
+                          <div className="font-semibold text-slate-900">{application.verification_status || 'pending'}</div>
                         </div>
                       </div>
                       

@@ -153,7 +153,7 @@ export default function Home() {
           <div className="space-y-2">
             <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
               <div className="flex justify-between items-center mb-1.5">
-                <h3 className="text-xs font-semibold text-white">Member Basic</h3>
+                <h3 className="text-xs font-semibold text-white">Member 12 Months</h3>
                 <div className="text-base font-bold text-emerald-400">R36/yr</div>
               </div>
               <p className="text-[10px] text-slate-400 mb-2 leading-tight">
@@ -167,38 +167,35 @@ export default function Home() {
               </Link>
             </div>
 
-            <div className="bg-slate-800/50 rounded-lg p-3 border-2 border-emerald-500 relative">
-              <div className="absolute -top-1.5 right-3 bg-emerald-500 text-white px-2 py-0.5 rounded-full text-[10px] font-semibold">
-                Popular
-              </div>
+            <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
               <div className="flex justify-between items-center mb-1.5">
-                <h3 className="text-xs font-semibold text-white">Member Plus</h3>
-                <div className="text-base font-bold text-emerald-400">R96/yr</div>
+                <h3 className="text-xs font-semibold text-white">Driver 3 Months</h3>
+                <div className="text-base font-bold text-emerald-400">R120</div>
               </div>
               <p className="text-[10px] text-slate-400 mb-2 leading-tight">
-                Everything in Basic • Trip Share • Route alerts • Trusted drivers
+                Verified badge • Admin review • Route assignment • Pilot access
               </p>
               <Link 
-                href="/register?type=member&plan=plus"
+                href="/register?type=driver&plan=quarterly"
                 className="block bg-emerald-500 hover:bg-emerald-600 text-white text-center py-2 rounded-lg text-xs font-semibold"
               >
-                Get Started
+                Become a Driver
               </Link>
             </div>
 
             <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
               <div className="flex justify-between items-center mb-1.5">
-                <h3 className="text-xs font-semibold text-white">Verified Provider</h3>
-                <div className="text-base font-bold text-emerald-400">R300/yr</div>
+                <h3 className="text-xs font-semibold text-white">Driver 12 Months</h3>
+                <div className="text-base font-bold text-emerald-400">R300</div>
               </div>
               <p className="text-[10px] text-slate-400 mb-2 leading-tight">
-                Verified badge • Create trips • Share links • Build reputation
+                Verified badge • Admin review • Route assignment • Pilot access
               </p>
               <Link 
-                href="/register?type=driver"
+                href="/register?type=driver&plan=annual"
                 className="block bg-white hover:bg-slate-100 text-slate-900 text-center py-2 rounded-lg text-xs font-semibold"
               >
-                Become a Provider
+                Become a Driver
               </Link>
             </div>
           </div>
@@ -259,11 +256,11 @@ export default function Home() {
             {/* FAQ Item 4 */}
             <details className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden group">
               <summary className="px-3 py-2.5 cursor-pointer list-none flex items-center justify-between text-xs font-semibold text-white hover:bg-slate-800/70">
-                <span>What's the difference between Member Basic and Plus?</span>
+                <span>What membership options are available?</span>
                 <span className="text-emerald-400 group-open:rotate-180 transition-transform">▼</span>
               </summary>
               <div className="px-3 pb-3 pt-1 text-[10px] text-slate-300 leading-relaxed">
-                Member Basic (R36/yr) gives you verified profile, driver checks, chat, and ratings. Member Plus (R96/yr) adds Trip Share (send live location to family), route alerts, and a trusted drivers list for frequent travelers.
+                Members now use one 12-month plan. Drivers can choose a 3-month or 12-month verified provider plan while the platform stays in pilot mode.
               </div>
             </details>
 
@@ -274,7 +271,7 @@ export default function Home() {
                 <span className="text-emerald-400 group-open:rotate-180 transition-transform">▼</span>
               </summary>
               <div className="px-3 pb-3 pt-1 text-[10px] text-slate-300 leading-relaxed">
-                Drivers upload their ID, driver's license, and vehicle registration. Our admin team manually reviews each document. Once approved, they get a verified badge and can create trips. This process typically takes 24-48 hours.
+                Drivers upload their ID, driver's license, and vehicle documents. Our admin team manually reviews each application. Once approved, drivers are assigned to official routes instead of publishing open trips.
               </div>
             </details>
 

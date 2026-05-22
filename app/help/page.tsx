@@ -17,12 +17,12 @@ export default function HelpPage() {
           a: 'Tap "Get Started" on the home page, choose your account type (Member or Driver), fill in your details, and complete the payment process. Your account will be activated within 24 hours after payment approval.',
         },
         {
-          q: 'What is the difference between Basic and Plus membership?',
-          a: 'Basic (R36/year) includes verified profile, Zii Verify, driver checks, chat, and ratings. Plus (R96/year) adds Trip Share, route alerts, trusted drivers list, and family trip link.',
+          q: 'What membership options are available?',
+          a: 'Members now have one 12-month plan. Drivers can choose a 3-month or 12-month verified provider plan.',
         },
         {
           q: 'How much does it cost to become a verified driver?',
-          a: 'Verified Provider membership costs R300/year. This includes verification, trip creation, shareable links, and access to all driver features.',
+          a: 'Driver plans are available for 3 months or 12 months. The provider account is reviewed by admin before activation.',
         },
       ],
     },
@@ -69,7 +69,7 @@ export default function HelpPage() {
         },
         {
           q: 'When does my membership expire?',
-          a: 'Memberships are valid for 365 days from activation. You\'ll receive reminders before expiry. Check your expiry date in Settings > Membership.',
+          a: 'Member memberships are valid for 12 months from activation. Driver plans are valid for either 3 months or 12 months depending on the option you choose.',
         },
         {
           q: 'Can I get a refund?',
@@ -82,11 +82,11 @@ export default function HelpPage() {
       questions: [
         {
           q: 'How do I create a trip?',
-          a: 'Go to Driver Dashboard, tap "Create New Trip", fill in route details, pricing, and rules. Once published, you\'ll get a shareable link for Facebook/WhatsApp groups.',
+          a: 'In pilot mode, official routes are admin-created. Drivers register and get assigned to approved routes instead of publishing open trips themselves.',
         },
         {
           q: 'How do I share my trip link?',
-          a: 'After creating a trip, tap "Share Trip" to get a link and pre-written message. Share this in Facebook lift groups or WhatsApp. Passengers can view your verified profile and request seats.',
+          a: 'In the pilot, passengers search official routes rather than open trip posts. Drivers can still use chat and route assignment once approved.',
         },
         {
           q: 'What documents do I need for verification?',

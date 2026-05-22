@@ -142,7 +142,7 @@ export default function NotificationsPage() {
                 <div className="flex-1">
                   <div className="text-sm font-semibold text-slate-900 mb-1">Payment Approved</div>
                   <p className="text-xs text-slate-600 mb-2">
-                    Your Member Plus subscription has been activated
+                    Your Member 12 Months membership has been activated
                   </p>
                   <span className="text-xs text-slate-500">3 days ago</span>
                 </div>

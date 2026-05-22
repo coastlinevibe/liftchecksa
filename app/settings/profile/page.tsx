@@ -4,6 +4,7 @@ import { ArrowLeft, Camera, Shield } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { getSettingsBackHref } from '../_lib';
 import ProfileEditor from './ProfileEditor';
+import { getPlanLabel } from '@/lib/membership';
 
 export default async function ProfilePage() {
   const supabase = await createClient();
@@ -23,16 +24,16 @@ export default async function ProfilePage() {
 
   const { data: driverProfile } = await supabase
     .from('driver_profiles')
-    .select('verification_status')
+    .select('verification_status, provider_plan')
     .eq('user_id', user.id)
     .maybeSingle();
 
   const roleLabel =
     profile?.role === 'driver'
-      ? `Verified Provider • ${driverProfile?.verification_status ?? 'pending'}`
+      ? `${getPlanLabel(driverProfile?.provider_plan)}`
       : profile?.role === 'group_admin'
         ? 'Group Admin'
-        : `${profile?.membership_type === 'plus' ? 'Member Plus' : 'Member Basic'}`;
+        : getPlanLabel(profile?.membership_type);
 
   const backHref = getSettingsBackHref(profile?.role, !!driverProfile);
 

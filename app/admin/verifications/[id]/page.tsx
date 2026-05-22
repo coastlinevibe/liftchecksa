@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeft, User, FileText, Camera, AlertCircle, Car } from 'lucide-react';
+import { unstable_noStore as noStore } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { resolveSignedStorageUrl } from '@/lib/supabase/storage';
 import { notFound } from 'next/navigation';
@@ -10,6 +11,8 @@ import CollapsibleImage from './CollapsibleImage';
 import VehiclePhoto from './VehiclePhoto';
 
 async function getVerificationData(id: string) {
+  noStore();
+
   const supabase = await createClient();
 
   // Get driver profile
@@ -61,7 +64,7 @@ async function getVerificationData(id: string) {
     .eq('user_id', driverProfile.user_id)
     .order('created_at', { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle();
 
   // Get signed URL for payment proof if exists
   const proofSource = payment?.proof_url || payment?.proof_image;
@@ -145,9 +148,9 @@ export default async function VerificationReviewPage({ params }: { params: Promi
       </div>
 
       <div className="px-4 py-4 max-w-4xl mx-auto">
-        {/* Applicant Info */}
+        {/* Basic Registration */}
         <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
-          <h2 className="text-base font-bold text-slate-900 mb-3">Applicant Information</h2>
+          <h2 className="text-base font-bold text-slate-900 mb-3">Basic Registration</h2>
           <div className="flex items-start gap-4 mb-4">
             {validSelfieUrl ? (
               <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-emerald-200">
@@ -190,37 +193,15 @@ export default async function VerificationReviewPage({ params }: { params: Promi
           </div>
           {!profile ? (
             <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-              This driver application is missing its linked profile row. Review the application carefully before taking action.
+              This basic registration is missing its linked profile row. Review the application carefully before taking action.
             </div>
           ) : null}
         </div>
 
-        {/* Selfie */}
-        <CollapsibleImage
-          title="Selfie / Profile Photo"
-          icon={<Camera className="w-5 h-5 text-slate-600" />}
-          imageUrl={validSelfieUrl}
-          altText="Selfie"
-          width={400}
-          height={400}
-          className="w-full max-w-sm mx-auto rounded-lg"
-        />
-
-        {/* ID Document */}
-        <CollapsibleImage
-          title="ID Document"
-          icon={<FileText className="w-5 h-5 text-slate-600" />}
-          imageUrl={validIdDocUrl}
-          altText="ID Document"
-          width={600}
-          height={400}
-          className="w-full rounded-lg"
-        />
-
         {/* Payment Info */}
         {payment && (
           <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
-            <h2 className="text-base font-bold text-slate-900 mb-3">Payment Information</h2>
+            <h2 className="text-base font-bold text-slate-900 mb-3">Payment Proof</h2>
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div className="bg-slate-50 rounded-lg p-2">
                 <div className="text-xs text-slate-600 mb-0.5">Reference</div>
@@ -254,61 +235,108 @@ export default async function VerificationReviewPage({ params }: { params: Promi
           </div>
         )}
 
-        {/* Approve/Reject Section */}
+        {validPaymentProofUrl && (
+          <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
+            <h2 className="text-base font-bold text-slate-900 mb-3">Payment Proof Image</h2>
+            <Image
+              src={validPaymentProofUrl}
+              alt="Payment proof"
+              width={900}
+              height={700}
+              className="w-full rounded-lg border border-slate-200 object-contain"
+            />
+          </div>
+        )}
+
+        {/* Approve Basic Registration */}
         <ApproveRejectButtons 
           driverProfileId={driverProfile.id}
           userId={driverProfile.user_id}
           paymentId={payment?.id}
         />
 
-        {/* Vehicles Section */}
-        {vehicles.length > 0 && (
-          <div className="bg-white rounded-xl border border-slate-200 p-4 mt-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Car className="w-5 h-5 text-slate-600" />
-              <h2 className="text-base font-bold text-slate-900">Vehicles ({vehicles.length})</h2>
-            </div>
-            
-            {vehicles.map((vehicle: any) => (
-              <div key={vehicle.id} className="mb-4 last:mb-0 pb-4 last:pb-0 border-b last:border-b-0">
-                <div className="grid grid-cols-2 gap-3 text-sm mb-3">
-                  <div className="bg-slate-50 rounded-lg p-2">
-                    <div className="text-xs text-slate-600 mb-0.5">Make & Model</div>
-                    <div className="font-semibold text-slate-900">{vehicle.make} {vehicle.model}</div>
-                  </div>
-                  <div className="bg-slate-50 rounded-lg p-2">
-                    <div className="text-xs text-slate-600 mb-0.5">Colour</div>
-                    <div className="font-semibold text-slate-900">{vehicle.colour}</div>
-                  </div>
-                  <div className="bg-slate-50 rounded-lg p-2">
-                    <div className="text-xs text-slate-600 mb-0.5">Licence Plate</div>
-                    <div className="font-semibold text-slate-900">{vehicle.licence_plate}</div>
-                  </div>
-                  <div className="bg-slate-50 rounded-lg p-2">
-                    <div className="text-xs text-slate-600 mb-0.5">Status</div>
-                    <div className={`font-semibold ${
-                      vehicle.verification_status === 'approved' ? 'text-emerald-600' :
-                      vehicle.verification_status === 'rejected' ? 'text-red-600' : 'text-amber-600'
-                    }`}>
-                      {vehicle.verification_status}
+        {/* Vehicle Registration */}
+        <div className="bg-white rounded-xl border border-slate-200 p-4 mt-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Car className="w-5 h-5 text-slate-600" />
+            <h2 className="text-base font-bold text-slate-900">Vehicle Registration{vehicles.length > 0 ? ` (${vehicles.length})` : ''}</h2>
+          </div>
+
+          <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+            This section shows the extended car registration details. The driver only becomes active after this is approved.
+          </div>
+
+          {vehicles.length > 0 ? (
+            <div>
+              {vehicles.map((vehicle: any) => (
+                <div key={vehicle.id} className="mb-4 last:mb-0 pb-4 last:pb-0 border-b last:border-b-0">
+                  <div className="grid grid-cols-2 gap-3 text-sm mb-3">
+                    <div className="bg-slate-50 rounded-lg p-2">
+                      <div className="text-xs text-slate-600 mb-0.5">Make & Model</div>
+                      <div className="font-semibold text-slate-900">{vehicle.make} {vehicle.model}</div>
+                    </div>
+                    <div className="bg-slate-50 rounded-lg p-2">
+                      <div className="text-xs text-slate-600 mb-0.5">Colour</div>
+                      <div className="font-semibold text-slate-900">{vehicle.colour}</div>
+                    </div>
+                    <div className="bg-slate-50 rounded-lg p-2">
+                      <div className="text-xs text-slate-600 mb-0.5">Licence Plate</div>
+                      <div className="font-semibold text-slate-900">{vehicle.licence_plate}</div>
+                    </div>
+                    <div className="bg-slate-50 rounded-lg p-2">
+                      <div className="text-xs text-slate-600 mb-0.5">Status</div>
+                      <div className={`font-semibold ${
+                        vehicle.verification_status === 'approved' ? 'text-emerald-600' :
+                        vehicle.verification_status === 'rejected' ? 'text-red-600' : 'text-amber-600'
+                      }`}>
+                        {vehicle.verification_status}
+                      </div>
                     </div>
                   </div>
+
+                  {vehicle.vehicle_photo_url && (
+                    <div className="mb-3">
+                      <div className="text-xs font-semibold text-slate-700 mb-2">Vehicle Photo</div>
+                      <VehiclePhoto photoUrl={vehicle.vehicle_photo_url} />
+                    </div>
+                  )}
+
+                  {vehicle.verification_status === 'pending' && (
+                    <VehicleApproveButtons vehicleId={vehicle.id} driverProfileId={driverProfile.id} />
+                  )}
                 </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-sm text-slate-600">
+              No vehicle registration has been submitted yet.
+            </div>
+          )}
+        </div>
 
-                {vehicle.vehicle_photo_url && (
-                  <div className="mb-3">
-                    <div className="text-xs font-semibold text-slate-700 mb-2">Vehicle Photo</div>
-                    <VehiclePhoto photoUrl={vehicle.vehicle_photo_url} />
-                  </div>
-                )}
-
-                {vehicle.verification_status === 'pending' && (
-                  <VehicleApproveButtons vehicleId={vehicle.id} driverProfileId={driverProfile.id} />
-                )}
-              </div>
-            ))}
-          </div>
-        )}
+        {/* Vehicle Documents */}
+        <div className="bg-white rounded-xl border border-slate-200 p-4 mt-4">
+          <h2 className="text-base font-bold text-slate-900 mb-3">Vehicle Documents</h2>
+          <CollapsibleImage
+            title="Selfie / Profile Photo"
+            icon={<Camera className="w-5 h-5 text-slate-600" />}
+            imageUrl={validSelfieUrl}
+            altText="Selfie"
+            width={400}
+            height={400}
+            className="w-full max-w-sm mx-auto rounded-lg"
+          />
+          <div className="mt-4" />
+          <CollapsibleImage
+            title="ID Document"
+            icon={<FileText className="w-5 h-5 text-slate-600" />}
+            imageUrl={validIdDocUrl}
+            altText="ID Document"
+            width={600}
+            height={400}
+            className="w-full rounded-lg"
+          />
+        </div>
 
         {/* Warning */}
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-4">
