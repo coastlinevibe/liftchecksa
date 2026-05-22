@@ -26,11 +26,6 @@ export default function Home() {
               Verified drivers and passengers<br />
               for safer lift sharing in South Africa.
             </p>
-            {PILOT_ROUTE_MODE ? (
-              <div className="mx-auto mt-4 max-w-[280px] rounded-xl border border-emerald-200 bg-white/95 px-3 py-2 text-xs font-semibold text-emerald-700">
-                Pilot mode uses verified official routes only.
-              </div>
-            ) : null}
           </div>
         </div>
       </GPSHeroBackground>
