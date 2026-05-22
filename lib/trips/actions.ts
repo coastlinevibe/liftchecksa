@@ -24,7 +24,7 @@ type PublishedTripCard = {
   vehicle_verification_status?: string | null;
 };
 
-export async function createTrip(formData: {
+export async function createTrip(_formData: {
   vehicleId: string;
   origin: string;
   destination: string;
@@ -48,74 +48,6 @@ export async function createTrip(formData: {
   }
 
   return { error: 'Drivers do not publish open trips. Admins create official routes and assign approved drivers.' };
-
-  // Get driver profile
-  const { data: driverProfile } = await supabase
-    .from('driver_profiles')
-    .select('id, verification_status')
-    .eq('user_id', user.id)
-    .single();
-
-  if (!driverProfile) {
-    return { error: 'Driver profile not found' };
-  }
-
-  if (driverProfile.verification_status !== 'approved') {
-    return { error: 'Driver verification pending or rejected' };
-  }
-
-  const { data: vehicle, error: vehicleError } = await supabase
-    .from('vehicles')
-    .select('id, verification_status, is_active')
-    .eq('id', formData.vehicleId)
-    .eq('driver_id', driverProfile.id)
-    .eq('is_active', true)
-    .single();
-
-  if (vehicleError || !vehicle) {
-    return { error: 'Select a registered vehicle before creating a trip' };
-  }
-
-  if (vehicle.verification_status !== 'approved') {
-    return { error: 'Your vehicle must be approved before you can create a trip' };
-  }
-
-  // Generate public slug
-  const slug = `trip-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-  // Create trip
-  const { data: trip, error } = await supabase
-    .from('trips')
-    .insert({
-      driver_id: driverProfile.id,
-      vehicle_id: formData.vehicleId,
-      origin: formData.origin,
-      destination: formData.destination,
-      route_corridor: formData.routeCorridor,
-      departure_date: formData.departureDate,
-      departure_time: formData.departureTime,
-      seats_total: formData.seatsTotal,
-      seats_available: formData.seatsTotal,
-      cost_share_amount: formData.costShareAmount,
-      luggage_rules: formData.luggageRules,
-      pickup_points: formData.pickupPoints,
-      dropoff_points: formData.dropoffPoints,
-      notes: formData.notes,
-      passenger_rules: formData.passengerRules,
-      status: 'published',
-      public_slug: slug,
-    })
-    .select()
-    .single();
-
-  if (error) {
-    return { error: error.message };
-  }
-
-  revalidatePath('/dashboard/driver');
-  revalidatePath('/trips');
-
-  return { success: true, trip };
 }
 
 export async function getDriverTrips() {
