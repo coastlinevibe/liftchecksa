@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState, useActionState } from 'react';
+import Link from 'next/link';
 import { CalendarDays, Send } from 'lucide-react';
 import { requestRouteSeatFromForm } from '@/lib/routes/actions';
 import type { RouteStop } from '@/lib/types/pilot-routes';
@@ -15,9 +16,11 @@ const weekdayOptions = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] 
 export default function RouteSeatRequestForm({
   routeId,
   stops,
+  canRequestSeat,
 }: {
   routeId: string;
   stops: RouteStop[];
+  canRequestSeat: boolean;
 }) {
   const [pickupStopId, setPickupStopId] = useState(stops[0]?.id || '');
   const [dropoffStopId, setDropoffStopId] = useState(stops[stops.length - 1]?.id || '');
@@ -48,6 +51,24 @@ export default function RouteSeatRequestForm({
     dropoffIndex < 0 ||
     pickupIndex >= dropoffIndex ||
     stops.length < 2;
+
+  if (!canRequestSeat) {
+    return (
+      <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+        <h2 className="text-base font-bold text-slate-900">Member access required</h2>
+        <p className="text-sm text-slate-600">
+          You can browse routes, but only active members can request a weekly seat.
+        </p>
+        <Link
+          href="/register?type=member"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-600"
+        >
+          <Send className="h-4 w-4" />
+          Request weekly seat
+        </Link>
+      </section>
+    );
+  }
 
   return (
     <form action={formAction} className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">

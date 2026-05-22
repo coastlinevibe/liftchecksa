@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, MapPin, Route as RouteIcon, Shield } from 'lucide-react';
 import { getRouteDetail } from '@/lib/routes/actions';
+import { createClient } from '@/lib/supabase/server';
 import RouteSeatRequestForm from './RouteSeatRequestForm';
 
 export default async function RouteDetailPage({
@@ -10,6 +11,7 @@ export default async function RouteDetailPage({
   params: Promise<{ routeId: string }>;
 }) {
   const { routeId } = await params;
+  const supabase = await createClient();
   const detail = await getRouteDetail(routeId);
 
   if ('error' in detail) {
@@ -17,6 +19,17 @@ export default async function RouteDetailPage({
   }
 
   const { route, stops } = detail;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: profile } = user
+    ? await supabase
+        .from('profiles')
+        .select('role, membership_status')
+        .eq('user_id', user.id)
+        .maybeSingle()
+    : { data: null };
+  const canRequestSeat = profile?.role === 'member' && profile.membership_status === 'active';
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -74,7 +87,7 @@ export default async function RouteDetailPage({
         </div>
 
         <div className="space-y-4">
-          <RouteSeatRequestForm routeId={route.id} stops={stops} />
+          <RouteSeatRequestForm routeId={route.id} stops={stops} canRequestSeat={canRequestSeat} />
         </div>
       </div>
     </div>
