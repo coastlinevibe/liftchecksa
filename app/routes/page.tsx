@@ -116,9 +116,20 @@ export default async function RoutesPage({
             const stopNames = route.route_stops.map((stop) => stop.stop_name);
             const routeStopsLabel = formatStopList(stopNames);
             const firstStop = route.route_stops[0];
-            const primaryAssignment = (route.assigned_drivers || []).find(
+            const approvedAssignments = (route.assigned_drivers || []).filter(
               (assignment) => assignment.status === 'approved' || assignment.status === 'active'
-            ) || route.assigned_drivers?.[0];
+            );
+            const primaryAssignment = approvedAssignments.sort((a, b) => {
+              const aSeats = Number(a.seats_available || 0);
+              const bSeats = Number(b.seats_available || 0);
+              if (aSeats !== bSeats) return bSeats - aSeats;
+
+              const aHasWeeklyPrice = a.weekly_price ? 1 : 0;
+              const bHasWeeklyPrice = b.weekly_price ? 1 : 0;
+              if (aHasWeeklyPrice !== bHasWeeklyPrice) return bHasWeeklyPrice - aHasWeeklyPrice;
+
+              return 0;
+            })[0] || route.assigned_drivers?.[0];
             const summaryDays = formatDaysForSummary(primaryAssignment?.days_active || []);
             const startTime = formatTimeForSummary(firstStop?.estimated_morning_time);
             const returnTime = formatTimeForSummary(firstStop?.estimated_return_time);

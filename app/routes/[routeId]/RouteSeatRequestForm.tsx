@@ -57,7 +57,7 @@ export default function RouteSeatRequestForm({
       <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="text-base font-bold text-slate-900">Member access required</h2>
         <p className="text-sm text-slate-600">
-          You can browse routes, but only active members can request a weekly seat.
+          New users can browse routes first. To request a weekly seat, register as a member.
         </p>
         <Link
           href="/register?type=member"
@@ -65,6 +65,12 @@ export default function RouteSeatRequestForm({
         >
           <Send className="h-4 w-4" />
           Request weekly seat
+        </Link>
+        <Link
+          href="/login"
+          className="inline-flex w-full items-center justify-center rounded-lg border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+        >
+          Already registered? Log in
         </Link>
       </section>
     );

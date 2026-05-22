@@ -1,7 +1,9 @@
 'use server';
 
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { DEFAULT_SUPABASE_URL } from '@/lib/supabase/config';
 import type {
   ContactUnlock,
   DriverRouteAssignment,
@@ -489,6 +491,18 @@ export async function recordContactUnlock(input: {
 
 export async function getOfficialRoutes(includeInactive = false) {
   const supabase = await createClient();
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL;
+  const publicAssignmentsClient =
+    !includeInactive && serviceRoleKey
+      ? createSupabaseClient(supabaseUrl, serviceRoleKey, {
+          auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+            detectSessionInUrl: false,
+          },
+        })
+      : null;
 
   const query = supabase
     .from('official_routes')
@@ -519,7 +533,7 @@ export async function getOfficialRoutes(includeInactive = false) {
   }
 
   const { data: assignments } = routeIds.length
-    ? await supabase
+    ? await (publicAssignmentsClient || supabase)
         .from('driver_route_assignments')
         .select('id, driver_id, vehicle_id, route_id, status, seats_available, weekly_price, single_trip_price, days_active, created_at')
         .in('route_id', routeIds)
@@ -530,7 +544,7 @@ export async function getOfficialRoutes(includeInactive = false) {
     new Set((assignments || []).map((assignment: any) => assignment.driver_id).filter(Boolean))
   );
 
-  const { data: driverProfiles } = driverProfileIds.length
+  const { data: driverProfiles } = includeInactive && driverProfileIds.length
     ? await supabase
         .from('profiles')
         .select('id, first_name, surname, phone, email')
@@ -545,7 +559,7 @@ export async function getOfficialRoutes(includeInactive = false) {
     new Set((assignments || []).map((assignment: any) => assignment.vehicle_id).filter(Boolean))
   );
 
-  const { data: vehicles } = vehicleIds.length
+  const { data: vehicles } = includeInactive && vehicleIds.length
     ? await supabase
         .from('vehicles')
         .select('id, make, model, licence_plate')
@@ -576,7 +590,7 @@ export async function getOfficialRoutes(includeInactive = false) {
     const vehicle = vehiclesById.get(assignment.vehicle_id);
     const driverName = driverProfile
       ? `${driverProfile.first_name || ''} ${driverProfile.surname || ''}`.trim()
-      : 'Unknown driver';
+      : 'Assigned driver';
     const vehicleLabel = vehicle
       ? `${vehicle.make || ''} ${vehicle.model || ''}`.trim() + (vehicle.licence_plate ? ` • ${vehicle.licence_plate}` : '')
       : null;
@@ -585,9 +599,9 @@ export async function getOfficialRoutes(includeInactive = false) {
       id: assignment.id,
       driver_id: assignment.driver_id,
       status: assignment.status,
-      driver_name: driverName || 'Unknown driver',
-      phone: driverProfile?.phone || null,
-      email: driverProfile?.email || null,
+      driver_name: driverName || 'Assigned driver',
+      phone: includeInactive ? driverProfile?.phone || null : null,
+      email: includeInactive ? driverProfile?.email || null : null,
       seats_available: assignment.seats_available,
       weekly_price: assignment.weekly_price,
       single_trip_price: assignment.single_trip_price,
