@@ -43,7 +43,7 @@ async function getDriverData() {
   // Get driver stats and ID
   const { data: driverProfile } = await supabase
     .from('driver_profiles')
-    .select('id, completed_trips, rating_average, verification_status')
+    .select('id, completed_trips, rating_average, verification_status, id_status, vehicle_status')
     .eq('user_id', user.id)
     .single();
 
@@ -160,7 +160,7 @@ export default async function DriverDashboard() {
   // Check if payment proof is needed
   const paymentProof = data.payment?.proof_url || data.payment?.proof_image;
   const paymentApproved = data.payment?.status === 'approved';
-  const basicApproved = data.driverProfile?.verification_status === 'approved';
+  const basicApproved = data.driverProfile?.id_status === 'approved';
   const approvedVehicles = data.vehicles.filter(
     (vehicle: DriverVehicleSummary) => vehicle.is_active !== false && vehicle.verification_status === 'approved'
   );
@@ -217,7 +217,7 @@ export default async function DriverDashboard() {
 
       <div className="px-4 py-4 max-w-md mx-auto">
         {PILOT_ROUTE_MODE ? (
-          <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+          <div className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
             Pilot mode uses verified official routes only. Drivers are assigned to routes after admin review.
           </div>
         ) : null}
@@ -257,17 +257,17 @@ export default async function DriverDashboard() {
 
         {/* Awaiting Verification Banner */}
         {awaitingPaymentReview && (
-          <div className="bg-blue-50 border-2 border-blue-300 rounded-xl p-4 mb-4">
+          <div className="mb-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-3">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-blue-400 rounded-full flex items-center justify-center flex-shrink-0">
-                <Clock className="w-5 h-5 text-white" />
+              <div className="w-8 h-8 bg-blue-400 rounded-full flex items-center justify-center flex-shrink-0">
+                <Clock className="w-4 h-4 text-white" />
               </div>
               <div className="flex-1">
-                <h3 className="text-base font-bold text-blue-900 mb-1">Verification In Progress</h3>
-                          <p className="text-sm text-blue-800 mb-2">
+                <h3 className="text-sm font-bold text-blue-900 mb-1">Verification In Progress</h3>
+                <p className="text-xs text-blue-800 mb-1.5">
                   Your payment proof has been submitted and is being reviewed by our admin team.
                 </p>
-                <p className="text-xs text-blue-700">
+                <p className="text-[11px] text-blue-700">
                   You&apos;ll be notified once your account is verified. This usually takes 24-48 hours.
                 </p>
               </div>
@@ -276,14 +276,14 @@ export default async function DriverDashboard() {
         )}
 
         {awaitingBasicApproval && (
-          <div className="bg-purple-50 border-2 border-purple-300 rounded-xl p-4 mb-4">
+          <div className="mb-3 rounded-lg border border-purple-200 bg-purple-50 px-3 py-3">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-purple-400 rounded-full flex items-center justify-center flex-shrink-0">
-                <Clock className="w-5 h-5 text-white" />
+              <div className="w-8 h-8 bg-purple-400 rounded-full flex items-center justify-center flex-shrink-0">
+                <Clock className="w-4 h-4 text-white" />
               </div>
               <div className="flex-1">
-                <h3 className="text-base font-bold text-purple-900 mb-1">Basic Registration Approved</h3>
-                <p className="text-sm text-purple-800">
+                <h3 className="text-sm font-bold text-purple-900 mb-1">Basic Registration Approved</h3>
+                <p className="text-xs text-purple-800">
                   Your payment is approved. Complete vehicle registration and approval to activate the driver dashboard.
                 </p>
               </div>
@@ -292,22 +292,31 @@ export default async function DriverDashboard() {
         )}
 
         {awaitingVehicleApproval && (
-          <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 mb-4">
+          <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-amber-400 rounded-full flex items-center justify-center flex-shrink-0">
-                <Calendar className="w-5 h-5 text-white" />
+              <div className="w-8 h-8 bg-amber-400 rounded-full flex items-center justify-center flex-shrink-0">
+                <Calendar className="w-4 h-4 text-white" />
               </div>
               <div className="flex-1">
-                <h3 className="text-base font-bold text-amber-900 mb-1">Vehicle Registration Pending</h3>
-                <p className="text-sm text-amber-800 mb-3">
-                  Payment and basic registration are approved. Your dashboard becomes active after vehicle approval.
+                <h3 className="text-sm font-bold text-amber-900 mb-1">Vehicle Registration Pending</h3>
+                <p className="text-xs text-amber-800 mb-3">
+                  Payment and basic registration are approved. Submit your vehicle information to continue.
                 </p>
-                <Link
-                  href="/dashboard/driver/vehicles"
-                  className="inline-flex items-center justify-center w-full bg-amber-500 hover:bg-amber-600 text-white py-3 rounded-lg text-sm font-semibold"
-                >
-                  Complete Vehicle Registration
-                </Link>
+                {data.vehicles.length > 0 ? (
+                  <Link
+                    href="/dashboard/driver/vehicles"
+                    className="inline-flex items-center justify-center rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-600"
+                  >
+                    View Vehicle Status
+                  </Link>
+                ) : (
+                  <Link
+                    href="/dashboard/driver/vehicles/add"
+                    className="inline-flex items-center justify-center rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-600"
+                  >
+                    Submit Vehicle Info
+                  </Link>
+                )}
               </div>
             </div>
           </div>

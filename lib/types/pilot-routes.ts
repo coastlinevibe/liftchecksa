@@ -130,6 +130,19 @@ export interface ContactUnlock {
 
 export interface OfficialRouteWithStops extends OfficialRoute {
   route_stops: RouteStop[];
+  assigned_drivers?: {
+    id: string;
+    driver_id: string;
+    status: string;
+    driver_name: string;
+    phone?: string | null;
+    email?: string | null;
+    seats_available?: number | null;
+    weekly_price?: number | string | null;
+    single_trip_price?: number | string | null;
+    days_active?: string[] | null;
+    vehicle_label?: string | null;
+  }[];
 }
 
 export interface RouteAssignmentSummary extends DriverRouteAssignment {

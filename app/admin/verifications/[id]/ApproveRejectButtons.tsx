@@ -7,14 +7,11 @@ import { createClient } from '@/lib/supabase/client';
 
 interface Props {
   driverProfileId: string;
-  userId: string;
-  paymentId?: string;
 }
 
-export default function ApproveRejectButtons({ driverProfileId, userId, paymentId }: Props) {
+export default function ApproveRejectButtons({ driverProfileId }: Props) {
   const router = useRouter();
   const [decision, setDecision] = useState<'approve' | 'reject' | null>(null);
-  const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -28,62 +25,15 @@ export default function ApproveRejectButtons({ driverProfileId, userId, paymentI
       const supabase = createClient();
 
       if (decision === 'approve') {
-        // Get payment details to calculate expiry
-        let expiresAt = new Date();
-        if (paymentId) {
-          const { data: payment } = await supabase
-            .from('payments')
-            .select('plan_type')
-            .eq('id', paymentId)
-            .single();
-
-          if (payment) {
-            // Calculate expiry based on plan
-            if (payment.plan_type.includes('monthly')) {
-              expiresAt.setMonth(expiresAt.getMonth() + 1);
-            } else if (payment.plan_type.includes('quarterly')) {
-              expiresAt.setMonth(expiresAt.getMonth() + 3);
-            } else {
-              expiresAt.setFullYear(expiresAt.getFullYear() + 1);
-            }
-          }
-        }
-
-        // Update profile membership status with expiry
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update({ 
-            membership_status: 'active',
-            membership_expires_at: expiresAt.toISOString()
-          })
-          .eq('user_id', userId);
-
-        if (profileError) throw profileError;
-
-        // Update driver profile to approved
         const { error: driverError } = await supabase
           .from('driver_profiles')
           .update({ 
             id_status: 'approved',
-            verification_status: 'approved'
+            verification_status: 'pending'
           })
           .eq('id', driverProfileId);
 
         if (driverError) throw driverError;
-
-        // Update payment if exists
-        if (paymentId) {
-          const { error: paymentError } = await supabase
-            .from('payments')
-            .update({ 
-              status: 'approved',
-              activated_at: new Date().toISOString(),
-              expires_at: expiresAt.toISOString()
-            })
-            .eq('id', paymentId);
-
-          if (paymentError) throw paymentError;
-        }
 
         alert('Basic registration approved successfully!');
         router.push('/admin');
@@ -98,15 +48,6 @@ export default function ApproveRejectButtons({ driverProfileId, userId, paymentI
           .eq('id', driverProfileId);
 
         if (driverError) throw driverError;
-
-        if (paymentId) {
-          const { error: paymentError } = await supabase
-            .from('payments')
-            .update({ status: 'rejected' })
-            .eq('id', paymentId);
-
-          if (paymentError) throw paymentError;
-        }
 
         alert('Application rejected');
         router.push('/admin');
@@ -142,7 +83,7 @@ export default function ApproveRejectButtons({ driverProfileId, userId, paymentI
             decision === 'approve' ? 'text-emerald-500' : 'text-slate-400'
           }`} />
           <div className="text-sm font-semibold text-slate-900">Approve</div>
-          <div className="text-xs text-slate-600 mt-1">Payment proof reviewed</div>
+          <div className="text-xs text-slate-600 mt-1">Basic details and ID look correct</div>
         </button>
 
         <button
@@ -159,17 +100,6 @@ export default function ApproveRejectButtons({ driverProfileId, userId, paymentI
           <div className="text-sm font-semibold text-slate-900">Reject</div>
           <div className="text-xs text-slate-600 mt-1">Documents invalid</div>
         </button>
-      </div>
-
-      <div className="mb-4">
-        <label className="block text-xs font-semibold text-slate-700 mb-1.5">Admin Notes (Optional)</label>
-        <textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Add notes about this verification..."
-          rows={3}
-          className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-        />
       </div>
 
       {decision && (

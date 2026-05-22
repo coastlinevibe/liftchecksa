@@ -518,9 +518,89 @@ export async function getOfficialRoutes(includeInactive = false) {
     stopsByRoute.set(stop.route_id, list);
   }
 
+  const { data: assignments } = routeIds.length
+    ? await supabase
+        .from('driver_route_assignments')
+        .select('id, driver_id, vehicle_id, route_id, status, seats_available, weekly_price, single_trip_price, days_active, created_at')
+        .in('route_id', routeIds)
+        .order('created_at', { ascending: false })
+    : { data: [] };
+
+  const driverProfileIds = Array.from(
+    new Set((assignments || []).map((assignment: any) => assignment.driver_id).filter(Boolean))
+  );
+
+  const { data: driverProfiles } = driverProfileIds.length
+    ? await supabase
+        .from('profiles')
+        .select('id, first_name, surname, phone, email')
+        .in('id', driverProfileIds)
+    : { data: [] };
+
+  const driverProfilesById = new Map(
+    (driverProfiles || []).map((profile: any) => [profile.id, profile])
+  );
+
+  const vehicleIds = Array.from(
+    new Set((assignments || []).map((assignment: any) => assignment.vehicle_id).filter(Boolean))
+  );
+
+  const { data: vehicles } = vehicleIds.length
+    ? await supabase
+        .from('vehicles')
+        .select('id, make, model, licence_plate')
+        .in('id', vehicleIds)
+    : { data: [] };
+
+  const vehiclesById = new Map((vehicles || []).map((vehicle: any) => [vehicle.id, vehicle]));
+
+  const assignmentsByRoute = new Map<
+    string,
+    Array<{
+      id: string;
+      driver_id: string;
+      status: string;
+      driver_name: string;
+      phone?: string | null;
+      email?: string | null;
+      seats_available?: number | null;
+      weekly_price?: number | string | null;
+      single_trip_price?: number | string | null;
+      days_active?: string[] | null;
+      vehicle_label?: string | null;
+    }>
+  >();
+  for (const assignment of assignments || []) {
+    const list = assignmentsByRoute.get(assignment.route_id) || [];
+    const driverProfile = driverProfilesById.get(assignment.driver_id);
+    const vehicle = vehiclesById.get(assignment.vehicle_id);
+    const driverName = driverProfile
+      ? `${driverProfile.first_name || ''} ${driverProfile.surname || ''}`.trim()
+      : 'Unknown driver';
+    const vehicleLabel = vehicle
+      ? `${vehicle.make || ''} ${vehicle.model || ''}`.trim() + (vehicle.licence_plate ? ` • ${vehicle.licence_plate}` : '')
+      : null;
+
+    list.push({
+      id: assignment.id,
+      driver_id: assignment.driver_id,
+      status: assignment.status,
+      driver_name: driverName || 'Unknown driver',
+      phone: driverProfile?.phone || null,
+      email: driverProfile?.email || null,
+      seats_available: assignment.seats_available,
+      weekly_price: assignment.weekly_price,
+      single_trip_price: assignment.single_trip_price,
+      days_active: assignment.days_active || [],
+      vehicle_label: vehicleLabel,
+    });
+    assignmentsByRoute.set(assignment.route_id, list);
+  }
+
   const normalizedRoutes = (routes || []).map((route) => ({
     ...(route as OfficialRoute),
     route_stops: stopsByRoute.get(route.id) || [],
+    assigned_drivers: assignmentsByRoute.get(route.id) || [],
   })) as OfficialRouteWithStops[];
 
   return { routes: normalizedRoutes };

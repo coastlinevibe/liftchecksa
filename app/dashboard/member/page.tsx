@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Search, MapPin, Calendar, Star, Shield, Bell, Settings, AlertCircle, Clock } from 'lucide-react';
 import LogoutButton from '@/components/LogoutButton';
 import { createClient } from '@/lib/supabase/server';
-import { formatMembershipExpiry, getMembershipExpiry } from '@/lib/membership';
+import { formatMembershipExpiry, getMembershipExpiry, getPlanLabel } from '@/lib/membership';
 import { redirect } from 'next/navigation';
 import { PILOT_ROUTE_MODE } from '@/lib/feature-flags';
 
@@ -129,7 +129,7 @@ function formatDate(dateString: string): string {
 export default async function MemberDashboard() {
   const data = await getMemberData();
 
-  const membershipLabel = data.profile?.membership_type === 'plus' ? 'Member Plus' : 'Member Basic';
+  const membershipLabel = getPlanLabel(data.profile?.membership_type);
   const membershipActive = data.profile?.membership_status === 'active' || data.payment?.status === 'approved';
   const paymentProof = data.payment?.proof_url || data.payment?.proof_image;
   const membershipExpiry = getMembershipExpiry(data.profile, data.payment);

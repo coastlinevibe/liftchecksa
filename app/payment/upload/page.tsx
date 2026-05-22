@@ -63,11 +63,32 @@ export default function PaymentUploadPage() {
     }
   };
 
-  const copyToClipboard = () => {
-    if (paymentData?.payment_reference) {
-      navigator.clipboard.writeText(paymentData.payment_reference);
+  const copyToClipboard = async () => {
+    if (!paymentData?.payment_reference) return;
+
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(paymentData.payment_reference);
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = paymentData.payment_reference;
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        const copied = document.execCommand('copy');
+        document.body.removeChild(textArea);
+
+        if (!copied) {
+          throw new Error('Copy failed');
+        }
+      }
+
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
     }
   };
 
