@@ -104,6 +104,7 @@ function MemberForm({ onBack }: { onBack: () => void }) {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [paymentRef, setPaymentRef] = useState('');
+  const [plan, setPlan] = useState<'basic' | 'plus'>('basic');
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     firstName: '',
@@ -137,7 +138,7 @@ function MemberForm({ onBack }: { onBack: () => void }) {
       surname: formData.surname,
       phone: formData.phone,
       role: 'member',
-      membershipType: 'basic',
+      membershipType: plan,
       homeProvince: formData.homeProvince,
     });
     if (result.success && result.paymentReference) {
@@ -165,7 +166,7 @@ function MemberForm({ onBack }: { onBack: () => void }) {
               <div className="text-2xl font-bold text-emerald-900">{paymentRef}</div>
             </div>
             <div className="text-xs text-emerald-800">
-              <strong>Amount:</strong> R36.00
+              <strong>Amount:</strong> R{plan === 'plus' ? '96' : '36'}.00
             </div>
           </div>
         </div>
@@ -183,7 +184,27 @@ function MemberForm({ onBack }: { onBack: () => void }) {
         <h1 className="text-2xl font-bold text-slate-900 mb-2">Member Sign Up</h1>
 
         <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900">
-          Members now use one 12-month plan.
+          Choose your 12-month member plan.
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-xs font-semibold text-slate-700 mb-2">Choose Plan</label>
+          <div className="grid grid-cols-2 gap-2">
+            <PlanCard
+              active={plan === 'basic'}
+              title="Basic"
+              price="R36 / 12 months"
+              detail="Route browsing, seat requests, chat, and safety checks."
+              onClick={() => setPlan('basic')}
+            />
+            <PlanCard
+              active={plan === 'plus'}
+              title="Upgraded"
+              price="R96 / 12 months"
+              detail="Everything in Basic plus upgraded member access."
+              onClick={() => setPlan('plus')}
+            />
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3 mt-4">
@@ -442,11 +463,13 @@ function PlanCard({
   active,
   title,
   price,
+  detail,
   onClick,
 }: {
   active: boolean;
   title: string;
   price: string;
+  detail?: string;
   onClick: () => void;
 }) {
   return (
@@ -459,6 +482,7 @@ function PlanCard({
     >
       <div className="text-sm font-semibold text-slate-900">{title}</div>
       <div className="text-lg font-bold text-emerald-600">{price}</div>
+      {detail ? <div className="mt-1 text-[11px] leading-tight text-slate-600">{detail}</div> : null}
     </button>
   );
 }
