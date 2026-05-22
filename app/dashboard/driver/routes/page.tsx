@@ -33,13 +33,13 @@ export default async function DriverRoutesPage() {
             Back to dashboard
           </Link>
           <h1 className="text-xl font-bold text-slate-900">Assigned Official Routes</h1>
-          <p className="text-xs text-slate-600">Driver access for the verified route pilot.</p>
+          <p className="text-xs text-slate-600">Driver access for assigned official routes.</p>
         </div>
       </div>
 
       <div className="mx-auto max-w-5xl px-4 py-4">
         <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
-          Drivers cannot publish public trips in pilot mode. Assigned routes appear here after admin approval.
+          Drivers do not publish public trips. Assigned routes appear here after admin approval.
         </div>
 
         <section className="mb-4 rounded-xl border border-slate-200 bg-white p-4">

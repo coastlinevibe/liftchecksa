@@ -3,13 +3,12 @@ import Image from 'next/image';
 import { Shield, CheckCircle, Users, MessageSquare, Search, Car } from 'lucide-react';
 import GPSHeroBackground from './components/GPSHeroBackground';
 import { Button } from '@/components/ui/button';
-import { PILOT_ROUTE_MODE } from '@/lib/feature-flags';
 
 export default function Home() {
-  const primaryHref = PILOT_ROUTE_MODE ? '/routes' : '/trips';
-  const primaryLabel = PILOT_ROUTE_MODE ? 'Browse Routes' : 'Find a Lift';
-  const secondaryHref = PILOT_ROUTE_MODE ? '/register?type=driver' : '/register?type=driver';
-  const secondaryLabel = PILOT_ROUTE_MODE ? 'Join as Driver' : 'Offer a Lift';
+  const primaryHref = '/routes';
+  const primaryLabel = 'Browse Routes';
+  const secondaryHref = '/register?type=driver';
+  const secondaryLabel = 'Join as Driver';
 
   return (
     <div className="min-h-screen bg-slate-900">
@@ -109,9 +108,9 @@ export default function Home() {
                 1
               </div>
               <div className="flex-1">
-                <h3 className="text-xs font-semibold text-white mb-0.5">Driver Posts Lift</h3>
+                <h3 className="text-xs font-semibold text-white mb-0.5">Admin Creates Routes</h3>
                 <p className="text-[10px] text-slate-400 leading-tight">
-                  Verified driver shares link to Facebook/WhatsApp groups
+                  Official routes are published with approved stops and pricing
                 </p>
               </div>
             </div>
@@ -121,9 +120,9 @@ export default function Home() {
                 2
               </div>
               <div className="flex-1">
-                <h3 className="text-xs font-semibold text-white mb-0.5">Check Before You Pay</h3>
+                <h3 className="text-xs font-semibold text-white mb-0.5">Drivers Get Approved</h3>
                 <p className="text-[10px] text-slate-400 leading-tight">
-                  View driver ID card, vehicle details and ratings
+                  Drivers complete payment, verification, and vehicle approval
                 </p>
               </div>
             </div>
@@ -133,9 +132,9 @@ export default function Home() {
                 3
               </div>
               <div className="flex-1">
-                <h3 className="text-xs font-semibold text-white mb-0.5">Confirm Before You Ride</h3>
+                <h3 className="text-xs font-semibold text-white mb-0.5">Passengers Request Seats</h3>
                 <p className="text-[10px] text-slate-400 leading-tight">
-                  Match driver face, vehicle and plate with Bluetooth Verify
+                  Choose a route, request a seat, and verify before you travel
                 </p>
               </div>
             </div>
@@ -168,7 +167,7 @@ export default function Home() {
                 <div className="text-base font-bold text-emerald-400">R120</div>
               </div>
               <p className="text-[10px] text-slate-400 mb-2 leading-tight">
-                Verified badge • Admin review • Route assignment • Pilot access
+                Verified badge • Admin review • Official route assignment
               </p>
               <Link 
                 href="/register?type=driver&plan=quarterly"
@@ -184,7 +183,7 @@ export default function Home() {
                 <div className="text-base font-bold text-emerald-400">R300</div>
               </div>
               <p className="text-[10px] text-slate-400 mb-2 leading-tight">
-                Verified badge • Admin review • Route assignment • Pilot access
+                Verified badge • Admin review • Official route assignment
               </p>
               <Link 
                 href="/register?type=driver&plan=annual"
@@ -244,7 +243,7 @@ export default function Home() {
                 <span className="text-emerald-400 group-open:rotate-180 transition-transform">▼</span>
               </summary>
               <div className="px-3 pb-3 pt-1 text-[10px] text-slate-300 leading-relaxed">
-                No! You can browse all available trips for free. Only sign up when you're ready to request a seat. Payment to drivers happens according to your agreement with them - LiftCheck doesn't handle trip payments, only annual membership fees.
+                No. You can browse official routes for free. Only sign up when you're ready to request a seat. LiftCheck handles membership and verification while trip payments follow the approved route flow.
               </div>
             </details>
 
@@ -255,7 +254,7 @@ export default function Home() {
                 <span className="text-emerald-400 group-open:rotate-180 transition-transform">▼</span>
               </summary>
               <div className="px-3 pb-3 pt-1 text-[10px] text-slate-300 leading-relaxed">
-                Members now use one 12-month plan. Drivers can choose a 3-month or 12-month verified provider plan while the platform stays in pilot mode.
+                Members use one 12-month plan. Drivers can choose a 3-month or 12-month verified provider plan.
               </div>
             </details>
 
@@ -277,7 +276,7 @@ export default function Home() {
                 <span className="text-emerald-400 group-open:rotate-180 transition-transform">▼</span>
               </summary>
               <div className="px-3 pb-3 pt-1 text-[10px] text-slate-300 leading-relaxed">
-                Yes! LiftCheck is designed to work alongside your existing groups. Drivers create trips on LiftCheck, then share the trip link to Facebook or WhatsApp. Members can check the driver's credentials before committing.
+                Yes. LiftCheck can still support your existing groups, but route availability is managed inside the platform by admins and approved drivers.
               </div>
             </details>
 

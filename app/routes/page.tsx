@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { MapPin, Search, Shield, Route as RouteIcon } from 'lucide-react';
 import { getOfficialRoutes } from '@/lib/routes/actions';
-import { PILOT_ROUTE_MODE } from '@/lib/feature-flags';
 
 type SearchParams = {
   pickup_area?: string | string[];
@@ -49,10 +48,10 @@ export default async function RoutesPage({
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
               <h1 className="text-xl font-bold text-slate-900">Official Routes</h1>
-              <p className="text-xs text-slate-600">Verified route pilot with ordered stops and seat requests.</p>
+              <p className="text-xs text-slate-600">Admin-managed routes with ordered stops and seat requests.</p>
             </div>
             <div className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-              {PILOT_ROUTE_MODE ? 'Pilot mode' : 'Routes'}
+              Admin managed
             </div>
           </div>
 
@@ -87,12 +86,6 @@ export default async function RoutesPage({
       </div>
 
       <div className="mx-auto max-w-5xl px-4 py-4">
-        {PILOT_ROUTE_MODE ? (
-          <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
-            Pilot mode uses verified official routes only. Phone numbers stay hidden until both sides accept.
-          </div>
-        ) : null}
-
         {error ? (
           <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{error}</div>
         ) : null}
@@ -147,7 +140,7 @@ export default async function RoutesPage({
               </div>
               <p className="text-sm font-semibold text-slate-900">No active routes found</p>
               <p className="mt-1 text-xs text-slate-500">
-                The admin team will publish official routes here once the pilot is ready.
+                The admin team will publish official routes here as they become available.
               </p>
             </div>
           ) : null}

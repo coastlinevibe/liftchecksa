@@ -24,7 +24,7 @@ export default async function AdminRoutesPage() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <h1 className="text-xl font-bold text-slate-900">Official Routes</h1>
-              <p className="text-xs text-slate-600">Admin-created routes for the verified pilot.</p>
+              <p className="text-xs text-slate-600">Admin-created routes for approved drivers and members.</p>
             </div>
             <Link
               href="/admin/routes/new"
@@ -147,7 +147,7 @@ export default async function AdminRoutesPage() {
 
           {(routes || []).length === 0 ? (
             <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
-              No routes yet. Create the first verified route to start the pilot.
+              No routes yet. Create the first official route to get started.
             </div>
           ) : null}
         </div>

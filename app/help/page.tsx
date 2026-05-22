@@ -82,11 +82,11 @@ export default function HelpPage() {
       questions: [
         {
           q: 'How do I create a trip?',
-          a: 'In pilot mode, official routes are admin-created. Drivers register and get assigned to approved routes instead of publishing open trips themselves.',
+          a: 'Drivers do not publish open trips themselves. Admins create official routes, and approved drivers are assigned to those routes.',
         },
         {
           q: 'How do I share my trip link?',
-          a: 'In the pilot, passengers search official routes rather than open trip posts. Drivers can still use chat and route assignment once approved.',
+          a: 'Passengers browse official routes inside LiftCheck. Once approved and assigned, drivers use route assignment and chat instead of sharing open trip posts.',
         },
         {
           q: 'What documents do I need for verification?',

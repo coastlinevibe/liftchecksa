@@ -277,7 +277,7 @@ export default async function AdminDashboard() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <div className="text-sm font-bold text-emerald-900">Official Routes</div>
-              <p className="text-xs text-emerald-800">Create, review, and assign verified pilot routes.</p>
+              <p className="text-xs text-emerald-800">Create, review, and assign official routes.</p>
             </div>
             <CheckCircle className="h-5 w-5 text-emerald-600" />
           </div>

@@ -68,7 +68,7 @@ export default async function RouteDetailPage({
             <div className="grid gap-2 text-sm text-slate-600">
               <div>Passengers choose any pickup and drop-off stop in order.</div>
               <div>Phone numbers stay hidden until both sides accept.</div>
-              <div>Weekly reservations are the default for the pilot.</div>
+              <div>Weekly reservations are the default booking flow.</div>
             </div>
           </section>
         </div>

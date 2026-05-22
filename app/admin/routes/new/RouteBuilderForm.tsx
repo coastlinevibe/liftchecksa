@@ -247,7 +247,7 @@ export default function RouteBuilderForm() {
       </div>
 
       <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
-        Admin-created routes are the only public pilot routes. Drivers will be assigned after verification.
+        Admin-created routes are the public route flow. Drivers will be assigned after verification.
       </div>
 
       <button
