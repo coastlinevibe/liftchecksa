@@ -110,7 +110,9 @@ export default async function AdminRouteDetailPage({
               ))}
             </div>
           </section>
+        </div>
 
+        <div className="space-y-4">
           <section className="rounded-xl border border-slate-200 bg-white p-4">
             <div className="mb-3 flex items-center gap-2">
               <Users className="h-4 w-4 text-emerald-600" />
@@ -122,7 +124,11 @@ export default async function AdminRouteDetailPage({
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="text-sm font-semibold text-slate-900">
-                        Assignment #{assignment.id.slice(0, 8)}
+                        {assignment.driver_name || `Driver ${assignment.driver_id.slice(0, 8)}`}
+                        {' '}
+                        •
+                        {' '}
+                        {assignment.vehicle_plate || 'Plate unavailable'}
                       </div>
                       <div className="text-xs text-slate-600">
                         Status: {assignment.status} • Seats: {assignment.seats_available}
@@ -145,9 +151,7 @@ export default async function AdminRouteDetailPage({
               ) : null}
             </div>
           </section>
-        </div>
 
-        <div className="space-y-4">
           <section className="rounded-xl border border-slate-200 bg-white p-4">
             <div className="mb-3 flex items-center gap-2">
               <CalendarDays className="h-4 w-4 text-emerald-600" />

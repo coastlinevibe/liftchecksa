@@ -149,4 +149,6 @@ export interface RouteAssignmentSummary extends DriverRouteAssignment {
   route?: OfficialRoute | null;
   route_stops?: RouteStop[];
   passenger_request_count?: number;
+  driver_name?: string;
+  vehicle_plate?: string | null;
 }

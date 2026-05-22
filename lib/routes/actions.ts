@@ -641,6 +641,26 @@ export async function getRouteDetail(routeId: string) {
     return { error: routeError?.message || 'Route not found' };
   }
 
+  const driverProfileIds = [...new Set((assignments || []).map((assignment) => assignment.driver_id).filter(Boolean))];
+  const vehicleIds = [...new Set((assignments || []).map((assignment) => assignment.vehicle_id).filter(Boolean))];
+
+  const [{ data: driverProfiles }, { data: vehicles }] = await Promise.all([
+    driverProfileIds.length
+      ? supabase
+          .from('profiles')
+          .select('id, first_name, surname')
+          .in('id', driverProfileIds)
+      : Promise.resolve({ data: [] as { id: string; first_name: string | null; surname: string | null }[] }),
+    vehicleIds.length
+      ? supabase
+          .from('vehicles')
+          .select('id, licence_plate')
+          .in('id', vehicleIds)
+      : Promise.resolve({ data: [] as { id: string; licence_plate: string | null }[] }),
+  ]);
+
+  const profileById = new Map((driverProfiles || []).map((profile) => [profile.id, profile]));
+  const vehicleById = new Map((vehicles || []).map((vehicle) => [vehicle.id, vehicle]));
   const requestCounts = countAssignmentsByRequest((requests || []) as RouteSeatRequest[]);
 
   return {
@@ -649,6 +669,12 @@ export async function getRouteDetail(routeId: string) {
     assignments: (assignments || []).map((assignment) => ({
       ...(assignment as DriverRouteAssignment),
       passenger_request_count: requestCounts.get(assignment.id) || 0,
+      driver_name: (() => {
+        const profile = profileById.get(assignment.driver_id);
+        if (!profile) return `Driver ${assignment.driver_id.slice(0, 8)}`;
+        return `${profile.first_name || ''} ${profile.surname || ''}`.trim() || `Driver ${assignment.driver_id.slice(0, 8)}`;
+      })(),
+      vehicle_plate: vehicleById.get(assignment.vehicle_id)?.licence_plate || null,
     })) as RouteAssignmentSummary[],
     requests: (requests || []) as RouteSeatRequest[],
     ledger: (ledger || []) as RidePaymentLedgerEntry[],
