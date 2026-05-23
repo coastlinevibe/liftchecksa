@@ -529,22 +529,14 @@ export async function sendRouteChatMessage(input: {
     redirect(`/routes/${input.routeId}?chat_error=${encodeURIComponent('Route is not active')}`);
   }
 
-  const { data: receiverProfile } = await supabase
-    .from('profiles')
-    .select('id, role, membership_status')
-    .eq('id', input.receiverId)
-    .single();
-
-  if (!receiverProfile) {
-    redirect(`/routes/${input.routeId}?chat_error=${encodeURIComponent('Chat receiver not found')}`);
-  }
-
   const isMemberSender = profile.role === 'member';
   const isDriverSender = profile.role === 'driver';
 
   if (!isMemberSender && !isDriverSender) {
     redirect(`/routes/${input.routeId}?chat_error=${encodeURIComponent('Route chat access required')}`);
   }
+
+  let resolvedReceiverId = input.receiverId;
 
   if (isMemberSender) {
     if (profile.membership_status !== 'active') {
@@ -554,6 +546,8 @@ export async function sendRouteChatMessage(input: {
     if (assignment.driver_id !== input.receiverId) {
       redirect(`/routes/${input.routeId}?chat_error=${encodeURIComponent('Route chat receiver mismatch')}`);
     }
+
+    resolvedReceiverId = assignment.driver_id;
   }
 
   if (isDriverSender) {
@@ -561,7 +555,36 @@ export async function sendRouteChatMessage(input: {
       redirect(`/dashboard/driver/routes/${input.routeId}?chat_error=${encodeURIComponent('Driver not assigned to this route')}`);
     }
 
-    if (receiverProfile.role !== 'member' || receiverProfile.membership_status !== 'active') {
+    const { data: routeRequest } = await supabase
+      .from('route_seat_requests')
+      .select('passenger_id, matched_assignment_id, status, created_at')
+      .eq('route_id', input.routeId)
+      .eq('matched_assignment_id', assignment.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (routeRequest?.passenger_id) {
+      resolvedReceiverId = routeRequest.passenger_id;
+    }
+  }
+
+  const { data: resolvedReceiverProfile } = await supabase
+    .from('profiles')
+    .select('id, role, membership_status')
+    .eq('id', resolvedReceiverId)
+    .single();
+
+  if (!resolvedReceiverProfile) {
+    redirect(
+      isDriverSender
+        ? `/dashboard/driver/routes/${input.routeId}?chat_error=${encodeURIComponent('Chat receiver not found')}`
+        : `/routes/${input.routeId}?chat_error=${encodeURIComponent('Chat receiver not found')}`
+    );
+  }
+
+  if (isDriverSender) {
+    if (resolvedReceiverProfile.role !== 'member' || resolvedReceiverProfile.membership_status !== 'active') {
       redirect(`/dashboard/driver/routes/${input.routeId}?chat_error=${encodeURIComponent('Driver replies require an active member')}`);
     }
   }
@@ -570,7 +593,7 @@ export async function sendRouteChatMessage(input: {
     route_id: input.routeId,
     assignment_id: input.assignmentId,
     sender_id: profile.id,
-    receiver_id: input.receiverId,
+    receiver_id: resolvedReceiverId,
     message,
   });
 

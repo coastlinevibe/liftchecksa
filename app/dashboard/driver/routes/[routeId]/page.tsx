@@ -69,16 +69,20 @@ export default async function DriverRouteDetailPage({
 
   const routeRequests = requests.filter((request) => request.route_id === route.id);
   const routeLedger = ledger.filter((entry) => entry.route_id === route.id);
-  const routeChatPeerId =
+  const assignmentRequest =
+    routeRequests.find((request) => request.matched_assignment_id === assignment.id && request.passenger_id) ||
+    routeRequests.find((request) => request.passenger_id) ||
+    null;
+  const inferredRouteChatPeerId =
+    assignmentRequest?.passenger_id ||
     routeChatMessages?.find((message) => message.sender_id !== profile.id)?.sender_id ||
     routeChatMessages?.find((message) => message.receiver_id !== profile.id)?.receiver_id ||
-    routeRequests[0]?.passenger_id ||
     null;
-  const { data: routeChatPeer } = routeChatPeerId
+  const { data: routeChatPeer } = inferredRouteChatPeerId
     ? await supabase
         .from('profiles')
         .select('id, first_name, surname, role')
-        .eq('id', routeChatPeerId)
+        .eq('id', inferredRouteChatPeerId)
         .maybeSingle()
     : { data: null };
   const driverName = `${profile.first_name || ''} ${profile.surname || ''}`.trim() || 'Driver';
@@ -184,11 +188,11 @@ export default async function DriverRouteDetailPage({
                 emptyStateText="No direct chat yet. Members can start the conversation from the route page."
               />
 
-              {routeChatPeerId ? (
+              {routeChatPeer?.id ? (
                 <form action={sendRouteChatMessageFromForm} className="mt-3 space-y-2">
                   <input type="hidden" name="routeId" value={route.id} />
                   <input type="hidden" name="assignmentId" value={assignment.id} />
-                  <input type="hidden" name="receiverId" value={routeChatPeerId} />
+                  <input type="hidden" name="receiverId" value={routeChatPeer.id} />
                   <label htmlFor="driverRouteChatMessage" className="block text-sm font-semibold text-slate-900">
                     Reply to {memberName}
                   </label>
@@ -207,7 +211,11 @@ export default async function DriverRouteDetailPage({
                     Send reply
                   </button>
                 </form>
-              ) : null}
+              ) : (
+                <div className="mt-3 rounded-lg border border-dashed border-slate-300 bg-white px-3 py-3 text-sm text-slate-600">
+                  No active member conversation yet.
+                </div>
+              )}
             </div>
           </section>
 
