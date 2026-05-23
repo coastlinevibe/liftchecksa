@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Bell, Calendar, Clock, MapPin, Plus, Settings } from 'lucide-react';
+import { Bell, Calendar, Clock, MapPin, Settings } from 'lucide-react';
 import LogoutButton from '@/components/LogoutButton';
 import { createClient } from '@/lib/supabase/server';
 import { getDriverRouteDashboard } from '@/lib/routes/actions';
@@ -247,26 +247,16 @@ export default async function DriverDashboard() {
 
         {isActiveDriver ? (
           <>
-            <Link
-              href="/dashboard/driver/routes"
-              className="block w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-lg text-sm font-semibold mb-4 flex items-center justify-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              View Assigned Routes
-            </Link>
-
-            <div className="mb-6">
+            <div id="assigned-routes" className="mb-6 scroll-mt-4">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-sm font-semibold text-slate-700">Assigned Routes</h2>
-                <Link href="/dashboard/driver/routes" className="text-xs font-semibold text-emerald-600 hover:underline">
-                  Open routes
-                </Link>
               </div>
 
               {routeAssignments.length > 0 ? (
                 <div className="space-y-3">
                   {routeAssignments.map((assignment) => {
                     const route = assignment.official_route;
+                    const requestCount = assignment.passenger_request_count || 0;
 
                     return (
                       <div key={assignment.id} className="bg-white border border-slate-200 rounded-xl p-3">
@@ -294,24 +284,23 @@ export default async function DriverDashboard() {
                               <span className="rounded-full bg-violet-50 px-2 py-0.5 font-semibold text-violet-700">
                                 Single: R{assignment.single_trip_price ?? '0'}
                               </span>
-                              {(assignment.passenger_request_count || 0) > 0 ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 font-semibold text-rose-600">
-                                  <Bell className="w-3 h-3" />
-                                  {assignment.passenger_request_count} request
-                                  {assignment.passenger_request_count === 1 ? '' : 's'}
-                                </span>
-                              ) : null}
+                              <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 font-semibold text-rose-600">
+                                <Bell className="w-3 h-3" />
+                                {requestCount} request{requestCount === 1 ? '' : 's'}
+                              </span>
                             </div>
                             <div className="mt-2 text-[11px] text-slate-500">
                               Days: {assignment.days_active?.join(', ') || 'Not set'}
                             </div>
                           </div>
-                          <Link
-                            href={`/dashboard/driver/routes/${assignment.route_id}`}
-                            className="rounded-lg border border-emerald-500 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
-                          >
-                            View route
-                          </Link>
+                          <div className="shrink-0">
+                            <Link
+                              href={`/dashboard/driver/routes/${assignment.route_id}`}
+                              className="inline-flex items-center justify-center rounded-lg border border-emerald-500 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+                            >
+                              View route
+                            </Link>
+                          </div>
                         </div>
                       </div>
                     );

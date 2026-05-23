@@ -57,7 +57,7 @@ export default async function DriverRouteDetailPage({
     null;
 
   if (!assignment) {
-    redirect('/dashboard/driver/routes');
+    redirect('/dashboard/driver#assigned-routes');
   }
 
   const { data: routeChatMessages } = await supabase
@@ -81,8 +81,8 @@ export default async function DriverRouteDetailPage({
   const { data: routeChatPeer } = inferredRouteChatPeerId
     ? await supabase
         .from('profiles')
-        .select('id, first_name, surname, role')
-        .eq('id', inferredRouteChatPeerId)
+        .select('id, user_id, first_name, surname, role')
+        .or(`id.eq.${inferredRouteChatPeerId},user_id.eq.${inferredRouteChatPeerId}`)
         .maybeSingle()
     : { data: null };
   const driverName = `${profile.first_name || ''} ${profile.surname || ''}`.trim() || 'Driver';
@@ -94,7 +94,7 @@ export default async function DriverRouteDetailPage({
     <div className="min-h-screen bg-slate-50">
       <div className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-5xl px-4 py-4">
-          <Link href="/dashboard/driver/routes" className="mb-2 inline-flex items-center text-sm text-slate-600">
+          <Link href="/dashboard/driver#assigned-routes" className="mb-2 inline-flex items-center text-sm text-slate-600">
             <ArrowLeft className="mr-1 h-4 w-4" />
             Back to assigned routes
           </Link>
@@ -188,11 +188,11 @@ export default async function DriverRouteDetailPage({
                 emptyStateText="No direct chat yet. Members can start the conversation from the route page."
               />
 
-              {routeChatPeer?.id ? (
+              {inferredRouteChatPeerId ? (
                 <form action={sendRouteChatMessageFromForm} className="mt-3 space-y-2">
                   <input type="hidden" name="routeId" value={route.id} />
                   <input type="hidden" name="assignmentId" value={assignment.id} />
-                  <input type="hidden" name="receiverId" value={routeChatPeer.id} />
+                  <input type="hidden" name="receiverId" value={routeChatPeer?.id || inferredRouteChatPeerId} />
                   <label htmlFor="driverRouteChatMessage" className="block text-sm font-semibold text-slate-900">
                     Reply to {memberName}
                   </label>
