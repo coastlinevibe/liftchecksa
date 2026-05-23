@@ -11,7 +11,7 @@ type DriverRouteAssignmentCard = {
   single_trip_price?: number | string | null;
   days_active?: string[] | null;
   passenger_request_count?: number | null;
-  official_routes?: {
+  official_route?: {
     id: string;
     name?: string | null;
     start_area?: string | null;
@@ -37,7 +37,7 @@ export default async function DriverRoutesPage() {
     }
   }
 
-  const assignments = ('assignments' in dashboard ? dashboard.assignments ?? [] : []) as DriverRouteAssignmentCard[];
+  const assignments = ('assignments' in dashboard ? dashboard.assignments ?? [] : []) as unknown as DriverRouteAssignmentCard[];
   const pendingRequests = 'pendingRequests' in dashboard ? dashboard.pendingRequests ?? [] : [];
 
   return (
@@ -66,7 +66,7 @@ export default async function DriverRoutesPage() {
 
           <div className="space-y-2">
             {assignments.map((assignment) => {
-              const route = assignment.official_routes;
+              const route = assignment.official_route;
               const requestCount = assignment.passenger_request_count || 0;
               return (
                 <div key={assignment.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">

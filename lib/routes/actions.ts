@@ -866,6 +866,9 @@ export async function getDriverRouteDashboard() {
     ...assignment,
     route_stops: stopsByRoute.get(assignment.route_id) || [],
     passenger_request_count: requestCounts.get(assignment.id) || 0,
+    official_route: Array.isArray((assignment as { official_routes?: unknown }).official_routes)
+      ? ((assignment as { official_routes?: { id: string; name?: string | null; start_area?: string | null; end_area?: string | null; status?: string | null }[] }).official_routes?.[0] || null)
+      : ((assignment as { official_routes?: { id: string; name?: string | null; start_area?: string | null; end_area?: string | null; status?: string | null } | null }).official_routes || null),
   }));
 
   const pendingRequests = routeIds.length
