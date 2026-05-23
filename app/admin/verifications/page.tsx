@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeft, Car } from 'lucide-react';
+import { redirect } from 'next/navigation';
 import { unstable_noStore as noStore } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import ApproveRejectButtons from './[id]/ApproveRejectButtons';
@@ -10,6 +11,23 @@ async function getPendingVerifications() {
   noStore();
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect('/login?redirect=/admin/verifications');
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (profile?.role !== 'platform_admin' && profile?.role !== 'group_admin') {
+    redirect('/dashboard/member');
+  }
 
   const { data: driverRows, error: driverRowsError } = await supabase
     .from('driver_profiles')

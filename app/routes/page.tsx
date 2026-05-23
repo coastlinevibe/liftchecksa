@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { MapPin, Search, Shield, Route as RouteIcon } from 'lucide-react';
+import { ArrowLeft, MapPin, Search, Shield, Route as RouteIcon } from 'lucide-react';
 import { getOfficialRoutes } from '@/lib/routes/actions';
 
 type SearchParams = {
@@ -61,6 +61,10 @@ export default async function RoutesPage({
     <div className="min-h-screen bg-slate-50">
       <div className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-5xl px-4 py-4">
+          <Link href="/" className="mb-3 inline-flex items-center text-sm text-slate-600 hover:text-slate-900">
+            <ArrowLeft className="mr-1 h-4 w-4" />
+            Back to home
+          </Link>
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
               <h1 className="text-xl font-bold text-slate-900">Official Routes</h1>

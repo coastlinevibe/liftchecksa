@@ -128,6 +128,16 @@ export interface ContactUnlock {
   created_at: string;
 }
 
+export interface RouteChatMessage {
+  id: string;
+  route_id: string;
+  assignment_id: string;
+  sender_id: string;
+  receiver_id: string;
+  message: string;
+  created_at?: string | null;
+}
+
 export interface OfficialRouteWithStops extends OfficialRoute {
   route_stops: RouteStop[];
   assigned_drivers?: {

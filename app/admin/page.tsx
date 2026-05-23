@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { Users, Car, CheckCircle, Clock, TrendingUp, Shield, CreditCard, AlertTriangle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import LogoutButton from '@/components/LogoutButton';
@@ -20,6 +21,24 @@ function getTimeAgo(date: Date): string {
 
 async function getAdminStats() {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect('/login?redirect=/admin');
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (profile?.role !== 'platform_admin' && profile?.role !== 'group_admin') {
+    redirect('/dashboard/member');
+  }
+
   const monthStart = new Date();
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);

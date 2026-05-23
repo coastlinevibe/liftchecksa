@@ -35,6 +35,16 @@ export async function middleware(request: NextRequest) {
     return '/dashboard/member';
   }
 
+  async function isAdminUser() {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('user_id', user?.id)
+      .maybeSingle();
+
+    return profile?.role === 'platform_admin' || profile?.role === 'group_admin';
+  }
+
   // Protected routes that require authentication
   const protectedRoutes = [
     '/dashboard',
@@ -59,6 +69,13 @@ export async function middleware(request: NextRequest) {
     const redirectUrl = new URL('/login', request.url);
     redirectUrl.searchParams.set('redirect', request.nextUrl.pathname);
     return NextResponse.redirect(redirectUrl);
+  }
+
+  if (request.nextUrl.pathname.startsWith('/admin') && user) {
+    const adminAllowed = await isAdminUser();
+    if (!adminAllowed) {
+      return NextResponse.redirect(new URL(await getUserLandingPath(), request.url));
+    }
   }
 
   // Redirect to dashboard if accessing login/register while authenticated
