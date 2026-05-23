@@ -41,7 +41,6 @@ export default function MobileNav() {
                   <Link
                     href={item.href}
                     className="relative w-full flex flex-col items-center justify-center font-semibold text-center"
-                    onClick={() => setActiveIndex(index)}
                   >
                     <Icon
                       className={`relative block text-2xl text-slate-900 transition-all duration-500 ${
