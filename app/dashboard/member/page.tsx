@@ -319,7 +319,7 @@ export default async function MemberDashboard() {
                         </div>
                       </div>
                       <Link
-                        href={`/trips/${trip.id}`}
+                        href="/routes"
                         className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold hover:bg-slate-200"
                       >
                         View Details
@@ -382,7 +382,7 @@ export default async function MemberDashboard() {
                         </div>
                       </div>
                       <Link
-                        href={`/trips/${trip.id}/booking-confirmed?request=${request.id}`}
+                        href="/routes"
                         className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold hover:bg-slate-200"
                       >
                         View Receipt

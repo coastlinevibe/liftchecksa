@@ -1,48 +1,53 @@
 import Link from 'next/link';
-import { Bell, Plus, Calendar, Users, MapPin, Clock, Settings } from 'lucide-react';
+import { Bell, Calendar, Clock, MapPin, Plus, Settings } from 'lucide-react';
 import LogoutButton from '@/components/LogoutButton';
 import { createClient } from '@/lib/supabase/server';
+import { getDriverRouteDashboard } from '@/lib/routes/actions';
 import { redirect } from 'next/navigation';
-
-type DriverTripSummary = {
-  id: string;
-  origin: string;
-  destination: string;
-  departure_date: string;
-  departure_time?: string;
-  seats_total: number;
-  seats_available: number;
-  cost_share_amount: number | string;
-  status?: string;
-  chat_count?: number;
-};
 
 type DriverVehicleSummary = {
   is_active?: boolean | null;
   verification_status?: string | null;
 };
 
+type DriverRouteSummary = {
+  id: string;
+  route_id: string;
+  status: string;
+  seats_available: number;
+  days_active: string[];
+  weekly_price?: number | string | null;
+  single_trip_price?: number | string | null;
+  passenger_request_count?: number;
+  official_route?: {
+    id: string;
+    name?: string | null;
+    start_area?: string | null;
+    end_area?: string | null;
+    status?: string | null;
+  } | null;
+};
+
 async function getDriverData() {
   const supabase = await createClient();
-  
-  // Get current user
-  const { data: { user } } = await supabase.auth.getUser();
-  
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   if (!user) {
     redirect('/login');
   }
 
-  // Check whether this user should actually be on the member or admin dashboard
   const { data: profile } = await supabase
     .from('profiles')
     .select('id, first_name, surname, role, membership_status')
     .eq('user_id', user.id)
     .single();
 
-  // Get driver stats and ID
   const { data: driverProfile } = await supabase
     .from('driver_profiles')
-    .select('id, completed_trips, rating_average, verification_status, id_status, vehicle_status')
+    .select('id, rating_average, verification_status, id_status, vehicle_status')
     .eq('user_id', user.id)
     .single();
 
@@ -58,7 +63,11 @@ async function getDriverData() {
     redirect('/dashboard/member');
   }
 
-  // Get payment info
+  const routeDashboard = await getDriverRouteDashboard();
+  const routeAssignments =
+    'error' in routeDashboard ? [] : ((routeDashboard.assignments || []) as DriverRouteSummary[]);
+  const routeRequests = 'error' in routeDashboard ? [] : routeDashboard.pendingRequests || [];
+
   const { data: payment } = await supabase
     .from('payments')
     .select('payment_reference, status, proof_url, proof_image, plan_type, created_at, activated_at, expires_at')
@@ -73,90 +82,19 @@ async function getDriverData() {
     .eq('driver_id', driverProfile.id)
     .order('created_at', { ascending: false });
 
-  // Get active trips (published or full status) - use driver_profiles.id
-  const { data: activeTrips } = await supabase
-    .from('trips')
-    .select(`
-      id,
-      origin,
-      destination,
-      departure_date,
-      departure_time,
-      seats_total,
-      seats_available,
-      cost_share_amount,
-      status
-    `)
-    .eq('driver_id', driverProfile.id)
-    .in('status', ['published', 'full'])
-    .order('departure_date', { ascending: true })
-    .limit(5);
-
-  const activeTripIds = (activeTrips || []).map((trip) => trip.id);
-  const { data: receivedChats } = profile?.id && activeTripIds.length > 0
-    ? await supabase
-        .from('trip_chats')
-        .select('trip_id')
-        .eq('receiver_id', profile.id)
-        .in('trip_id', activeTripIds)
-    : { data: [] };
-
-  const chatCountsByTrip = new Map<string, number>();
-  for (const chat of receivedChats || []) {
-    chatCountsByTrip.set(chat.trip_id, (chatCountsByTrip.get(chat.trip_id) || 0) + 1);
-  }
-
-  const activeTripsWithChats = (activeTrips || []).map((trip) => ({
-    ...trip,
-    chat_count: chatCountsByTrip.get(trip.id) || 0,
-  }));
-
-  // Get completed trips - use driver_profiles.id
-  const { data: completedTrips } = await supabase
-    .from('trips')
-    .select(`
-      id,
-      origin,
-      destination,
-      departure_date,
-      seats_total,
-      seats_available,
-      cost_share_amount
-    `)
-    .eq('driver_id', driverProfile.id)
-    .eq('status', 'completed')
-    .order('departure_date', { ascending: false })
-    .limit(5);
-
-  // Calculate total earnings (completed trips)
-  const totalEarnings = completedTrips?.reduce((sum, trip) => {
-    const seatsBooked = trip.seats_total - trip.seats_available;
-    return sum + (seatsBooked * trip.cost_share_amount);
-  }, 0) || 0;
-
   return {
     profile,
     driverProfile,
     payment,
-    activeTrips: activeTripsWithChats,
-    completedTrips: completedTrips || [],
     vehicles: vehicles || [],
-    totalEarnings,
+    routeAssignments,
+    routeRequests,
   };
-}
-
-function formatDate(dateString: string): string {
-  const date = new Date(dateString);
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  
-  return `${days[date.getDay()]}, ${date.getDate()} ${months[date.getMonth()]}`;
 }
 
 export default async function DriverDashboard() {
   const data = await getDriverData();
-  
-  // Check if payment proof is needed
+
   const paymentProof = data.payment?.proof_url || data.payment?.proof_image;
   const paymentApproved = data.payment?.status === 'approved';
   const basicApproved = data.driverProfile?.id_status === 'approved';
@@ -164,6 +102,8 @@ export default async function DriverDashboard() {
     (vehicle: DriverVehicleSummary) => vehicle.is_active !== false && vehicle.verification_status === 'approved'
   );
   const vehicleApproved = approvedVehicles.length > 0;
+  const routeAssignments = data.routeAssignments ?? [];
+  const routeRequests = data.routeRequests ?? [];
   const isActiveDriver = paymentApproved && basicApproved && vehicleApproved;
   const needsPaymentProof = !!data.payment && !paymentProof && !paymentApproved;
   const awaitingPaymentReview = !!paymentProof && data.payment?.status === 'pending';
@@ -172,7 +112,6 @@ export default async function DriverDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Header */}
       <div className="bg-white border-b border-slate-200">
         <div className="px-4 py-4 max-w-md mx-auto">
           <div className="flex items-center justify-between mb-3">
@@ -190,32 +129,24 @@ export default async function DriverDashboard() {
             </div>
           </div>
 
-          {/* Stats */}
           <div className="grid grid-cols-3 gap-2">
             <div className="bg-emerald-50 rounded-lg p-2.5 text-center">
-              <div className="text-lg font-bold text-emerald-600">
-                {data.driverProfile?.completed_trips || 0}
-              </div>
-              <div className="text-[10px] text-slate-600">Trips</div>
+              <div className="text-lg font-bold text-emerald-600">{routeAssignments.length}</div>
+              <div className="text-[10px] text-slate-600">Routes</div>
             </div>
             <div className="bg-blue-50 rounded-lg p-2.5 text-center">
-              <div className="text-lg font-bold text-blue-600">
-                {data.driverProfile?.rating_average?.toFixed(1) || '0.0'}
-              </div>
-              <div className="text-[10px] text-slate-600">Rating</div>
+              <div className="text-lg font-bold text-blue-600">{routeRequests.length}</div>
+              <div className="text-[10px] text-slate-600">Requests</div>
             </div>
             <div className="bg-purple-50 rounded-lg p-2.5 text-center">
-              <div className="text-lg font-bold text-purple-600">
-                R{data.totalEarnings.toLocaleString()}
-              </div>
-              <div className="text-[10px] text-slate-600">Earned</div>
+              <div className="text-lg font-bold text-purple-600">{approvedVehicles.length}</div>
+              <div className="text-[10px] text-slate-600">Vehicles</div>
             </div>
           </div>
         </div>
       </div>
 
       <div className="px-4 py-4 max-w-md mx-auto">
-        {/* Payment Proof Required Banner */}
         {needsPaymentProof && (
           <div className="bg-amber-50 border-2 border-amber-400 rounded-xl p-4 mb-4">
             <div className="flex items-start gap-3">
@@ -248,7 +179,6 @@ export default async function DriverDashboard() {
           </div>
         )}
 
-        {/* Awaiting Verification Banner */}
         {awaitingPaymentReview && (
           <div className="mb-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-3">
             <div className="flex items-start gap-3">
@@ -315,10 +245,8 @@ export default async function DriverDashboard() {
           </div>
         )}
 
-        {/* Active Driver Dashboard */}
         {isActiveDriver ? (
           <>
-            {/* Vehicle gate */}
             <Link
               href="/dashboard/driver/routes"
               className="block w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-lg text-sm font-semibold mb-4 flex items-center justify-center gap-2"
@@ -327,135 +255,75 @@ export default async function DriverDashboard() {
               View Assigned Routes
             </Link>
 
-        {/* Active Trips */}
-        <div className="mb-6">
-          <h2 className="text-sm font-semibold text-slate-700 mb-3">Active Trips</h2>
-          {data.activeTrips.length > 0 ? (
-            <div className="space-y-3">
-              {data.activeTrips.map((trip: DriverTripSummary) => {
-                const seatsBooked = trip.seats_total - trip.seats_available;
-                const isFull = trip.seats_available === 0;
-                
-                return (
-                  <div key={trip.id} className="bg-white border border-slate-200 rounded-xl p-3">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <MapPin className="w-3.5 h-3.5 text-emerald-500" />
-                          <span className="text-sm font-semibold text-slate-900">
-                            {trip.origin} → {trip.destination}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-3 text-xs text-slate-600">
-                          <div className="flex items-center gap-1">
-                            <Calendar className="w-3 h-3" />
-                            <span>{formatDate(trip.departure_date)}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            <span>{trip.departure_time}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-base font-bold text-emerald-600">
-                          R{trip.cost_share_amount}
-                        </div>
-                        <div className="text-[10px] text-slate-500">per seat</div>
-                      </div>
-                    </div>
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-slate-700">Assigned Routes</h2>
+                <Link href="/dashboard/driver/routes" className="text-xs font-semibold text-emerald-600 hover:underline">
+                  Open routes
+                </Link>
+              </div>
 
-                      <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                        <div className="flex items-center gap-1 text-xs text-slate-600">
-                          <Users className="w-3.5 h-3.5" />
-                          <span>{seatsBooked} of {trip.seats_total} seats booked</span>
-                          {(trip.chat_count || 0) > 0 ? (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-600">
-                              <Bell className="w-3 h-3" />
-                              {trip.chat_count}
-                            </span>
-                          ) : null}
-                        </div>
-                      <div className="flex items-center gap-2">
-                        {isFull ? (
-                          <div className="px-3 py-1.5 bg-emerald-500 text-white rounded-lg text-xs font-semibold">
-                            Full
+              {routeAssignments.length > 0 ? (
+                <div className="space-y-3">
+                  {routeAssignments.map((assignment) => {
+                    const route = assignment.official_route;
+
+                    return (
+                      <div key={assignment.id} className="bg-white border border-slate-200 rounded-xl p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <MapPin className="w-3.5 h-3.5 text-emerald-500" />
+                              <span className="text-sm font-semibold text-slate-900">
+                                {route?.name || 'Assigned route'}
+                              </span>
+                              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                                {assignment.status}
+                              </span>
+                            </div>
+                            <div className="text-xs text-slate-600 mb-2">
+                              {route?.start_area || 'Start'} → {route?.end_area || 'Destination'}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-600">
+                              <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">
+                                {assignment.seats_available} seats available
+                              </span>
+                              <span className="rounded-full bg-sky-50 px-2 py-0.5 font-semibold text-sky-700">
+                                Weekly: R{assignment.weekly_price ?? '0'}
+                              </span>
+                              <span className="rounded-full bg-violet-50 px-2 py-0.5 font-semibold text-violet-700">
+                                Single: R{assignment.single_trip_price ?? '0'}
+                              </span>
+                              {(assignment.passenger_request_count || 0) > 0 ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 font-semibold text-rose-600">
+                                  <Bell className="w-3 h-3" />
+                                  {assignment.passenger_request_count} request
+                                  {assignment.passenger_request_count === 1 ? '' : 's'}
+                                </span>
+                              ) : null}
+                            </div>
+                            <div className="mt-2 text-[11px] text-slate-500">
+                              Days: {assignment.days_active?.join(', ') || 'Not set'}
+                            </div>
                           </div>
-                        ) : null}
-                        <Link
-                          href={`/dashboard/driver/trip-requests/${trip.id}`}
-                          className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-semibold hover:bg-blue-100 inline-flex items-center gap-1"
-                        >
-                          {(trip.chat_count || 0) > 0 ? <Bell className="w-3 h-3" /> : null}
-                          Chats
-                        </Link>
-                        <Link
-                          href={`/dashboard/driver/trips/${trip.id}`}
-                          className="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-semibold hover:bg-emerald-100"
-                        >
-                          View Details
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="bg-white border border-slate-200 rounded-xl p-6 text-center">
-              <p className="text-sm text-slate-500">No active trips</p>
-              <p className="text-xs text-slate-400 mt-1">Create your first trip to get started</p>
-            </div>
-          )}
-        </div>
-
-        {/* Completed Trips */}
-        <div>
-          <h2 className="text-sm font-semibold text-slate-700 mb-3">Recent Completed Trips</h2>
-          {data.completedTrips.length > 0 ? (
-            <div className="space-y-2">
-              {data.completedTrips.map((trip: DriverTripSummary) => {
-                const seatsBooked = trip.seats_total - trip.seats_available;
-                const earnings = seatsBooked * Number(trip.cost_share_amount);
-                
-                return (
-                  <div key={trip.id} className="bg-white border border-slate-200 rounded-lg p-3">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex-1">
-                        <div className="text-sm font-semibold text-slate-900 mb-1">
-                          {trip.origin} → {trip.destination}
-                        </div>
-                        <div className="text-xs text-slate-600">
-                          {formatDate(trip.departure_date)} • {seatsBooked} passenger{seatsBooked !== 1 ? 's' : ''}
+                          <Link
+                            href={`/dashboard/driver/routes/${assignment.route_id}`}
+                            className="rounded-lg border border-emerald-500 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+                          >
+                            View route
+                          </Link>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-sm font-bold text-slate-900">R{earnings}</div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="bg-white border border-slate-200 rounded-xl p-6 text-center">
+                  <p className="text-sm text-slate-500">No assigned routes yet</p>
+                  <p className="text-xs text-slate-400 mt-1">Routes will appear here once admin assigns one</p>
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="bg-white border border-slate-200 rounded-xl p-6 text-center">
-              <p className="text-sm text-slate-500">No completed trips yet</p>
-            </div>
-          )}
-        </div>
-
-        {/* Disabled State for Unverified Users */}
-        {!isActiveDriver && (
-          <div className="bg-slate-100 border border-slate-300 rounded-xl p-6 text-center">
-            <div className="w-16 h-16 bg-slate-300 rounded-full flex items-center justify-center mx-auto mb-3">
-              <Calendar className="w-8 h-8 text-slate-500" />
-            </div>
-            <h3 className="text-base font-bold text-slate-700 mb-2">Account Not Active</h3>
-            <p className="text-sm text-slate-600">
-              Complete payment, basic registration, and vehicle approval to activate your dashboard.
-            </p>
-          </div>
-        )}
           </>
         ) : (
           <div className="bg-slate-100 border border-slate-300 rounded-xl p-6 text-center">
@@ -464,7 +332,7 @@ export default async function DriverDashboard() {
             </div>
             <h3 className="text-base font-bold text-slate-700 mb-2">Account Not Active</h3>
             <p className="text-sm text-slate-600">
-              Complete payment verification to start creating trips and earning.
+              Complete payment verification to start viewing your assigned routes.
             </p>
           </div>
         )}

@@ -39,8 +39,8 @@ export default function NotificationsPage() {
                   </p>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-slate-500">2 minutes ago</span>
-                    <Link href="/trips/trip-123" className="text-xs text-emerald-600 font-semibold">
-                      View Trip
+                    <Link href="/routes" className="text-xs text-emerald-600 font-semibold">
+                      View Routes
                     </Link>
                   </div>
                 </div>
@@ -79,8 +79,8 @@ export default function NotificationsPage() {
                   </p>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-slate-500">1 hour ago</span>
-                    <Link href="/trips" className="text-xs text-purple-600 font-semibold">
-                      View Trips
+                    <Link href="/routes" className="text-xs text-purple-600 font-semibold">
+                      View Routes
                     </Link>
                   </div>
                 </div>
@@ -99,14 +99,14 @@ export default function NotificationsPage() {
                   <Star className="w-4 h-4 text-yellow-600" />
                 </div>
                 <div className="flex-1">
-                  <div className="text-sm font-semibold text-slate-900 mb-1">Rate Your Trip</div>
+                  <div className="text-sm font-semibold text-slate-900 mb-1">Share Route Feedback</div>
                   <p className="text-xs text-slate-600 mb-2">
-                    How was your trip with Sipho N.? Share your experience
+                    How was your route with Sipho N.? Share your experience
                   </p>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-slate-500">1 day ago</span>
-                    <Link href="/rate/trip-122" className="text-xs text-yellow-600 font-semibold">
-                      Rate Now
+                    <Link href="/routes" className="text-xs text-yellow-600 font-semibold">
+                      View Routes
                     </Link>
                   </div>
                 </div>
@@ -119,9 +119,9 @@ export default function NotificationsPage() {
                   <Clock className="w-4 h-4 text-slate-600" />
                 </div>
                 <div className="flex-1">
-                  <div className="text-sm font-semibold text-slate-900 mb-1">Trip Reminder</div>
+                  <div className="text-sm font-semibold text-slate-900 mb-1">Route Reminder</div>
                   <p className="text-xs text-slate-600 mb-2">
-                    Your trip to George is tomorrow at 14:00. Don't forget!
+                    Your route to George is tomorrow at 14:00. Don't forget!
                   </p>
                   <span className="text-xs text-slate-500">1 day ago</span>
                 </div>

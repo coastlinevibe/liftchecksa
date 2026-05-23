@@ -47,7 +47,7 @@ async function getAdminStats() {
   const [
     { count: totalMembers },
     { count: verifiedDrivers },
-    { count: activeTrips },
+    { count: activeRoutes },
     { count: pendingDriverVerifications },
     { count: pendingVehicleVerifications },
     { count: pendingPayments },
@@ -58,7 +58,7 @@ async function getAdminStats() {
     { data: vehicleVerificationRows },
     { data: reportRows },
     { count: activeBluetoothVerifications },
-    { count: tripsThisMonth },
+    { count: routesThisMonth },
     { data: ratingRows },
     { data: suspendedMemberRows },
     { data: suspendedDriverRows },
@@ -66,7 +66,7 @@ async function getAdminStats() {
   ] = await Promise.all([
     supabase.from('profiles').select('*', { count: 'exact', head: true }).in('role', ['member', 'driver']),
     supabase.from('driver_profiles').select('*', { count: 'exact', head: true }).eq('verification_status', 'approved'),
-    supabase.from('trips').select('*', { count: 'exact', head: true }).eq('status', 'published'),
+    supabase.from('official_routes').select('*', { count: 'exact', head: true }).eq('status', 'active'),
     supabase.from('driver_profiles').select('*', { count: 'exact', head: true }).eq('verification_status', 'pending'),
     supabase.from('vehicles').select('*', { count: 'exact', head: true }).eq('verification_status', 'pending'),
     supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
@@ -77,7 +77,7 @@ async function getAdminStats() {
     supabase.from('vehicles').select('verification_status, created_at, updated_at').in('verification_status', ['approved', 'rejected', 'expired']),
     supabase.from('reports').select('status'),
     supabase.from('zii_tokens').select('*', { count: 'exact', head: true }).eq('token_status', 'active').gte('expires_at', nowIso),
-    supabase.from('trips').select('*', { count: 'exact', head: true }).gte('created_at', monthStart.toISOString()),
+    supabase.from('official_routes').select('*', { count: 'exact', head: true }).gte('created_at', monthStart.toISOString()),
     supabase.from('ratings').select('rating'),
     supabase.from('profiles').select('id').eq('membership_status', 'suspended'),
     supabase.from('driver_profiles').select('user_id').eq('is_suspended', true),
@@ -143,7 +143,7 @@ async function getAdminStats() {
   return {
     totalMembers: totalMembers || 0,
     verifiedDrivers: verifiedDrivers || 0,
-    activeTrips: activeTrips || 0,
+    activeTrips: activeRoutes || 0,
     pendingVerifications: (pendingDriverVerifications || 0) + (pendingVehicleVerifications || 0),
     pendingDriverVerifications: pendingDriverVerifications || 0,
     pendingVehicleVerifications: pendingVehicleVerifications || 0,
@@ -155,7 +155,7 @@ async function getAdminStats() {
     averageReviewTimeHours,
     reportResolutionRate,
     activeBluetoothVerifications: activeBluetoothVerifications || 0,
-    tripsThisMonth: tripsThisMonth || 0,
+    tripsThisMonth: routesThisMonth || 0,
     averageRating,
     suspendedAccounts: suspendedAccountIds.size,
     groupAdmins: groupAdmins || 0,
@@ -204,7 +204,7 @@ export default async function AdminDashboard() {
           <div className="bg-white rounded-lg border border-slate-200 p-3">
             <div className="flex items-center gap-2 mb-2">
               <TrendingUp className="w-4 h-4 text-purple-500" />
-              <span className="text-xs text-slate-600">Active Trips</span>
+              <span className="text-xs text-slate-600">Active Routes</span>
             </div>
             <div className="text-2xl font-bold text-slate-900">{stats.activeTrips}</div>
             <div className="text-xs text-slate-600 mt-1">Published</div>
@@ -412,7 +412,7 @@ export default async function AdminDashboard() {
             <h2 className="text-base font-bold text-slate-900 mb-3">Quick Stats</h2>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-slate-600">Trips This Month</span>
+                <span className="text-xs text-slate-600">Routes This Month</span>
                 <span className="text-sm font-bold text-slate-900">{stats.tripsThisMonth.toLocaleString()}</span>
               </div>
               <div className="flex items-center justify-between">
