@@ -497,7 +497,8 @@ export async function sendRouteChatMessage(input: {
   const supabase = await createClient();
   const current = await getCurrentProfile(supabase);
   if ('error' in current) {
-    redirect(`/routes/${input.routeId}?chat_error=${encodeURIComponent(current.error)}`);
+    const errorMessage = current.error || 'Not authenticated';
+    redirect(`/routes/${input.routeId}?chat_error=${encodeURIComponent(errorMessage)}`);
   }
 
   const { profile } = current;
