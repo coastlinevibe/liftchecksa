@@ -2,7 +2,6 @@ import Link from 'next/link';
 import { Bell, Calendar, Clock, MapPin, Settings } from 'lucide-react';
 import LogoutButton from '@/components/LogoutButton';
 import { createClient } from '@/lib/supabase/server';
-import { getDriverRouteDashboard } from '@/lib/routes/actions';
 import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
@@ -66,10 +65,30 @@ async function getDriverData() {
     redirect('/dashboard/member');
   }
 
-  const routeDashboard = await getDriverRouteDashboard();
-  const routeAssignments =
-    'error' in routeDashboard ? [] : ((routeDashboard.assignments || []) as DriverRouteSummary[]);
-  const routeRequests = 'error' in routeDashboard ? [] : routeDashboard.pendingRequests || [];
+  const { data: driverAssignments } = await supabase
+    .from('driver_route_assignments')
+    .select('id, driver_id, vehicle_id, route_id, status, seats_available, days_active, weekly_price, single_route_price, created_at, official_routes(id, name, start_area, end_area, status)')
+    .eq('driver_id', driverProfile.id)
+    .order('created_at', { ascending: false });
+
+  const routeAssignments = (driverAssignments || []).map((assignment) => {
+    const typedAssignment = assignment as any;
+    return {
+      ...typedAssignment,
+      official_route: Array.isArray(typedAssignment.official_routes)
+        ? typedAssignment.official_routes[0] || null
+        : typedAssignment.official_routes || null,
+    } as DriverRouteSummary;
+  });
+
+  const assignmentIds = routeAssignments.map((assignment) => assignment.id);
+  const { data: routeRequestsData } = assignmentIds.length
+    ? await supabase
+        .from('route_seat_requests')
+        .select('id, passenger_id, route_id, pickup_stop_id, dropoff_stop_id, seats_requested, requested_days, request_type, preferred_morning_time, preferred_return_time, status, matched_assignment_id, admin_notes, created_at, updated_at')
+        .in('matched_assignment_id', assignmentIds)
+        .order('created_at', { ascending: false })
+    : { data: [] };
 
   const { data: payment } = await supabase
     .from('payments')
@@ -91,7 +110,7 @@ async function getDriverData() {
     payment,
     vehicles: vehicles || [],
     routeAssignments,
-    routeRequests,
+    routeRequests: routeRequestsData || [],
   };
 }
 
