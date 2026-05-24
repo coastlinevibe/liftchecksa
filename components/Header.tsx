@@ -1,6 +1,4 @@
 'use client';
-
-import Link from 'next/link';
 import DesktopNav from './DesktopNav';
 
 export default function Header() {

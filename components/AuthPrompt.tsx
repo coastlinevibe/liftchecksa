@@ -42,7 +42,7 @@ export default function AuthPrompt({
         </div>
 
         <p className="text-xs text-slate-500 text-center mt-4">
-          Browse trips freely. Sign up only when you're ready to book.
+          Browse trips freely. Sign up only when you&apos;re ready to book.
         </p>
       </div>
     </div>

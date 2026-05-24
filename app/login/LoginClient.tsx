@@ -120,7 +120,7 @@ export default function LoginClient({ redirectTo }: { redirectTo?: string }) {
 
         <div className="text-center">
           <p className="text-sm text-slate-400">
-            Don't have an account?{' '}
+            Don&apos;t have an account?{' '}
             <Link href="/register" className="text-emerald-400 font-semibold hover:text-emerald-300">
               Sign up
             </Link>

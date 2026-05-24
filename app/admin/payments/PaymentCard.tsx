@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CheckCircle, XCircle, Eye, AlertCircle } from 'lucide-react';
@@ -170,10 +171,12 @@ export default function PaymentCard({ payment }: { payment: PaymentCardPayment }
           
           {showProof && (
             <div className="bg-slate-100 rounded-lg p-4">
-              <img 
-                src={proofUrl} 
-                alt="Payment Proof" 
-                className="w-full max-w-md rounded-lg"
+              <Image
+                src={proofUrl}
+                alt="Payment Proof"
+                width={768}
+                height={512}
+                className="h-auto w-full max-w-md rounded-lg"
               />
             </div>
           )}

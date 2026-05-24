@@ -9,6 +9,14 @@ interface Props {
   driverProfileId: string;
 }
 
+function getErrorMessage(error: unknown) {
+  if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
+    return error.message;
+  }
+
+  return 'An error occurred';
+}
+
 export default function ApproveRejectButtons({ driverProfileId }: Props) {
   const router = useRouter();
   const [decision, setDecision] = useState<'approve' | 'reject' | null>(null);
@@ -52,8 +60,8 @@ export default function ApproveRejectButtons({ driverProfileId }: Props) {
         alert('Application rejected');
         router.push('/admin');
       }
-    } catch (err: any) {
-      setError(err.message || 'An error occurred');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }

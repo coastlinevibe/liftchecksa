@@ -2,6 +2,20 @@ import Link from 'next/link';
 import { ArrowLeft, Car } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 
+type DriverListRow = {
+  id: string;
+  user_id: string;
+  verification_status: string | null;
+  completed_trips: number | null;
+  rating_average: number | null;
+  created_at: string;
+  profile: {
+    first_name: string | null;
+    surname: string | null;
+    phone: string | null;
+  } | null;
+};
+
 async function getDrivers() {
   const supabase = await createClient();
 
@@ -24,7 +38,7 @@ async function getDrivers() {
     }
   }
 
-  return drivers;
+  return drivers as DriverListRow[];
 }
 
 export default async function AdminDriversPage() {
@@ -47,7 +61,7 @@ export default async function AdminDriversPage() {
         <div className="bg-white rounded-xl border border-slate-200 p-4">
           {drivers.length > 0 ? (
             <div className="space-y-2">
-              {drivers.map((driver: any) => (
+              {drivers.map((driver) => (
                 <div key={driver.id} className="flex items-center justify-between gap-3 p-3 bg-slate-50 rounded-lg">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0">

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft, Download, CheckCircle, Clock, XCircle, CreditCard } from 'lucide-react';
+import { ArrowLeft, Download, CheckCircle, CreditCard } from 'lucide-react';
 
 export default function PaymentHistoryPage() {
   return (

@@ -28,36 +28,27 @@ export default function TripChatThread({
   emptyStateText,
 }: TripChatThreadProps) {
   const supabase = useMemo(() => createClient(), []);
-  const [messages, setMessages] = useState<TripChatMessage[]>(initialMessages);
-  const [resolvedPeerProfileId, setResolvedPeerProfileId] = useState<string | null>(peerProfileId || null);
-  const bottomRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    setMessages(initialMessages);
-  }, [initialMessages]);
-
-  useEffect(() => {
-    setResolvedPeerProfileId(peerProfileId || null);
-  }, [peerProfileId]);
-
-  useEffect(() => {
-    if (resolvedPeerProfileId || !currentProfileId) return;
+  const initialResolvedPeerProfileId = useMemo(() => {
+    if (peerProfileId) return peerProfileId;
 
     const inferred = initialMessages.find(
       (message) => message.sender_id !== currentProfileId && message.sender_id
     );
     if (inferred?.sender_id) {
-      setResolvedPeerProfileId(inferred.sender_id);
-      return;
+      return inferred.sender_id;
     }
 
     const fallback = initialMessages.find(
       (message) => message.receiver_id !== currentProfileId && message.receiver_id
     );
-    if (fallback?.receiver_id) {
-      setResolvedPeerProfileId(fallback.receiver_id);
-    }
-  }, [currentProfileId, initialMessages, resolvedPeerProfileId]);
+    return fallback?.receiver_id || null;
+  }, [currentProfileId, initialMessages, peerProfileId]);
+
+  const [messages, setMessages] = useState<TripChatMessage[]>(() => initialMessages);
+  const [resolvedPeerProfileId, setResolvedPeerProfileId] = useState<string | null>(
+    () => initialResolvedPeerProfileId
+  );
+  const bottomRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!tripId || !currentProfileId) return;

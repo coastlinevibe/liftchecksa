@@ -1,8 +1,62 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { Users, Car, CheckCircle, Clock, TrendingUp, Shield, CreditCard, AlertTriangle } from 'lucide-react';
+import { Users, Car, CheckCircle, Clock, TrendingUp, CreditCard, AlertTriangle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import LogoutButton from '@/components/LogoutButton';
+
+type RecentMemberRow = {
+  id: string;
+  user_id: string;
+  first_name: string | null;
+  surname: string | null;
+  phone: string | null;
+  role: string;
+  membership_status: string | null;
+  created_at: string;
+};
+
+type RecentDriverRow = {
+  id: string;
+  user_id: string;
+  verification_status: string | null;
+  completed_trips: number | null;
+  rating_average: number | null;
+  created_at: string;
+};
+
+type DriverProfilePreviewRow = {
+  first_name: string | null;
+  surname: string | null;
+  phone: string | null;
+  role: string | null;
+  membership_status: string | null;
+};
+
+type VerificationReviewRow = {
+  verification_status: string | null;
+  created_at: string;
+  updated_at: string | null;
+};
+
+type ReportStatusRow = {
+  status: string;
+};
+
+type RatingRow = {
+  rating: number | string | null;
+};
+
+type SuspendedMemberRow = {
+  id: string;
+};
+
+type SuspendedDriverRow = {
+  user_id: string;
+};
+
+type DriverWithProfile = RecentDriverRow & {
+  profile: DriverProfilePreviewRow | null;
+};
 
 // Helper function to get relative time
 function getTimeAgo(date: Date): string {
@@ -84,9 +138,9 @@ async function getAdminStats() {
     supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'group_admin'),
   ]);
 
-  const driversWithProfiles: any[] = [];
+  const driversWithProfiles: DriverWithProfile[] = [];
   if (recentDrivers && recentDrivers.length > 0) {
-    for (const driver of recentDrivers) {
+    for (const driver of recentDrivers as RecentDriverRow[]) {
       const { data: profile } = await supabase
         .from('profiles')
         .select('first_name, surname, phone, role, membership_status')
@@ -101,44 +155,44 @@ async function getAdminStats() {
   }
 
   const verificationReviewRows = [
-    ...(driverVerificationRows || []).map((row: any) => ({
+    ...((driverVerificationRows || []) as VerificationReviewRow[]).map((row) => ({
       status: row.verification_status,
       createdAt: row.created_at,
       reviewedAt: row.updated_at,
     })),
-    ...(vehicleVerificationRows || []).map((row: any) => ({
+    ...((vehicleVerificationRows || []) as VerificationReviewRow[]).map((row) => ({
       status: row.verification_status,
       createdAt: row.created_at,
       reviewedAt: row.updated_at,
     })),
-  ].filter((row: any) => row.reviewedAt);
+  ].filter((row) => row.reviewedAt);
 
   const reviewedVerificationCount = verificationReviewRows.length;
-  const approvedVerificationCount = verificationReviewRows.filter((row: any) => row.status === 'approved').length;
+  const approvedVerificationCount = verificationReviewRows.filter((row) => row.status === 'approved').length;
   const verificationSuccessRate = reviewedVerificationCount > 0
     ? Math.round((approvedVerificationCount / reviewedVerificationCount) * 100)
     : 0;
 
   const reviewDurations = verificationReviewRows
-    .map((row: any) => new Date(row.reviewedAt).getTime() - new Date(row.createdAt).getTime())
+    .map((row) => new Date(row.reviewedAt).getTime() - new Date(row.createdAt).getTime())
     .filter((duration: number) => Number.isFinite(duration) && duration >= 0);
   const averageReviewTimeHours = reviewDurations.length > 0
     ? reviewDurations.reduce((sum: number, duration: number) => sum + duration, 0) / reviewDurations.length / (1000 * 60 * 60)
     : 0;
 
   const resolvedReportStatuses = ['warning_issued', 'suspended', 'banned', 'cleared'];
-  const resolvedReportCount = (reportRows || []).filter((report: any) => resolvedReportStatuses.includes(report.status)).length;
+  const resolvedReportCount = ((reportRows || []) as ReportStatusRow[]).filter((report) => resolvedReportStatuses.includes(report.status)).length;
   const reportResolutionRate = reportRows && reportRows.length > 0
     ? Math.round((resolvedReportCount / reportRows.length) * 100)
     : 0;
 
   const averageRating = ratingRows && ratingRows.length > 0
-    ? ratingRows.reduce((sum: number, row: any) => sum + Number(row.rating || 0), 0) / ratingRows.length
+    ? (ratingRows as RatingRow[]).reduce((sum: number, row) => sum + Number(row.rating || 0), 0) / ratingRows.length
     : 0;
 
   const suspendedAccountIds = new Set<string>();
-  (suspendedMemberRows || []).forEach((row: any) => suspendedAccountIds.add(row.id));
-  (suspendedDriverRows || []).forEach((row: any) => suspendedAccountIds.add(row.user_id));
+  ((suspendedMemberRows || []) as SuspendedMemberRow[]).forEach((row) => suspendedAccountIds.add(row.id));
+  ((suspendedDriverRows || []) as SuspendedDriverRow[]).forEach((row) => suspendedAccountIds.add(row.user_id));
 
   return {
     totalMembers: totalMembers || 0,
@@ -312,7 +366,7 @@ export default async function AdminDashboard() {
             </div>
             {stats.recentMembers.length > 0 ? (
               <div className="space-y-2">
-                {stats.recentMembers.map((member: any) => {
+                {stats.recentMembers.map((member: RecentMemberRow) => {
                   const timeAgo = getTimeAgo(new Date(member.created_at));
 
                   return (
@@ -352,7 +406,7 @@ export default async function AdminDashboard() {
             </div>
             {stats.recentDrivers.length > 0 ? (
               <div className="space-y-2">
-                {stats.recentDrivers.map((driver: any) => {
+                {stats.recentDrivers.map((driver: DriverWithProfile) => {
                   const timeAgo = getTimeAgo(new Date(driver.created_at));
 
                   return (

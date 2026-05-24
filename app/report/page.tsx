@@ -141,7 +141,7 @@ export default function ReportScammerPage() {
 
             <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
               <p className="text-xs text-blue-800">
-                <strong>Helpful evidence:</strong> Screenshots of messages, payment confirmations, photos of vehicle/driver that don't match
+                <strong>Helpful evidence:</strong> Screenshots of messages, payment confirmations, photos of vehicle/driver that don&apos;t match
               </p>
             </div>
           </div>

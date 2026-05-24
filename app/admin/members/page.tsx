@@ -2,6 +2,16 @@ import Link from 'next/link';
 import { ArrowLeft, Users } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 
+type MemberListRow = {
+  id: string;
+  first_name: string | null;
+  surname: string | null;
+  phone: string | null;
+  role: string;
+  membership_status: string | null;
+  created_at: string;
+};
+
 async function getMembers() {
   const supabase = await createClient();
 
@@ -12,7 +22,7 @@ async function getMembers() {
     .order('created_at', { ascending: false })
     .limit(50);
 
-  return data || [];
+  return (data || []) as MemberListRow[];
 }
 
 export default async function AdminMembersPage() {
@@ -35,7 +45,7 @@ export default async function AdminMembersPage() {
         <div className="bg-white rounded-xl border border-slate-200 p-4">
           {members.length > 0 ? (
             <div className="space-y-2">
-              {members.map((member: any) => (
+              {members.map((member) => (
                 <div key={member.id} className="flex items-center justify-between gap-3 p-3 bg-slate-50 rounded-lg">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">

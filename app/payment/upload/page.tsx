@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Upload, Copy, CheckCircle, Building, CreditCard, AlertCircle, X } from 'lucide-react';
@@ -313,7 +314,14 @@ export default function PaymentUploadPage() {
                     </div>
                   </div>
                 ) : (
-                  <img src={proofPreview} alt="Payment Proof" className="w-full h-48 object-cover rounded" />
+                  <Image
+                    src={proofPreview}
+                    alt="Payment Proof"
+                    width={768}
+                    height={192}
+                    unoptimized
+                    className="h-48 w-full rounded object-cover"
+                  />
                 )}
                 <button
                   type="button"

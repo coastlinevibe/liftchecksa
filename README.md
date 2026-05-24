@@ -78,6 +78,8 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+Note: on this machine, local Node-based scripts run through `scripts/next-with-local-ca.cjs` so Next.js trusts the exported Avast HTTPS-scanning root certificate. This replaces the insecure `NODE_TLS_REJECT_UNAUTHORIZED=0` workaround.
+
 ## Project Structure
 
 ```

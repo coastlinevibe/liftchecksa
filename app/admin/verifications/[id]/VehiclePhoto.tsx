@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
@@ -42,11 +43,12 @@ export default function VehiclePhoto({ photoUrl }: { photoUrl: string }) {
 
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
-      <img
+      <Image
         src={resolvedUrl}
         alt="Vehicle"
-        className="block w-full max-w-md object-contain"
-        style={{ maxHeight: '360px' }}
+        width={768}
+        height={360}
+        className="block h-auto max-h-[360px] w-full max-w-md object-contain"
       />
     </div>
   );

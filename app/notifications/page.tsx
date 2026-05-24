@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft, Bell, CheckCircle, AlertTriangle, MessageSquare, Star, MapPin, Clock } from 'lucide-react';
+import { ArrowLeft, Bell, CheckCircle, MessageSquare, Star, MapPin, Clock } from 'lucide-react';
 
 export default function NotificationsPage() {
   return (
@@ -121,7 +121,7 @@ export default function NotificationsPage() {
                 <div className="flex-1">
                   <div className="text-sm font-semibold text-slate-900 mb-1">Route Reminder</div>
                   <p className="text-xs text-slate-600 mb-2">
-                    Your route to George is tomorrow at 14:00. Don't forget!
+                    Your route to George is tomorrow at 14:00. Don&apos;t forget!
                   </p>
                   <span className="text-xs text-slate-500">1 day ago</span>
                 </div>

@@ -3,6 +3,15 @@ import { ArrowLeft, Plus, Car, CheckCircle, Clock, XCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 
+type DriverVehicleRow = {
+  id: string;
+  make: string | null;
+  model: string | null;
+  colour: string | null;
+  licence_plate: string | null;
+  verification_status: 'approved' | 'pending' | 'rejected' | string | null;
+};
+
 async function getDriverVehicles() {
   const supabase = await createClient();
   
@@ -30,7 +39,7 @@ async function getDriverVehicles() {
     .eq('driver_id', driverProfile.id)
     .order('created_at', { ascending: false });
 
-  return vehicles || [];
+  return (vehicles || []) as DriverVehicleRow[];
 }
 
 export default async function VehiclesPage() {
@@ -63,7 +72,7 @@ export default async function VehiclesPage() {
         {/* Vehicles List */}
         {vehicles.length > 0 ? (
           <div className="space-y-3">
-            {vehicles.map((vehicle: any) => (
+            {vehicles.map((vehicle) => (
               <VehicleCard key={vehicle.id} vehicle={vehicle} />
             ))}
           </div>
@@ -91,7 +100,7 @@ export default async function VehiclesPage() {
   );
 }
 
-function VehicleCard({ vehicle }: { vehicle: any }) {
+function VehicleCard({ vehicle }: { vehicle: DriverVehicleRow }) {
   const statusConfig = {
     approved: {
       color: 'border-emerald-300',

@@ -4,6 +4,14 @@ import { ArrowLeft, CheckCircle2, Route } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { assignDriverToRouteFromForm, getRouteDetail } from '@/lib/routes/actions';
 
+type AssignableVehicleRow = {
+  id: string;
+  driver_id: string;
+  make: string | null;
+  model: string | null;
+  licence_plate: string | null;
+};
+
 function weekdayLabel(day: string) {
   return day.charAt(0).toUpperCase() + day.slice(1);
 }
@@ -67,7 +75,7 @@ export default async function AssignDriverPage({
     .order('created_at', { ascending: false });
 
   const approvedDrivers = (drivers || []).filter((driver) => driver.role === 'driver');
-  const activeVehicles = vehicles || [];
+  const activeVehicles = (vehicles || []) as AssignableVehicleRow[];
   const driverProfileById = new Map((driverProfiles || []).map((driverProfile) => [driverProfile.id, driverProfile]));
   const profileByUserId = new Map((profiles || []).map((profile) => [profile.user_id, profile]));
 
@@ -136,7 +144,7 @@ export default async function AssignDriverPage({
                   className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
                 >
                   <option value="">Select vehicle</option>
-                  {activeVehicles.map((vehicle: any) => {
+                  {activeVehicles.map((vehicle) => {
                     const ownerDriverProfile = driverProfileById.get(vehicle.driver_id);
                     const owner = ownerDriverProfile ? profileByUserId.get(ownerDriverProfile.user_id) : null;
                     const ownerName = owner ? `${owner.first_name ?? ''} ${owner.surname ?? ''}`.trim() : 'Driver';

@@ -18,6 +18,58 @@ import type {
 
 const DEFAULT_WEEKDAYS: Weekday[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
 
+type DriverProfileLookupRow = {
+  id: string;
+  user_id: string;
+};
+
+type DriverMemberProfileRow = {
+  user_id: string;
+  first_name: string | null;
+  surname: string | null;
+  phone?: string | null;
+  email?: string | null;
+};
+
+type VehicleLookupRow = {
+  id: string;
+  make: string | null;
+  model: string | null;
+  licence_plate: string | null;
+};
+
+type DriverAssignmentListRow = {
+  id: string;
+  driver_id: string;
+  vehicle_id: string;
+  route_id: string;
+  status: string;
+  seats_available: number | null;
+  weekly_price?: number | string | null;
+  single_trip_price?: number | string | null;
+  days_active?: string[] | null;
+  created_at: string;
+};
+
+type DriverDashboardAssignmentRow = DriverRouteAssignment & {
+  official_routes:
+    | {
+        id: string;
+        name: string;
+        start_area: string;
+        end_area: string;
+        status: string;
+      }
+    | {
+        id: string;
+        name: string;
+        start_area: string;
+        end_area: string;
+        status: string;
+      }[]
+    | null;
+};
+
 function slugify(value: string) {
   return value
     .toLowerCase()
@@ -706,8 +758,10 @@ export async function getOfficialRoutes(includeInactive = false) {
         : assignmentsQuery.in('status', ['approved', 'active']))
     : { data: [] };
 
+  const typedAssignments = (assignments || []) as DriverAssignmentListRow[];
+
   const driverProfileIds = Array.from(
-    new Set((assignments || []).map((assignment: any) => assignment.driver_id).filter(Boolean))
+    new Set(typedAssignments.map((assignment) => assignment.driver_id).filter(Boolean))
   );
 
   const { data: driverProfiles } = driverProfileIds.length
@@ -717,8 +771,10 @@ export async function getOfficialRoutes(includeInactive = false) {
         .in('id', driverProfileIds)
     : { data: [] };
 
+  const typedDriverProfiles = (driverProfiles || []) as DriverProfileLookupRow[];
+
   const driverUserIds = Array.from(
-    new Set((driverProfiles || []).map((profile: any) => profile.user_id).filter(Boolean))
+    new Set(typedDriverProfiles.map((profile) => profile.user_id).filter(Boolean))
   );
 
   const { data: driverMemberProfiles } = driverUserIds.length
@@ -729,14 +785,14 @@ export async function getOfficialRoutes(includeInactive = false) {
     : { data: [] };
 
   const driverProfilesByUserId = new Map(
-    (driverMemberProfiles || []).map((profile: any) => [profile.user_id, profile])
+    ((driverMemberProfiles || []) as DriverMemberProfileRow[]).map((profile) => [profile.user_id, profile])
   );
   const driverProfilesByDriverProfileId = new Map(
-    (driverProfiles || []).map((profile: any) => [profile.id, profile])
+    typedDriverProfiles.map((profile) => [profile.id, profile])
   );
 
   const vehicleIds = Array.from(
-    new Set((assignments || []).map((assignment: any) => assignment.vehicle_id).filter(Boolean))
+    new Set(typedAssignments.map((assignment) => assignment.vehicle_id).filter(Boolean))
   );
 
   const { data: vehicles } = includeInactive && vehicleIds.length
@@ -746,7 +802,9 @@ export async function getOfficialRoutes(includeInactive = false) {
         .in('id', vehicleIds)
     : { data: [] };
 
-  const vehiclesById = new Map((vehicles || []).map((vehicle: any) => [vehicle.id, vehicle]));
+  const vehiclesById = new Map(
+    ((vehicles || []) as VehicleLookupRow[]).map((vehicle) => [vehicle.id, vehicle])
+  );
 
   const assignmentsByRoute = new Map<
     string,
@@ -764,7 +822,7 @@ export async function getOfficialRoutes(includeInactive = false) {
       vehicle_label?: string | null;
     }>
   >();
-  for (const assignment of assignments || []) {
+  for (const assignment of typedAssignments) {
     const list = assignmentsByRoute.get(assignment.route_id) || [];
     const driverProfileRow = driverProfilesByDriverProfileId.get(assignment.driver_id);
     const driverProfile = driverProfileRow
@@ -927,15 +985,14 @@ export async function getDriverRouteDashboard() {
 
   const requestCounts = countAssignmentsByRequest((requestAssignments.data || []) as RouteSeatRequest[]);
 
-  const assignments = (assignmentsResult.data || []).map((assignment) => ({
+  const assignments = ((assignmentsResult.data || []) as DriverDashboardAssignmentRow[]).map((assignment) => ({
     ...assignment,
     route_stops: stopsByRoute.get(assignment.route_id) || [],
     passenger_request_count: requestCounts.get(assignment.id) || 0,
     official_route: (() => {
-      const rawAssignment = assignment as any;
-      return Array.isArray(rawAssignment.official_routes)
-        ? rawAssignment.official_routes[0] || null
-        : rawAssignment.official_routes || null;
+      return Array.isArray(assignment.official_routes)
+        ? assignment.official_routes[0] || null
+        : assignment.official_routes || null;
     })(),
   }));
 

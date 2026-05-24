@@ -1,9 +1,10 @@
 'use client';
 
+import Image from 'next/image';
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Car, AlertCircle, CheckCircle, Camera, X } from 'lucide-react';
+import { ArrowLeft, AlertCircle, CheckCircle, Camera, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 export default function AddVehiclePage() {
@@ -106,7 +107,7 @@ export default function AddVehiclePage() {
           router.push('/dashboard/driver/vehicles');
         }, 2000);
       }
-    } catch (err) {
+    } catch {
       setError('An unexpected error occurred');
     } finally {
       setLoading(false);
@@ -220,7 +221,14 @@ export default function AddVehiclePage() {
                   </label>
                 ) : (
                   <div className="relative border-2 border-emerald-500 rounded-lg p-2">
-                    <img src={photoPreview} alt="Vehicle" className="w-full h-48 object-cover rounded" />
+                    <Image
+                      src={photoPreview}
+                      alt="Vehicle"
+                      width={768}
+                      height={192}
+                      unoptimized
+                      className="h-48 w-full rounded object-cover"
+                    />
                     <button
                       type="button"
                       onClick={() => {

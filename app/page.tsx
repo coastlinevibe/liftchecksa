@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import Image from 'next/image';
 import { Shield, CheckCircle, Users, MessageSquare, Search, Car } from 'lucide-react';
 import GPSHeroBackground from './components/GPSHeroBackground';
 import { Button } from '@/components/ui/button';
@@ -151,7 +150,7 @@ export default function Home() {
                 <div className="text-base font-bold text-emerald-400">R36/yr</div>
               </div>
               <p className="text-[10px] text-slate-400 mb-2 leading-tight">
-                Verified profile • Bluetooth Verify • Driver checks • Chat • Ratings
+                Verified profile, Bluetooth Verify, driver checks, chat, and ratings
               </p>
               <Link 
                 href="/register?type=member&plan=basic"
@@ -232,7 +231,7 @@ export default function Home() {
                 <span className="text-emerald-400 group-open:rotate-180 transition-transform">▼</span>
               </summary>
               <div className="px-3 pb-3 pt-1 text-[10px] text-slate-300 leading-relaxed">
-                Bluetooth Verification lets you confirm the driver's identity when you meet in person, without using mobile data. Both you and the driver tap "Verify" in the app, and your phones exchange encrypted tokens via Bluetooth to confirm the match.
+                Bluetooth Verification lets you confirm the driver&apos;s identity when you meet in person, without using mobile data. Both you and the driver tap &quot;Verify&quot; in the app, and your phones exchange encrypted tokens via Bluetooth to confirm the match.
               </div>
             </details>
 
@@ -243,7 +242,7 @@ export default function Home() {
                 <span className="text-emerald-400 group-open:rotate-180 transition-transform">▼</span>
               </summary>
               <div className="px-3 pb-3 pt-1 text-[10px] text-slate-300 leading-relaxed">
-                No. You can browse official routes for free. Only sign up when you're ready to request a seat. LiftCheck handles membership and verification while trip payments follow the approved route flow.
+                No. You can browse official routes for free. Only sign up when you&apos;re ready to request a seat. LiftCheck handles membership and verification while trip payments follow the approved route flow.
               </div>
             </details>
 
@@ -265,7 +264,7 @@ export default function Home() {
                 <span className="text-emerald-400 group-open:rotate-180 transition-transform">▼</span>
               </summary>
               <div className="px-3 pb-3 pt-1 text-[10px] text-slate-300 leading-relaxed">
-                Drivers upload their ID, driver's license, and vehicle documents. Our admin team manually reviews each application. Once approved, drivers are assigned to official routes instead of publishing open trips.
+                Drivers upload their ID, driver&apos;s license, and vehicle documents. Our admin team manually reviews each application. Once approved, drivers are assigned to official routes instead of publishing open trips.
               </div>
             </details>
 
@@ -298,7 +297,7 @@ export default function Home() {
                 <span className="text-emerald-400 group-open:rotate-180 transition-transform">▼</span>
               </summary>
               <div className="px-3 pb-3 pt-1 text-[10px] text-slate-300 leading-relaxed">
-                Yes. We use bank-level encryption for all data. Your phone number and full name are only visible to drivers you've requested trips with. License plate numbers are hidden until you sign up and request a specific trip.
+                Yes. We use bank-level encryption for all data. Your phone number and full name are only visible to drivers you&apos;ve requested trips with. License plate numbers are hidden until you sign up and request a specific trip.
               </div>
             </details>
           </div>

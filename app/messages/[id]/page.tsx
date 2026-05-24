@@ -57,7 +57,7 @@ export default function ChatPage() {
             <div className="flex-1">
               <div className="bg-white border border-slate-200 rounded-lg rounded-tl-none p-3 max-w-[80%]">
                 <p className="text-sm text-slate-900">
-                  Hi! Thanks for booking. I'll be at the pickup point at 15:50.
+                  Hi! Thanks for booking. I&apos;ll be at the pickup point at 15:50.
                 </p>
               </div>
               <div className="text-xs text-slate-500 mt-1 ml-1">10:23 AM</div>
@@ -69,7 +69,7 @@ export default function ChatPage() {
             <div className="flex-1 flex flex-col items-end">
               <div className="bg-emerald-500 rounded-lg rounded-tr-none p-3 max-w-[80%]">
                 <p className="text-sm text-white">
-                  Perfect! I'll be there on time. What does your car look like?
+                  Perfect! I&apos;ll be there on time. What does your car look like?
                 </p>
               </div>
               <div className="text-xs text-slate-500 mt-1 mr-1">10:25 AM</div>

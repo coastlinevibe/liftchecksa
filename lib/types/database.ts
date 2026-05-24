@@ -85,8 +85,8 @@ export interface Trip {
   seats_available: number
   cost_share_amount: number
   luggage_rules?: string
-  pickup_points?: any
-  dropoff_points?: any
+  pickup_points?: string[]
+  dropoff_points?: string[]
   status: TripStatus
   public_slug: string
   created_at: string
@@ -120,7 +120,7 @@ export interface Rating {
   reviewed_user_id: string
   rating: number
   feedback?: string
-  tags?: any
+  tags?: string[]
   created_at: string
 }
 

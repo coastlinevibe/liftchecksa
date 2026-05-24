@@ -7,6 +7,48 @@ import { createClient } from '@/lib/supabase/server';
 import ApproveRejectButtons from './[id]/ApproveRejectButtons';
 import VehicleApproveButtons from './[id]/VehicleApproveButtons';
 
+type DriverVerificationRow = {
+  id: string;
+  user_id: string;
+  id_status: string | null;
+  provider_plan: string | null;
+};
+
+type ProfileLookupRow = {
+  user_id: string;
+  first_name: string | null;
+  surname: string | null;
+  phone: string | null;
+  email: string | null;
+};
+
+type VehicleVerificationRow = {
+  id: string;
+  driver_id: string;
+  make: string | null;
+  model: string | null;
+  colour: string | null;
+  licence_plate: string | null;
+  year: string | null;
+  vehicle_photo_url: string | null;
+  verification_status: string | null;
+  created_at: string;
+};
+
+type DriverProfileLookupRow = {
+  id: string;
+  user_id: string;
+};
+
+type DriverApplication = DriverVerificationRow & {
+  profile: ProfileLookupRow | null;
+};
+
+type VehicleApplication = VehicleVerificationRow & {
+  driverProfileId: string;
+  profile: ProfileLookupRow | null;
+};
+
 async function getPendingVerifications() {
   noStore();
 
@@ -50,10 +92,10 @@ async function getPendingVerifications() {
   }
 
   const userIds = Array.from(
-    new Set((driverRows || []).map((row: any) => row.user_id).filter(Boolean))
+    new Set(((driverRows || []) as DriverVerificationRow[]).map((row) => row.user_id).filter(Boolean))
   );
 
-  let profilesByUserId = new Map<string, any>();
+  let profilesByUserId = new Map<string, ProfileLookupRow>();
 
   if (userIds.length > 0) {
     const { data: profiles, error: profilesError } = await supabase
@@ -71,15 +113,17 @@ async function getPendingVerifications() {
       });
     }
 
-    profilesByUserId = new Map((profiles || []).map((profile: any) => [profile.user_id, profile]));
+    profilesByUserId = new Map(
+      ((profiles || []) as ProfileLookupRow[]).map((profile) => [profile.user_id, profile])
+    );
   }
 
-  const driverApplications = (driverRows || [])
-    .filter((application: any) => application.id_status !== 'approved' && application.id_status !== 'rejected')
-    .map((application: any) => ({
+  const driverApplications = ((driverRows || []) as DriverVerificationRow[])
+    .filter((application) => application.id_status !== 'approved' && application.id_status !== 'rejected')
+    .map((application) => ({
       ...application,
       profile: profilesByUserId.get(application.user_id) || null,
-    }));
+    })) as DriverApplication[];
 
   const { data: vehicleRows, error: vehicleRowsError } = await supabase
     .from('vehicles')
@@ -108,10 +152,10 @@ async function getPendingVerifications() {
   }
 
   const vehicleDriverIds = Array.from(
-    new Set((vehicleRows || []).map((vehicle: any) => vehicle.driver_id).filter(Boolean))
+    new Set(((vehicleRows || []) as VehicleVerificationRow[]).map((vehicle) => vehicle.driver_id).filter(Boolean))
   );
 
-  let driverProfilesById = new Map<string, any>();
+  let driverProfilesById = new Map<string, DriverProfileLookupRow>();
 
   if (vehicleDriverIds.length > 0) {
     const { data: vehicleDriverProfiles, error: vehicleDriverProfilesError } = await supabase
@@ -128,18 +172,20 @@ async function getPendingVerifications() {
       });
     }
 
-    driverProfilesById = new Map((vehicleDriverProfiles || []).map((row: any) => [row.id, row]));
+    driverProfilesById = new Map(
+      ((vehicleDriverProfiles || []) as DriverProfileLookupRow[]).map((row) => [row.id, row])
+    );
   }
 
   const vehicleUserIds = Array.from(
     new Set(
       Array.from(driverProfilesById.values())
-        .map((driverProfile: any) => driverProfile.user_id)
+        .map((driverProfile) => driverProfile.user_id)
         .filter(Boolean)
     )
   );
 
-  let vehicleProfilesByUserId = new Map<string, any>();
+  let vehicleProfilesByUserId = new Map<string, ProfileLookupRow>();
 
   if (vehicleUserIds.length > 0) {
     const { data: vehicleProfiles, error: vehicleProfilesError } = await supabase
@@ -156,10 +202,12 @@ async function getPendingVerifications() {
       });
     }
 
-    vehicleProfilesByUserId = new Map((vehicleProfiles || []).map((profile: any) => [profile.user_id, profile]));
+    vehicleProfilesByUserId = new Map(
+      ((vehicleProfiles || []) as ProfileLookupRow[]).map((profile) => [profile.user_id, profile])
+    );
   }
 
-  const vehicleApplications = (vehicleRows || []).map((vehicle: any) => {
+  const vehicleApplications = ((vehicleRows || []) as VehicleVerificationRow[]).map((vehicle) => {
     const driverProfile = driverProfilesById.get(vehicle.driver_id) || null;
     const profile = driverProfile ? vehicleProfilesByUserId.get(driverProfile.user_id) || null : null;
 
@@ -168,7 +216,7 @@ async function getPendingVerifications() {
       driverProfileId: vehicle.driver_id,
       profile,
     };
-  });
+  }) as VehicleApplication[];
 
   return {
     driverApplications,
@@ -198,7 +246,7 @@ export default async function AdminVerificationsPage() {
       <div className="px-4 py-4 max-w-4xl mx-auto">
         {applications.driverApplications.length > 0 ? (
           <div className="space-y-3">
-            {applications.driverApplications.map((application: any) => (
+            {applications.driverApplications.map((application) => (
               <div key={application.id} className="bg-white rounded-xl border border-slate-200 p-4">
                 <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-3">Basic Registration</div>
                 <div className="grid grid-cols-1 gap-2 text-sm mb-4">
@@ -239,7 +287,7 @@ export default async function AdminVerificationsPage() {
           <div className="mb-3 text-[10px] uppercase tracking-wide text-slate-500">Vehicle Applications</div>
           {applications.vehicleApplications.length > 0 ? (
             <div className="space-y-3">
-              {applications.vehicleApplications.map((vehicle: any) => (
+              {applications.vehicleApplications.map((vehicle) => (
                 <div key={vehicle.id} className="bg-white rounded-xl border border-slate-200 p-4">
                   <div className="grid grid-cols-1 gap-2 text-sm mb-4">
                     <div className="rounded-lg bg-slate-50 px-3 py-2">

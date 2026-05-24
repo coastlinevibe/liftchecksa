@@ -329,6 +329,30 @@ ALTER TABLE trip_checkins ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view own profile" ON profiles FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (auth.uid() = user_id);
 CREATE POLICY "Users can insert own profile" ON profiles FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Route chat participants can view peer profiles" ON profiles FOR SELECT USING (
+    auth.uid() = user_id OR
+    EXISTS (
+        SELECT 1
+        FROM route_chats chat
+        JOIN profiles actor ON actor.user_id = auth.uid()
+        WHERE (chat.sender_id = profiles.id AND chat.receiver_id = actor.id)
+           OR (chat.receiver_id = profiles.id AND chat.sender_id = actor.id)
+    ) OR
+    EXISTS (
+        SELECT 1
+        FROM route_seat_requests request
+        JOIN driver_route_assignments assignment ON assignment.id = request.matched_assignment_id
+        JOIN profiles actor ON actor.user_id = auth.uid()
+        WHERE (request.passenger_id = profiles.id AND assignment.driver_id = actor.id)
+           OR (assignment.driver_id = profiles.id AND request.passenger_id = actor.id)
+    ) OR
+    EXISTS (
+        SELECT 1
+        FROM profiles admin_profile
+        WHERE admin_profile.user_id = auth.uid()
+          AND admin_profile.role IN ('group_admin', 'platform_admin')
+    )
+);
 
 -- Driver Profiles: Users can view and edit their own driver profile
 CREATE POLICY "Users can view own driver profile" ON driver_profiles FOR SELECT USING (auth.uid() = user_id);

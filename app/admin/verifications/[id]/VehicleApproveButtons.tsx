@@ -10,6 +10,14 @@ interface Props {
   driverProfileId: string;
 }
 
+function getErrorMessage(error: unknown) {
+  if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
+    return error.message;
+  }
+
+  return 'An error occurred';
+}
+
 export default function VehicleApproveButtons({ vehicleId, driverProfileId }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -43,8 +51,8 @@ export default function VehicleApproveButtons({ vehicleId, driverProfileId }: Pr
 
       alert('Vehicle approved!');
       router.refresh();
-    } catch (err: any) {
-      setError(err.message || 'An error occurred');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -68,8 +76,8 @@ export default function VehicleApproveButtons({ vehicleId, driverProfileId }: Pr
 
       alert('Vehicle rejected');
       router.refresh();
-    } catch (err: any) {
-      setError(err.message || 'An error occurred');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }

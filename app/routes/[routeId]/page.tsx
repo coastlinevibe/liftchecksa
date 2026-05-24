@@ -40,7 +40,6 @@ export default async function RouteDetailPage({
       primaryAssignment &&
       (Number(primaryAssignment.seats_available || 0) > 0)
   );
-  const chatSinceIso = new Date(Date.now() - 30 * 60 * 1000).toISOString();
 
   const { data: routeChatMessages } = primaryAssignment && profile?.id
     ? await supabase
@@ -48,8 +47,8 @@ export default async function RouteDetailPage({
         .select('id, route_id, assignment_id, sender_id, receiver_id, message, created_at')
         .eq('route_id', route.id)
         .eq('assignment_id', primaryAssignment.id)
-        .gte('created_at', chatSinceIso)
         .order('created_at', { ascending: true })
+        .limit(50)
     : { data: [] };
   const chatDriverName = primaryAssignment?.driver_name || 'Assigned driver';
   const chatVehicleLabel = primaryAssignment?.vehicle_plate
