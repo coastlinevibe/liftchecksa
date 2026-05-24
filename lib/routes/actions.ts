@@ -547,14 +547,22 @@ export async function sendRouteChatMessage(input: {
     redirect(`/routes/${input.routeId}?chat_error=${encodeURIComponent('Route chat access required')}`);
   }
 
-  let resolvedReceiverId = input.receiverId;
+  const { data: postedReceiverProfile } = input.receiverId
+    ? await supabase
+        .from('profiles')
+        .select('id, user_id, role, membership_status')
+        .or(`id.eq.${input.receiverId},user_id.eq.${input.receiverId}`)
+        .maybeSingle()
+    : { data: null };
+
+  let resolvedReceiverId = postedReceiverProfile?.id || input.receiverId;
 
   if (isMemberSender) {
     if (profile.membership_status !== 'active') {
       redirect(`/routes/${input.routeId}?chat_error=${encodeURIComponent('Active member access required')}`);
     }
 
-    if (assignment.driver_id !== input.receiverId) {
+    if (resolvedReceiverId !== assignment.driver_id) {
       redirect(`/routes/${input.routeId}?chat_error=${encodeURIComponent('Route chat receiver mismatch')}`);
     }
 
@@ -577,14 +585,36 @@ export async function sendRouteChatMessage(input: {
 
     if (routeRequest?.passenger_id) {
       resolvedReceiverId = routeRequest.passenger_id;
+    } else if (postedReceiverProfile?.role === 'member') {
+      resolvedReceiverId = postedReceiverProfile.id;
+    } else {
+      const { data: latestDriverChat } = await supabase
+        .from('route_chats')
+        .select('sender_id, receiver_id, created_at')
+        .eq('route_id', input.routeId)
+        .eq('assignment_id', assignment.id)
+        .or(`sender_id.eq.${profile.id},receiver_id.eq.${profile.id}`)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const inferredReceiverId = latestDriverChat
+        ? latestDriverChat.sender_id === profile.id
+          ? latestDriverChat.receiver_id
+          : latestDriverChat.sender_id
+        : null;
+
+      if (inferredReceiverId) {
+        resolvedReceiverId = inferredReceiverId;
+      }
     }
   }
 
   const { data: resolvedReceiverProfile } = await supabase
     .from('profiles')
     .select('id, user_id, role, membership_status')
-    .or(`id.eq.${resolvedReceiverId},user_id.eq.${resolvedReceiverId}`)
-    .single();
+    .eq('id', resolvedReceiverId)
+    .maybeSingle();
 
   if (!resolvedReceiverProfile) {
     redirect(
