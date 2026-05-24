@@ -216,6 +216,23 @@ export async function signIn(email: string, password: string, redirectTo?: strin
 
 export async function signOut() {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (profile?.id) {
+      await supabase
+        .from('route_chats')
+        .delete()
+        .or(`sender_id.eq.${profile.id},receiver_id.eq.${profile.id}`);
+    }
+  }
+
   await supabase.auth.signOut();
   return { success: true, redirectUrl: '/' };
 }

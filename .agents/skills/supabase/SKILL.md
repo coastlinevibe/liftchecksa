@@ -8,27 +8,6 @@ metadata:
 
 # Supabase
 
-## LiftCheck MCP Setup
-
-For this repository, use the verified Codex remote MCP setup:
-
-```bash
-codex mcp add supabase --url https://mcp.supabase.com/mcp?project_ref=bfouoswqvgwentswoorl
-codex mcp login supabase
-```
-
-The matching Codex config belongs in `~/.codex/config.toml`:
-
-```toml
-[mcp]
-remote_mcp_client_enabled = true
-
-[mcp_servers.supabase]
-url = "https://mcp.supabase.com/mcp?project_ref=bfouoswqvgwentswoorl"
-```
-
-Use only this Codex remote MCP setup for LiftCheck unless the user explicitly asks to switch tools. If MCP tools still return `Auth required` after `codex mcp login supabase`, restart/reload Codex so the current session picks up the refreshed OAuth token.
-
 ## Core Principles
 
 **1. Supabase changes frequently — verify against changelog and current docs before implementing.**
@@ -112,7 +91,7 @@ supabase <group> <command> --help  # Flags for a specific command
 
 ## Supabase MCP Server
 
-For LiftCheck, use the Codex remote MCP setup at the top of this skill. The project ref is `bfouoswqvgwentswoorl`.
+For setup instructions, server URL, and configuration, see the [MCP setup guide](https://supabase.com/docs/guides/getting-started/mcp).
 
 **Troubleshooting connection issues** — follow these steps in order:
 
@@ -120,11 +99,11 @@ For LiftCheck, use the Codex remote MCP setup at the top of this skill. The proj
    `curl -so /dev/null -w "%{http_code}" https://mcp.supabase.com/mcp`
    A `401` is expected (no token) and means the server is up. Timeout or "connection refused" means it may be down.
 
-2. **Check Codex remote MCP configuration:**
-   Verify `~/.codex/config.toml` contains `remote_mcp_client_enabled = true` and the Supabase URL with `project_ref=bfouoswqvgwentswoorl`.
+2. **Check `.mcp.json` configuration:**
+   Verify the project root has a valid `.mcp.json` with the correct server URL. If missing, create one pointing to `https://mcp.supabase.com/mcp`.
 
 3. **Authenticate the MCP server:**
-   Run `codex mcp login supabase`, complete the browser auth, then restart/reload Codex if the current chat still shows stale MCP auth errors.
+   If the server is reachable and `.mcp.json` is correct but tools aren't visible, the user needs to authenticate. The Supabase MCP server uses OAuth 2.1 — tell the user to trigger the auth flow in their agent, complete it in the browser, and reload the session.
 
 ## Supabase Documentation
 

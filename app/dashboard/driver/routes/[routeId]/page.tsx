@@ -91,7 +91,7 @@ export default async function DriverRouteDetailPage({
     : 'Member';
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 pb-28 md:pb-0">
       <div className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-5xl px-4 py-4">
           <Link href="/dashboard/driver#assigned-routes" className="mb-2 inline-flex items-center text-sm text-slate-600">

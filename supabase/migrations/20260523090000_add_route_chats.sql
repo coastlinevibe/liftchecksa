@@ -15,7 +15,7 @@ create index if not exists idx_route_chats_created_at on public.route_chats(crea
 alter publication supabase_realtime add table public.route_chats;
 
 alter table public.route_chats enable row level security;
-grant select, insert on table public.route_chats to authenticated;
+grant select, insert, delete on table public.route_chats to authenticated;
 
 drop policy if exists "Route chat participants can read messages" on public.route_chats;
 create policy "Route chat participants can read messages"
@@ -60,5 +60,25 @@ with check (
       and assignment.status in ('approved', 'active')
       and route.status = 'active'
       and assignment.driver_id = route_chats.receiver_id
+  )
+);
+
+drop policy if exists "Route chat participants can delete messages" on public.route_chats;
+create policy "Route chat participants can delete messages"
+on public.route_chats
+for delete
+to authenticated
+using (
+  exists (
+    select 1
+    from public.profiles actor
+    where actor.user_id = auth.uid()
+      and (actor.id = route_chats.sender_id or actor.id = route_chats.receiver_id)
+  )
+  or exists (
+    select 1
+    from public.profiles actor
+    where actor.user_id = auth.uid()
+      and actor.role in ('group_admin', 'platform_admin')
   )
 );

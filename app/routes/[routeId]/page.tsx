@@ -40,6 +40,7 @@ export default async function RouteDetailPage({
       primaryAssignment &&
       (Number(primaryAssignment.seats_available || 0) > 0)
   );
+  const chatSinceIso = new Date(Date.now() - 30 * 60 * 1000).toISOString();
 
   const { data: routeChatMessages } = primaryAssignment && profile?.id
     ? await supabase
@@ -47,6 +48,7 @@ export default async function RouteDetailPage({
         .select('id, route_id, assignment_id, sender_id, receiver_id, message, created_at')
         .eq('route_id', route.id)
         .eq('assignment_id', primaryAssignment.id)
+        .gte('created_at', chatSinceIso)
         .order('created_at', { ascending: true })
     : { data: [] };
   const chatDriverName = primaryAssignment?.driver_name || 'Assigned driver';
@@ -55,7 +57,7 @@ export default async function RouteDetailPage({
     : null;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 pb-28 md:pb-0">
       <div className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-5xl px-4 py-4">
           <Link href="/routes" className="mb-2 inline-flex items-center text-sm text-slate-600">

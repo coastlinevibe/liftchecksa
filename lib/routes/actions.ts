@@ -571,8 +571,8 @@ export async function sendRouteChatMessage(input: {
 
   const { data: resolvedReceiverProfile } = await supabase
     .from('profiles')
-    .select('id, role, membership_status')
-    .eq('id', resolvedReceiverId)
+    .select('id, user_id, role, membership_status')
+    .or(`id.eq.${resolvedReceiverId},user_id.eq.${resolvedReceiverId}`)
     .single();
 
   if (!resolvedReceiverProfile) {

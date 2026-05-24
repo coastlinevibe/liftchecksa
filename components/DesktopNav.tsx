@@ -27,7 +27,7 @@ export default function DesktopNav() {
             <Button
               key={item.href}
               asChild
-              className={`rounded-none shadow-none first:rounded-s-lg last:rounded-e-lg focus-visible:z-10 ${
+              className={`rounded-none shadow-none text-slate-900 first:rounded-s-lg last:rounded-e-lg focus-visible:z-10 ${
                 isActive ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : ''
               }`}
               variant="outline"
