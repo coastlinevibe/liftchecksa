@@ -28,6 +28,15 @@ using (
   )
   or exists (
     select 1
+    from public.route_seat_requests request
+    join public.driver_route_assignments assignment on assignment.route_id = request.route_id
+    join public.profiles actor on actor.user_id = auth.uid()
+    where request.passenger_id = profiles.id
+      and assignment.driver_id = actor.id
+      and assignment.status in ('approved', 'active')
+  )
+  or exists (
+    select 1
     from public.profiles admin_profile
     where admin_profile.user_id = auth.uid()
       and admin_profile.role in ('group_admin', 'platform_admin')

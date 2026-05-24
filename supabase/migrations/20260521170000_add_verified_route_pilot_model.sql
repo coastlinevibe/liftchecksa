@@ -354,6 +354,14 @@ using (
     where assignment.id = route_seat_requests.matched_assignment_id
       and driver_profile.user_id = auth.uid()
   )
+  or exists (
+    select 1
+    from public.driver_route_assignments assignment
+    join public.profiles driver_profile on driver_profile.id = assignment.driver_id
+    where assignment.route_id = route_seat_requests.route_id
+      and driver_profile.user_id = auth.uid()
+      and assignment.status in ('approved', 'active')
+  )
 );
 
 drop policy if exists "Passengers can create own route requests" on public.route_seat_requests;

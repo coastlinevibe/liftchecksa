@@ -24,6 +24,7 @@ export default function RouteSeatRequestForm({
 }) {
   const [pickupStopId, setPickupStopId] = useState(stops[0]?.id || '');
   const [dropoffStopId, setDropoffStopId] = useState(stops[stops.length - 1]?.id || '');
+  const [seatsRequested, setSeatsRequested] = useState(1);
   const [requestedDays, setRequestedDays] = useState<string[]>(['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);
   const [state, formAction, pending] = useActionState(
     async (_prev: State, formData: FormData) => {
@@ -94,6 +95,22 @@ export default function RouteSeatRequestForm({
       ) : null}
 
       <div className="grid gap-3 md:grid-cols-2">
+        <div>
+          <label className="mb-1.5 block text-xs font-semibold text-slate-700">Seats needed</label>
+          <input
+            name="seats_requested"
+            type="number"
+            min={1}
+            max={8}
+            value={seatsRequested}
+            onChange={(event) => {
+              const nextValue = Number(event.target.value || 1);
+              setSeatsRequested(Number.isFinite(nextValue) ? Math.max(1, Math.floor(nextValue)) : 1);
+            }}
+            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          />
+        </div>
+
         <div>
           <label className="mb-1.5 block text-xs font-semibold text-slate-700">Pickup stop</label>
           <select

@@ -82,6 +82,7 @@ export interface RouteSeatRequest {
   route_id: string;
   pickup_stop_id: string;
   dropoff_stop_id: string;
+  seats_requested?: number;
   requested_days: string[];
   request_type: string;
   preferred_morning_time?: string | null;
@@ -89,6 +90,11 @@ export interface RouteSeatRequest {
   status: PilotRequestStatus;
   matched_assignment_id?: string | null;
   admin_notes?: string | null;
+  passenger_name?: string | null;
+  passenger_phone?: string | null;
+  passenger_email?: string | null;
+  pickup_stop_name?: string | null;
+  dropoff_stop_name?: string | null;
   created_at: string;
   updated_at: string;
 }

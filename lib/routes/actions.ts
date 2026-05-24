@@ -31,6 +31,14 @@ type DriverMemberProfileRow = {
   email?: string | null;
 };
 
+type PassengerProfileRow = {
+  id: string;
+  first_name: string | null;
+  surname: string | null;
+  phone?: string | null;
+  email?: string | null;
+};
+
 type VehicleLookupRow = {
   id: string;
   make: string | null;
@@ -389,6 +397,7 @@ export async function requestRouteSeat(input: {
   routeId: string;
   pickupStopId: string;
   dropoffStopId: string;
+  seatsRequested?: number;
   requestedDays?: Weekday[];
   requestType?: string;
   preferredMorningTime?: string;
@@ -409,11 +418,16 @@ export async function requestRouteSeat(input: {
     .eq('passenger_id', profile.id)
     .maybeSingle();
 
+  const seatsRequested = Number.isFinite(input.seatsRequested)
+    ? Math.max(1, Math.floor(Number(input.seatsRequested)))
+    : 1;
+
   const payload = {
     passenger_id: profile.id,
     route_id: input.routeId,
     pickup_stop_id: input.pickupStopId,
     dropoff_stop_id: input.dropoffStopId,
+    seats_requested: seatsRequested,
     requested_days: input.requestedDays?.length ? input.requestedDays : DEFAULT_WEEKDAYS,
     request_type: input.requestType || 'weekly',
     preferred_morning_time: input.preferredMorningTime || null,
@@ -463,6 +477,7 @@ export async function requestRouteSeatFromForm(formData: FormData) {
     routeId: String(formData.get('route_id') || ''),
     pickupStopId: String(formData.get('pickup_stop_id') || ''),
     dropoffStopId: String(formData.get('dropoff_stop_id') || ''),
+    seatsRequested: Number(formData.get('seats_requested') || 1),
     requestedDays: parsedDays.length ? parsedDays : DEFAULT_WEEKDAYS,
     requestType: String(formData.get('request_type') || 'weekly'),
     preferredMorningTime: String(formData.get('preferred_morning_time') || ''),
@@ -882,7 +897,7 @@ export async function getRouteDetail(routeId: string) {
       .order('created_at', { ascending: false }),
     supabase
       .from('route_seat_requests')
-      .select('id, passenger_id, route_id, pickup_stop_id, dropoff_stop_id, requested_days, request_type, preferred_morning_time, preferred_return_time, status, matched_assignment_id, admin_notes, created_at, updated_at')
+      .select('id, passenger_id, route_id, pickup_stop_id, dropoff_stop_id, seats_requested, requested_days, request_type, preferred_morning_time, preferred_return_time, status, matched_assignment_id, admin_notes, created_at, updated_at')
       .eq('route_id', routeId)
       .order('created_at', { ascending: false }),
     supabase
@@ -895,6 +910,20 @@ export async function getRouteDetail(routeId: string) {
   if (routeError || !route) {
     return { error: routeError?.message || 'Route not found' };
   }
+
+  const stopById = new Map((stops || []).map((stop) => [stop.id, stop] as const));
+  const passengerIds = Array.from(
+    new Set(((requests || []) as RouteSeatRequest[]).map((request) => request.passenger_id).filter(Boolean))
+  );
+  const { data: passengerProfiles } = passengerIds.length
+    ? await supabase
+        .from('profiles')
+        .select('id, first_name, surname, phone, email')
+        .in('id', passengerIds)
+    : { data: [] };
+  const passengerProfilesById = new Map(
+    ((passengerProfiles || []) as PassengerProfileRow[]).map((profile) => [profile.id, profile])
+  );
 
   const assignmentDisplayDetails = assignments?.length
     ? await Promise.all(
@@ -920,7 +949,19 @@ export async function getRouteDetail(routeId: string) {
       driver_name: assignmentDetailsById.get(assignment.id)?.driver_name || `Driver ${assignment.driver_id.slice(0, 8)}`,
       vehicle_plate: assignmentDetailsById.get(assignment.id)?.vehicle_plate || null,
     })) as RouteAssignmentSummary[],
-    requests: (requests || []) as RouteSeatRequest[],
+    requests: ((requests || []) as RouteSeatRequest[]).map((request) => {
+      const passengerProfile = passengerProfilesById.get(request.passenger_id);
+      return {
+        ...request,
+        passenger_name: passengerProfile
+          ? `${passengerProfile.first_name || ''} ${passengerProfile.surname || ''}`.trim() || null
+          : null,
+        passenger_phone: passengerProfile?.phone || null,
+        passenger_email: passengerProfile?.email || null,
+        pickup_stop_name: stopById.get(request.pickup_stop_id)?.stop_name || null,
+        dropoff_stop_name: stopById.get(request.dropoff_stop_id)?.stop_name || null,
+      };
+    }),
     ledger: (ledger || []) as RidePaymentLedgerEntry[],
   };
 }
@@ -945,7 +986,7 @@ export async function getDriverRouteDashboard() {
       .order('created_at', { ascending: false }),
     supabase
       .from('route_seat_requests')
-      .select('id, passenger_id, route_id, pickup_stop_id, dropoff_stop_id, requested_days, request_type, preferred_morning_time, preferred_return_time, status, matched_assignment_id, admin_notes, created_at, updated_at')
+      .select('id, passenger_id, route_id, pickup_stop_id, dropoff_stop_id, seats_requested, requested_days, request_type, preferred_morning_time, preferred_return_time, status, matched_assignment_id, admin_notes, created_at, updated_at')
       .eq('status', 'pending')
       .order('created_at', { ascending: false }),
   ]);
@@ -962,10 +1003,10 @@ export async function getDriverRouteDashboard() {
   const assignmentIds = (assignmentsResult.data || []).map((assignment) => assignment.id);
   const requestAssignments = assignmentIds.length
     ? await supabase
-        .from('route_seat_requests')
-        .select('id, passenger_id, route_id, pickup_stop_id, dropoff_stop_id, requested_days, request_type, preferred_morning_time, preferred_return_time, status, matched_assignment_id, admin_notes, created_at, updated_at')
-        .in('matched_assignment_id', assignmentIds)
-        .order('created_at', { ascending: false })
+      .from('route_seat_requests')
+      .select('id, passenger_id, route_id, pickup_stop_id, dropoff_stop_id, seats_requested, requested_days, request_type, preferred_morning_time, preferred_return_time, status, matched_assignment_id, admin_notes, created_at, updated_at')
+      .in('matched_assignment_id', assignmentIds)
+      .order('created_at', { ascending: false })
     : { data: [] as RouteSeatRequest[] };
 
   const stopsResult = routeIds.length

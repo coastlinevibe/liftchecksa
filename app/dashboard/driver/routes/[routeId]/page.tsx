@@ -11,6 +11,13 @@ function badgeClass(status: string) {
   return 'bg-slate-100 text-slate-700';
 }
 
+function formatPreferredTime(morning?: string | null, returnTime?: string | null) {
+  const parts: string[] = [];
+  if (morning) parts.push(`AM ${morning}`);
+  if (returnTime) parts.push(`PM ${returnTime}`);
+  return parts.length > 0 ? parts.join(' • ') : 'Not set';
+}
+
 export default async function DriverRouteDetailPage({
   params,
 }: {
@@ -230,9 +237,15 @@ export default async function DriverRouteDetailPage({
               {routeRequests.length > 0 ? (
                 routeRequests.map((request) => (
                   <div key={request.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                    <div className="text-sm font-semibold text-slate-900">Request #{request.id.slice(0, 8)}</div>
+                    <div className="text-sm font-semibold text-slate-900">
+                      {request.passenger_name || `Passenger ${request.passenger_id.slice(0, 8)}`}
+                    </div>
                     <div className="text-xs text-slate-600">Status: {request.status}</div>
+                    <div className="text-xs text-slate-600">Seats: {request.seats_requested ?? 1}</div>
                     <div className="text-xs text-slate-600">Days: {(request.requested_days || []).join(', ')}</div>
+                    <div className="text-xs text-slate-600">
+                      Time: {formatPreferredTime(request.preferred_morning_time, request.preferred_return_time)}
+                    </div>
                   </div>
                 ))
               ) : (
