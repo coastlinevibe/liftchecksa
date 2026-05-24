@@ -3,11 +3,11 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, Car, CheckCircle, Eye, EyeOff, Shield, User } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import { signUp } from '@/lib/auth/actions';
 import { createClient } from '@/lib/supabase/client';
 
-type Step = 'choose' | 'member' | 'driver' | 'group_admin';
+type Step = 'member' | 'driver' | 'group_admin';
 
 function getDriverPlanFromQuery(plan: string | null): 'provider_quarterly' | 'provider_annual' {
   if (plan === 'quarterly' || plan === 'provider_quarterly' || plan === '3months') {
@@ -17,86 +17,21 @@ function getDriverPlanFromQuery(plan: string | null): 'provider_quarterly' | 'pr
 }
 
 export default function RegisterClient() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const initialType = searchParams.get('type');
   const initialDriverPlan = getDriverPlanFromQuery(searchParams.get('plan'));
-  const [step, setStep] = useState<Step>(
-    initialType === 'member' || initialType === 'driver' || initialType === 'group_admin' ? initialType : 'choose'
+  const [step] = useState<Step>(
+    initialType === 'driver' || initialType === 'group_admin' ? initialType : 'member'
   );
 
-  if (step === 'member') return <MemberForm onBack={() => setStep('choose')} />;
-  if (step === 'driver') return <DriverForm initialPlan={initialDriverPlan} onBack={() => setStep('choose')} />;
-  if (step === 'group_admin') return <GroupAdminForm onBack={() => setStep('choose')} />;
+  const handleBack = () => {
+    router.push('/');
+  };
 
-  return (
-    <div className="min-h-screen bg-white">
-      <div className="px-4 py-6 max-w-md mx-auto">
-        <div className="mb-6">
-          <Link href="/" className="inline-flex items-center text-slate-600 text-sm mb-4">
-            <ArrowLeft className="w-4 h-4 mr-1" />
-            Back
-          </Link>
-          <h1 className="text-2xl font-bold text-slate-900 mb-2">Get Started</h1>
-          <p className="text-sm text-slate-600">Choose your account type</p>
-        </div>
-
-        <div className="space-y-3">
-          <ChoiceCard
-            icon={<User className="w-6 h-6 text-emerald-600" />}
-            title="I Need Lifts"
-            subtitle="Find verified drivers and travel safely"
-            price="12 months only"
-            onClick={() => setStep('member')}
-          />
-          <ChoiceCard
-            icon={<Car className="w-6 h-6 text-emerald-600" />}
-            title="I Offer Lifts"
-            subtitle="Get verified and choose a 3 or 12 month plan"
-            price="3 or 12 months"
-            onClick={() => setStep('driver')}
-          />
-          <ChoiceCard
-            icon={<Shield className="w-6 h-6 text-blue-600" />}
-            title="I Manage a Group"
-            subtitle="Keep your Facebook/WhatsApp group safe"
-            price="Free Access"
-            onClick={() => setStep('group_admin')}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ChoiceCard({
-  icon,
-  title,
-  subtitle,
-  price,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  subtitle: string;
-  price: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="w-full bg-white border-2 border-slate-200 hover:border-emerald-500 rounded-xl p-4 text-left transition-all"
-    >
-      <div className="flex items-start gap-3">
-        <div className="bg-slate-100 p-2.5 rounded-lg">{icon}</div>
-        <div className="flex-1">
-          <h3 className="text-base font-semibold text-slate-900 mb-1">{title}</h3>
-          <p className="text-xs text-slate-600 mb-2">{subtitle}</p>
-          <span className="text-xs font-semibold text-emerald-600">{price}</span>
-        </div>
-      </div>
-    </button>
-  );
+  if (step === 'driver') return <DriverForm initialPlan={initialDriverPlan} onBack={handleBack} />;
+  if (step === 'group_admin') return <GroupAdminForm onBack={handleBack} />;
+  return <MemberForm onBack={handleBack} />;
 }
 
 function MemberForm({ onBack }: { onBack: () => void }) {
