@@ -54,6 +54,70 @@ export default function RouteChatThread({
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    setMessages(initialMessages);
+  }, [initialMessages]);
+
+  useEffect(() => {
+    setResolvedPeerProfileId(initialResolvedPeerProfileId);
+  }, [initialResolvedPeerProfileId]);
+
+  useEffect(() => {
+    if (!routeId || !assignmentId || !currentProfileId) return;
+
+    let cancelled = false;
+
+    const syncMessages = async () => {
+      const { data } = await supabase
+        .from('route_chats')
+        .select('id, route_id, assignment_id, sender_id, receiver_id, message, created_at')
+        .eq('route_id', routeId)
+        .eq('assignment_id', assignmentId)
+        .order('created_at', { ascending: true });
+
+      if (cancelled || !data) return;
+
+      setMessages((currentMessages) => {
+        const merged = new Map<string, RouteChatMessage>();
+
+        for (const message of currentMessages) {
+          merged.set(message.id, message);
+        }
+
+        for (const message of data as RouteChatMessage[]) {
+          merged.set(message.id, message);
+        }
+
+        return Array.from(merged.values()).sort((a, b) => {
+          const aTime = new Date(a.created_at || 0).getTime();
+          const bTime = new Date(b.created_at || 0).getTime();
+          return aTime - bTime;
+        });
+      });
+
+      if (!resolvedPeerProfileId) {
+        const inferredPeer =
+          (data as RouteChatMessage[]).find((message) => message.sender_id !== currentProfileId)?.sender_id ||
+          (data as RouteChatMessage[]).find((message) => message.receiver_id !== currentProfileId)?.receiver_id ||
+          null;
+
+        if (inferredPeer) {
+          setResolvedPeerProfileId(inferredPeer);
+        }
+      }
+    };
+
+    void syncMessages();
+    const intervalId = window.setInterval(() => {
+      void syncMessages();
+    }, 5000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [assignmentId, currentProfileId, routeId, resolvedPeerProfileId, supabase]);
+
+  useEffect(() => {
     if (!routeId || !assignmentId || !currentProfileId) return;
 
     const channel = supabase
