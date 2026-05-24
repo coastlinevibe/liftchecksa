@@ -161,6 +161,7 @@ export default async function RouteDetailPage({
                   id="routeChatMessage"
                   name="message"
                   rows={3}
+                  required
                   placeholder={`Message ${chatDriverName}...`}
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />

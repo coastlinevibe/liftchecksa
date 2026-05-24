@@ -503,9 +503,20 @@ export async function sendRouteChatMessage(input: {
 
   const { profile } = current;
   const message = input.message.trim();
+  const fallbackPath = profile.role === 'driver'
+    ? `/dashboard/driver/routes/${input.routeId || ''}`
+    : `/routes/${input.routeId || ''}`;
 
-  if (!input.routeId || !input.assignmentId || !input.receiverId || !message) {
-    redirect(`/routes/${input.routeId || ''}?chat_error=${encodeURIComponent('Missing route chat details')}`);
+  if (!input.routeId || !input.assignmentId) {
+    redirect(`${fallbackPath}?chat_error=${encodeURIComponent('Missing route chat details')}`);
+  }
+
+  if (!input.receiverId) {
+    redirect(`${fallbackPath}?chat_error=${encodeURIComponent('Chat receiver is not available yet')}`);
+  }
+
+  if (!message) {
+    redirect(`${fallbackPath}?chat_error=${encodeURIComponent('Enter a message before sending')}`);
   }
 
   const { data: assignment } = await supabase
@@ -598,10 +609,10 @@ export async function sendRouteChatMessage(input: {
   });
 
   if (error) {
-    const fallbackPath = isDriverSender
+    const errorPath = isDriverSender
       ? `/dashboard/driver/routes/${input.routeId}`
       : `/routes/${input.routeId}`;
-    redirect(`${fallbackPath}?chat_error=${encodeURIComponent(error.message)}`);
+    redirect(`${errorPath}?chat_error=${encodeURIComponent(error.message)}`);
   }
 
   revalidatePath(`/routes/${input.routeId}`);
