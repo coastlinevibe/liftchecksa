@@ -9,6 +9,15 @@ import RouteSeatRequestForm from './RouteSeatRequestForm';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+function formatRouteStopTime(value?: string | null) {
+  if (!value) return null;
+  const [hours = '', minutes = ''] = value.split(':');
+  if (!hours || !minutes) return value;
+  const hourNumber = Number(hours);
+  const suffix = hourNumber >= 12 ? 'pm' : 'am';
+  return `${hours.padStart(2, '0')}:${minutes} ${suffix}`;
+}
+
 export default async function RouteDetailPage({
   params,
   searchParams,
@@ -36,8 +45,19 @@ export default async function RouteDetailPage({
         .eq('user_id', user.id)
         .maybeSingle()
     : { data: null };
+  const { data: latestPayment } = user
+    ? await supabase
+        .from('payments')
+        .select('status, proof_url, proof_image, activated_at, expires_at, created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    : { data: null };
   const isLoggedIn = Boolean(user);
-  const canRequestSeat = profile?.role === 'member' && profile.membership_status === 'active';
+  const membershipActive = profile?.membership_status === 'active' || latestPayment?.status === 'approved';
+  const isMemberUser = profile?.role === 'member' || latestPayment?.status === 'approved';
+  const canRequestSeat = Boolean(isLoggedIn && isMemberUser && membershipActive);
   const primaryAssignment = assignments.find((assignment) => ['approved', 'active'].includes(assignment.status)) || assignments[0] || null;
   const canUseRouteChat = Boolean(
     canRequestSeat &&
@@ -101,6 +121,11 @@ export default async function RouteDetailPage({
                         {stop.stop_order}. {stop.stop_name}
                       </div>
                       <div className="text-xs text-slate-600">{stop.area || 'Area to be confirmed'}</div>
+                      <div className="mt-1 text-[11px] font-semibold text-slate-500">
+                        {formatRouteStopTime(stop.estimated_morning_time) || 'AM time pending'}
+                        {' · '}
+                        {formatRouteStopTime(stop.estimated_return_time) || 'PM time pending'}
+                      </div>
                     </div>
                     <MapPin className="mt-0.5 h-4 w-4 text-emerald-500" />
                   </div>
@@ -184,7 +209,7 @@ export default async function RouteDetailPage({
             stops={stops}
             canRequestSeat={canRequestSeat}
             isLoggedIn={isLoggedIn}
-            membershipStatus={profile?.membership_status || null}
+            membershipStatus={membershipActive ? 'active' : profile?.membership_status || latestPayment?.status || null}
           />
         </div>
       </div>

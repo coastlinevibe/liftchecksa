@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect, notFound } from 'next/navigation';
 import { ArrowLeft, Bell, CalendarDays, MapPin, MessageSquare, Route as RouteIcon, Users } from 'lucide-react';
+import { getDisplayName } from '@/lib/display-name';
 import { createClient } from '@/lib/supabase/server';
 import { getRouteDetail, sendRouteChatMessageFromForm } from '@/lib/routes/actions';
 import RouteChatThread, { type RouteChatMessage } from '@/components/RouteChatThread';
@@ -9,6 +10,15 @@ function badgeClass(status: string) {
   if (status === 'active' || status === 'approved') return 'bg-emerald-100 text-emerald-700';
   if (status === 'paused' || status === 'pending') return 'bg-amber-100 text-amber-700';
   return 'bg-slate-100 text-slate-700';
+}
+
+function formatStopTime(value?: string | null) {
+  if (!value) return null;
+  const [hours = '', minutes = ''] = value.split(':');
+  if (!hours || !minutes) return value;
+  const hourNumber = Number(hours);
+  const suffix = hourNumber >= 12 ? 'pm' : 'am';
+  return `${hours.padStart(2, '0')}:${minutes} ${suffix}`;
 }
 
 function formatPreferredTime(morning?: string | null, returnTime?: string | null) {
@@ -40,15 +50,18 @@ export default async function DriverRouteDetailPage({
     .eq('user_id', user.id)
     .maybeSingle();
 
-  if (!profile) {
-    redirect('/login');
-  }
+  const { data: driverProfile } = await supabase
+    .from('driver_profiles')
+    .select('id, user_id')
+    .eq('user_id', user.id)
+    .maybeSingle();
 
-  if (profile.role === 'platform_admin' || profile.role === 'group_admin') {
+  if (profile?.role === 'platform_admin' || profile?.role === 'group_admin') {
     redirect(`/admin/routes/${routeId}`);
   }
 
-  if (profile.role !== 'driver') {
+  const isDriver = profile?.role === 'driver' || !!driverProfile;
+  if (!isDriver) {
     redirect('/dashboard/member');
   }
 
@@ -58,32 +71,45 @@ export default async function DriverRouteDetailPage({
   }
 
   const { route, stops, assignments, requests, ledger } = detail;
+  const driverIds = [profile?.id, driverProfile?.id].filter(Boolean) as string[];
+  const { data: directAssignment } = driverIds.length
+    ? await supabase
+        .from('driver_route_assignments')
+        .select('id, driver_id, vehicle_id, route_id, status, seats_available, days_active, weekly_price, single_route_price, admin_notes, approved_by, approved_at, created_at')
+        .eq('route_id', route.id)
+        .in('driver_id', driverIds)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    : { data: null };
+
   const assignment =
-    assignments.find((entry) => entry.driver_id === profile.id) ||
+    (directAssignment as typeof assignments[number] | null) ||
+    assignments.find((entry) => entry.driver_id === profile?.id || entry.driver_id === driverProfile?.id) ||
     assignments.find((entry) => ['approved', 'active', 'pending', 'paused'].includes(entry.status)) ||
+    assignments[0] ||
     null;
 
-  if (!assignment) {
-    redirect('/dashboard/driver#assigned-routes');
-  }
-
-  const { data: routeChatMessages } = await supabase
-    .from('route_chats')
-    .select('id, route_id, assignment_id, sender_id, receiver_id, message, created_at')
-    .eq('route_id', route.id)
-    .eq('assignment_id', assignment.id)
-    .order('created_at', { ascending: true });
+  const { data: routeChatMessages } = assignment
+    ? await supabase
+        .from('route_chats')
+        .select('id, route_id, assignment_id, sender_id, receiver_id, message, created_at')
+        .eq('route_id', route.id)
+        .eq('assignment_id', assignment.id)
+        .order('created_at', { ascending: true })
+    : { data: [] };
 
   const routeRequests = requests.filter((request) => request.route_id === route.id);
   const routeLedger = ledger.filter((entry) => entry.route_id === route.id);
-  const assignmentRequest =
-    routeRequests.find((request) => request.matched_assignment_id === assignment.id && request.passenger_id) ||
-    routeRequests.find((request) => request.passenger_id) ||
-    null;
+  const assignmentRequest = assignment
+    ? routeRequests.find((request) => request.matched_assignment_id === assignment.id && request.passenger_id) ||
+      routeRequests.find((request) => request.passenger_id) ||
+      null
+    : null;
   const inferredRouteChatPeerId =
     assignmentRequest?.passenger_id ||
-    routeChatMessages?.find((message) => message.sender_id !== profile.id)?.sender_id ||
-    routeChatMessages?.find((message) => message.receiver_id !== profile.id)?.receiver_id ||
+    routeChatMessages?.find((message) => message.sender_id !== profile?.id)?.sender_id ||
+    routeChatMessages?.find((message) => message.receiver_id !== profile?.id)?.receiver_id ||
     null;
   const { data: routeChatPeer } = inferredRouteChatPeerId
     ? await supabase
@@ -92,7 +118,12 @@ export default async function DriverRouteDetailPage({
         .or(`id.eq.${inferredRouteChatPeerId},user_id.eq.${inferredRouteChatPeerId}`)
         .maybeSingle()
     : { data: null };
-  const driverName = `${profile.first_name || ''} ${profile.surname || ''}`.trim() || 'Driver';
+  const driverName = getDisplayName({
+    firstName: profile?.first_name,
+    surname: profile?.surname,
+    email: user.email ?? null,
+    fallback: 'Driver',
+  });
   const memberName = routeChatPeer
     ? `${routeChatPeer.first_name || ''} ${routeChatPeer.surname || ''}`.trim() || 'Member'
     : 'Member';
@@ -110,8 +141,10 @@ export default async function DriverRouteDetailPage({
               <div className="mb-1 flex items-center gap-2">
                 <RouteIcon className="h-4 w-4 text-emerald-600" />
                 <h1 className="text-xl font-bold text-slate-900">{route.name}</h1>
-                <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${badgeClass(assignment.status)}`}>
-                  {assignment.status}
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${badgeClass(assignment?.status || 'paused')}`}
+                >
+                  {assignment?.status || 'unassigned'}
                 </span>
               </div>
               <p className="text-sm text-slate-600">
@@ -121,10 +154,10 @@ export default async function DriverRouteDetailPage({
             <div className="text-right text-xs text-slate-600">
               <div className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 font-medium">
                 <Bell className="h-3.5 w-3.5 text-rose-500" />
-                {assignment.passenger_request_count || 0} requests
+                {assignment?.passenger_request_count || 0} requests
               </div>
               <div className="mt-2 inline-flex items-center rounded-full bg-sky-100 px-2 py-1 font-semibold text-sky-700">
-                {assignment.seats_available} seats available
+                {assignment?.seats_available ?? 0} seats available
               </div>
             </div>
           </div>
@@ -144,6 +177,11 @@ export default async function DriverRouteDetailPage({
                         {stop.stop_order}. {stop.stop_name}
                       </div>
                       <div className="text-xs text-slate-600">{stop.area || 'Area to be confirmed'}</div>
+                      <div className="mt-1 text-[11px] font-semibold text-slate-500">
+                        {formatStopTime(stop.estimated_morning_time) || 'AM time pending'}
+                        {' · '}
+                        {formatStopTime(stop.estimated_return_time) || 'PM time pending'}
+                      </div>
                     </div>
                     <MapPin className="mt-0.5 h-4 w-4 text-emerald-500" />
                   </div>
@@ -155,12 +193,12 @@ export default async function DriverRouteDetailPage({
 
           <section className="rounded-xl border border-slate-200 bg-white p-4">
             <h2 className="mb-3 text-base font-bold text-slate-900">Assignment summary</h2>
-            <div className="grid gap-2 text-sm text-slate-600">
+              <div className="grid gap-2 text-sm text-slate-600">
               <div>Driver: {driverName}</div>
-              <div>Vehicle plate: {assignment.vehicle_plate || 'TBA'}</div>
-              <div>Weekly price: {assignment.weekly_price ? `R${assignment.weekly_price}` : 'TBA'}</div>
-              <div>Single route price: {assignment.single_route_price ? `R${assignment.single_route_price}` : 'TBA'}</div>
-              <div>Days: {(assignment.days_active || []).join(', ')}</div>
+              <div>Vehicle plate: {assignment?.vehicle_plate || 'TBA'}</div>
+              <div>Weekly price: {assignment?.weekly_price ? `R${assignment.weekly_price}` : 'TBA'}</div>
+              <div>Single route price: {assignment?.single_route_price ? `R${assignment.single_route_price}` : 'TBA'}</div>
+              <div>Days: {(assignment?.days_active || []).join(', ')}</div>
             </div>
           </section>
         </div>
@@ -186,16 +224,22 @@ export default async function DriverRouteDetailPage({
               <div className="mb-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
                 Chat with {memberName} on this route
               </div>
-              <RouteChatThread
-                key={`${route.id}:${assignment.id}:${(routeChatMessages || []).length}`}
-                routeId={route.id}
-                assignmentId={assignment.id}
-                currentProfileId={profile.id}
-                initialMessages={(routeChatMessages || []) as RouteChatMessage[]}
-                emptyStateText="No direct chat yet. Members can start the conversation from the route page."
-              />
+              {assignment ? (
+                <RouteChatThread
+                  key={`${route.id}:${assignment.id}:${(routeChatMessages || []).length}`}
+                  routeId={route.id}
+                  assignmentId={assignment.id}
+                  currentProfileId={profile?.id || user.id}
+                  initialMessages={(routeChatMessages || []) as RouteChatMessage[]}
+                  emptyStateText="No direct chat yet. Members can start the conversation from the route page."
+                />
+              ) : (
+                <div className="rounded-lg border border-dashed border-slate-300 bg-white px-3 py-3 text-sm text-slate-600">
+                  Route details are available, but no assignment is being resolved for this driver session yet.
+                </div>
+              )}
 
-              {inferredRouteChatPeerId ? (
+              {assignment && inferredRouteChatPeerId && profile?.id ? (
                 <form action={sendRouteChatMessageFromForm} className="mt-3 space-y-2">
                   <input type="hidden" name="routeId" value={route.id} />
                   <input type="hidden" name="assignmentId" value={assignment.id} />
@@ -219,11 +263,15 @@ export default async function DriverRouteDetailPage({
                     Send reply
                   </button>
                 </form>
-              ) : (
+              ) : assignment ? (
                 <div className="mt-3 rounded-lg border border-dashed border-slate-300 bg-white px-3 py-3 text-sm text-slate-600">
                   No active member conversation yet.
                 </div>
-              )}
+              ) : !profile?.id ? (
+                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800">
+                  Driver profile lookup is still resolving. The route is open, but chat controls need the profile row to load.
+                </div>
+              ) : null}
             </div>
           </section>
 

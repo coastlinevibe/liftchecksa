@@ -192,25 +192,6 @@ export default function RouteSeatRequestForm({
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2">
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold text-slate-700">Preferred morning time</label>
-          <input
-            name="preferred_morning_time"
-            type="time"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
-          />
-        </div>
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold text-slate-700">Preferred return time</label>
-          <input
-            name="preferred_return_time"
-            type="time"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
-          />
-        </div>
-      </div>
-
       <input type="hidden" name="request_type" value="weekly" />
 
       {invalidOrder ? (
@@ -230,6 +211,7 @@ export default function RouteSeatRequestForm({
 
       <div className="text-xs text-slate-500">
         Seat requests stay private until admin, driver, and passenger complete the acceptance flow.
+        You&apos;ll follow the driver&apos;s fixed route times.
       </div>
     </form>
   );

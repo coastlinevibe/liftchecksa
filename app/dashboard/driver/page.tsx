@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Bell, Calendar, Clock, MapPin, Settings } from 'lucide-react';
 import LogoutButton from '@/components/LogoutButton';
+import { getDisplayName } from '@/lib/display-name';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 
@@ -107,6 +108,7 @@ async function getDriverData() {
   return {
     profile,
     driverProfile,
+    userEmail: user.email ?? null,
     payment,
     vehicles: vehicles || [],
     routeAssignments,
@@ -116,6 +118,12 @@ async function getDriverData() {
 
 export default async function DriverDashboard() {
   const data = await getDriverData();
+  const driverDisplayName = getDisplayName({
+    firstName: data.profile?.first_name,
+    surname: data.profile?.surname,
+    email: data.userEmail,
+    fallback: 'Driver',
+  });
 
   const paymentProof = data.payment?.proof_url || data.payment?.proof_image;
   const paymentApproved = data.payment?.status === 'approved';
@@ -140,7 +148,7 @@ export default async function DriverDashboard() {
             <div>
               <h1 className="text-xl font-bold text-slate-900">Driver Dashboard</h1>
               <p className="text-xs text-slate-600">
-                Welcome back, {data.profile?.first_name || 'Driver'}
+                Welcome back, {driverDisplayName}
               </p>
             </div>
             <div className="flex items-center gap-2">

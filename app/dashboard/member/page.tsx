@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Search, MapPin, Star, Shield, Bell, Settings, AlertCircle, Clock } from 'lucide-react';
 import LogoutButton from '@/components/LogoutButton';
+import { getDisplayName } from '@/lib/display-name';
 import { createClient } from '@/lib/supabase/server';
 import { formatMembershipExpiry, getMembershipExpiry, getPlanLabel } from '@/lib/membership';
 import { redirect } from 'next/navigation';
@@ -97,6 +98,7 @@ async function getMemberData() {
 
   return {
     profile,
+    userEmail: user.email ?? null,
     payment,
     savedRoutes: (savedRoutes || []) as SavedRoute[],
     trustedDrivers: (trustedDrivers || []) as TrustedDriver[],
@@ -105,6 +107,12 @@ async function getMemberData() {
 
 export default async function MemberDashboard() {
   const data = await getMemberData();
+  const memberDisplayName = getDisplayName({
+    firstName: data.profile?.first_name,
+    surname: data.profile?.surname,
+    email: data.userEmail,
+    fallback: 'Member',
+  });
 
   const membershipLabel = getPlanLabel(data.profile?.membership_type);
   const membershipActive = data.profile?.membership_status === 'active' || data.payment?.status === 'approved';
@@ -125,7 +133,7 @@ export default async function MemberDashboard() {
             <div>
               <h1 className="text-xl font-bold text-slate-900">My Dashboard</h1>
               <p className="text-xs text-slate-600">
-                Welcome back, {data.profile?.first_name || 'Member'}
+                Welcome back, {memberDisplayName}
               </p>
             </div>
             <div className="flex items-center gap-2">
