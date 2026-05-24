@@ -6,6 +6,9 @@ import { createClient } from '@/lib/supabase/server';
 import RouteChatThread, { type RouteChatMessage } from '@/components/RouteChatThread';
 import RouteSeatRequestForm from './RouteSeatRequestForm';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default async function RouteDetailPage({
   params,
   searchParams,

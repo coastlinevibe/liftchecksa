@@ -44,19 +44,19 @@ export default function HelpPage() {
       ],
     },
     {
-      category: 'Bookings & Trips',
+      category: 'Routes & Seats',
       questions: [
         {
-          q: 'How do I book a trip?',
-          a: 'Search for trips by route, view driver details and ratings, tap "Request a Seat", and wait for driver confirmation. You\'ll receive a notification when approved.',
+          q: 'How do I request a seat?',
+          a: 'Browse active routes, open the route details, choose your pickup and drop-off stops, then tap "Request a Seat". You\'ll receive a notification when approved.',
         },
         {
-          q: 'Can I cancel a booking?',
-          a: 'Yes, you can cancel before the trip starts. Go to your trip details and tap "Cancel Booking". Note that repeated cancellations may affect your profile.',
+          q: 'Can I cancel a seat request?',
+          a: 'Yes, you can cancel before the request is matched or confirmed. Go to the route request details and tap "Cancel".',
         },
         {
-          q: 'What if the driver doesn\'t show up?',
-          a: 'If a driver doesn\'t show up, report them immediately through the app. Include evidence like messages or payment proof. We take no-shows very seriously.',
+          q: 'What if the driver does not respond?',
+          a: 'If a driver does not respond, report them immediately through the app. Include evidence like route messages or payment proof. We take no-shows seriously.',
         },
       ],
     },
@@ -81,12 +81,12 @@ export default function HelpPage() {
       category: 'For Drivers',
       questions: [
         {
-          q: 'How do I create a trip?',
-          a: 'Drivers do not publish open trips themselves. Admins create official routes, and approved drivers are assigned to those routes.',
+          q: 'How do drivers get a route?',
+          a: 'Drivers do not publish open route offers themselves. Admins create official routes, and approved drivers are assigned to those routes.',
         },
         {
-          q: 'How do I share my trip link?',
-          a: 'Passengers browse official routes inside LiftCheck. Once approved and assigned, drivers use route assignment and chat instead of sharing open trip posts.',
+          q: 'How do passengers contact the driver?',
+          a: 'Passengers browse official routes inside LiftCheck. Once approved and assigned, drivers use route assignment and chat instead of sharing open route posts.',
         },
         {
           q: 'What documents do I need for verification?',

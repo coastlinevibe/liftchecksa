@@ -69,7 +69,7 @@ export interface DriverRouteAssignment {
   seats_available: number;
   days_active: string[];
   weekly_price?: number | string | null;
-  single_trip_price?: number | string | null;
+  single_route_price?: number | string | null;
   admin_notes?: string | null;
   approved_by?: string | null;
   approved_at?: string | null;
@@ -149,7 +149,7 @@ export interface OfficialRouteWithStops extends OfficialRoute {
     email?: string | null;
     seats_available?: number | null;
     weekly_price?: number | string | null;
-    single_trip_price?: number | string | null;
+    single_route_price?: number | string | null;
     days_active?: string[] | null;
     vehicle_label?: string | null;
   }[];

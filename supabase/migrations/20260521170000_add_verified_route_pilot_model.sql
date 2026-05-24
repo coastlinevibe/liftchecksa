@@ -37,7 +37,7 @@ create table if not exists public.driver_route_assignments (
   seats_available integer not null default 1,
   days_active text[] not null default array['monday', 'tuesday', 'wednesday', 'thursday', 'friday']::text[],
   weekly_price numeric(10,2),
-  single_trip_price numeric(10,2),
+  single_route_price numeric(10,2),
   admin_notes text,
   approved_by uuid references public.profiles(id) on delete set null,
   approved_at timestamptz,

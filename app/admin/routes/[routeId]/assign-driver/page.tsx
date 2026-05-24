@@ -181,9 +181,9 @@ export default async function AssignDriverPage({
               </div>
 
               <div>
-                <label className="mb-1.5 block text-xs font-semibold text-slate-700">Single Trip Price</label>
+                <label className="mb-1.5 block text-xs font-semibold text-slate-700">Single Route Price</label>
                 <input
-                  name="single_trip_price"
+                  name="single_route_price"
                   type="number"
                   min={0}
                   step="0.01"

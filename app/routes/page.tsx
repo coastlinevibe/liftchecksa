@@ -3,6 +3,9 @@ import { ArrowLeft, MapPin, Search, Shield, Route as RouteIcon } from 'lucide-re
 import { getOfficialRoutes } from '@/lib/routes/actions';
 import { createClient } from '@/lib/supabase/server';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 type SearchParams = {
   pickup_area?: string | string[];
   destination_area?: string | string[];

@@ -135,7 +135,7 @@ export default async function AdminRouteDetailPage({
                       </div>
                       <div className="text-xs text-slate-600">
                         Weekly: {assignment.weekly_price ? `R${assignment.weekly_price}` : 'TBA'} • Single:{' '}
-                        {assignment.single_trip_price ? `R${assignment.single_trip_price}` : 'TBA'}
+                        {assignment.single_route_price ? `R${assignment.single_route_price}` : 'TBA'}
                       </div>
                     </div>
                     <div className="text-right text-xs text-slate-500">

@@ -152,7 +152,7 @@ export default async function DriverRouteDetailPage({
               <div>Driver: {driverName}</div>
               <div>Vehicle plate: {assignment.vehicle_plate || 'TBA'}</div>
               <div>Weekly price: {assignment.weekly_price ? `R${assignment.weekly_price}` : 'TBA'}</div>
-              <div>Single trip price: {assignment.single_trip_price ? `R${assignment.single_trip_price}` : 'TBA'}</div>
+              <div>Single route price: {assignment.single_route_price ? `R${assignment.single_route_price}` : 'TBA'}</div>
               <div>Days: {(assignment.days_active || []).join(', ')}</div>
             </div>
           </section>

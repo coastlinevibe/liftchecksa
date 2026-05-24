@@ -46,7 +46,7 @@ type DriverAssignmentListRow = {
   status: string;
   seats_available: number | null;
   weekly_price?: number | string | null;
-  single_trip_price?: number | string | null;
+  single_route_price?: number | string | null;
   days_active?: string[] | null;
   created_at: string;
 };
@@ -261,7 +261,7 @@ export async function assignDriverToRoute(input: {
   vehicleId: string;
   seatsAvailable: number;
   weeklyPrice: number;
-  singleTripPrice: number;
+  singleRoutePrice: number;
   daysActive: Weekday[];
   adminNotes?: string;
 }) {
@@ -341,7 +341,7 @@ export async function assignDriverToRoute(input: {
       seats_available: input.seatsAvailable,
       days_active: input.daysActive,
       weekly_price: input.weeklyPrice,
-      single_trip_price: input.singleTripPrice,
+      single_route_price: input.singleRoutePrice,
       admin_notes: input.adminNotes || null,
       approved_by: current.profile.id,
       approved_at: new Date().toISOString(),
@@ -379,7 +379,7 @@ export async function assignDriverToRouteFromForm(formData: FormData) {
     vehicleId: String(formData.get('vehicle_id') || ''),
     seatsAvailable: Number(formData.get('seats_available') || 1),
     weeklyPrice: Number(formData.get('weekly_price') || 0),
-    singleTripPrice: Number(formData.get('single_trip_price') || 0),
+    singleRoutePrice: Number(formData.get('single_route_price') || 0),
     daysActive: parsedDays.length ? parsedDays : DEFAULT_WEEKDAYS,
     adminNotes: String(formData.get('admin_notes') || ''),
   });
@@ -748,7 +748,7 @@ export async function getOfficialRoutes(includeInactive = false) {
 
   const assignmentsQuery = supabase
     .from('driver_route_assignments')
-    .select('id, driver_id, vehicle_id, route_id, status, seats_available, weekly_price, single_trip_price, days_active, created_at')
+    .select('id, driver_id, vehicle_id, route_id, status, seats_available, weekly_price, single_route_price, days_active, created_at')
     .in('route_id', routeIds)
     .order('created_at', { ascending: false });
 
@@ -817,7 +817,7 @@ export async function getOfficialRoutes(includeInactive = false) {
       email?: string | null;
       seats_available?: number | null;
       weekly_price?: number | string | null;
-      single_trip_price?: number | string | null;
+      single_route_price?: number | string | null;
       days_active?: string[] | null;
       vehicle_label?: string | null;
     }>
@@ -845,7 +845,7 @@ export async function getOfficialRoutes(includeInactive = false) {
       email: includeInactive ? driverProfile?.email || null : null,
       seats_available: assignment.seats_available,
       weekly_price: assignment.weekly_price,
-      single_trip_price: assignment.single_trip_price,
+      single_route_price: assignment.single_route_price,
       days_active: assignment.days_active || [],
       vehicle_label: vehicleLabel,
     });
@@ -877,7 +877,7 @@ export async function getRouteDetail(routeId: string) {
       .order('stop_order', { ascending: true }),
     supabase
       .from('driver_route_assignments')
-      .select('id, driver_id, vehicle_id, route_id, status, seats_available, days_active, weekly_price, single_trip_price, admin_notes, approved_by, approved_at, created_at')
+      .select('id, driver_id, vehicle_id, route_id, status, seats_available, days_active, weekly_price, single_route_price, admin_notes, approved_by, approved_at, created_at')
       .eq('route_id', routeId)
       .order('created_at', { ascending: false }),
     supabase
@@ -940,7 +940,7 @@ export async function getDriverRouteDashboard() {
   const [assignmentsResult, requestsResult] = await Promise.all([
     supabase
       .from('driver_route_assignments')
-      .select('id, driver_id, vehicle_id, route_id, status, seats_available, days_active, weekly_price, single_trip_price, admin_notes, approved_by, approved_at, created_at, official_routes(id, name, start_area, end_area, status)')
+      .select('id, driver_id, vehicle_id, route_id, status, seats_available, days_active, weekly_price, single_route_price, admin_notes, approved_by, approved_at, created_at, official_routes(id, name, start_area, end_area, status)')
       .eq('driver_id', profile.id)
       .order('created_at', { ascending: false }),
     supabase

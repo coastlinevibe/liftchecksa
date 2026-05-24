@@ -45,39 +45,39 @@ export async function resolveSignedStorageUrl(
   return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl || url;
 }
 
-export async function resolveTripMediaUrls<
+export async function resolveRouteMediaUrls<
   T extends {
     profiles?: { profile_photo_url?: string | null } | null;
     vehicles?: { vehicle_photo_url?: string | null } | null;
   },
->(supabase: Awaited<ReturnType<typeof createSupabaseClient>> | SupabaseStorageClient, trip: T): Promise<T> {
+>(supabase: Awaited<ReturnType<typeof createSupabaseClient>> | SupabaseStorageClient, record: T): Promise<T> {
   const [profilePhotoUrl, vehiclePhotoUrl] = await Promise.all([
-    resolveSignedStorageUrl(supabase, 'profile-photos', trip.profiles?.profile_photo_url),
-    resolveSignedStorageUrl(supabase, 'vehicle-photos', trip.vehicles?.vehicle_photo_url),
+    resolveSignedStorageUrl(supabase, 'profile-photos', record.profiles?.profile_photo_url),
+    resolveSignedStorageUrl(supabase, 'vehicle-photos', record.vehicles?.vehicle_photo_url),
   ]);
 
   return {
-    ...trip,
-    profiles: trip.profiles
+    ...record,
+    profiles: record.profiles
       ? {
-          ...trip.profiles,
-          profile_photo_url: profilePhotoUrl || trip.profiles.profile_photo_url,
+          ...record.profiles,
+          profile_photo_url: profilePhotoUrl || record.profiles.profile_photo_url,
         }
-      : trip.profiles,
-    vehicles: trip.vehicles
+      : record.profiles,
+    vehicles: record.vehicles
       ? {
-          ...trip.vehicles,
-          vehicle_photo_url: vehiclePhotoUrl || trip.vehicles.vehicle_photo_url,
+          ...record.vehicles,
+          vehicle_photo_url: vehiclePhotoUrl || record.vehicles.vehicle_photo_url,
         }
-      : trip.vehicles,
+      : record.vehicles,
   };
 }
 
-export async function resolveTripsMediaUrls<
+export async function resolveRoutesMediaUrls<
   T extends {
     profiles?: { profile_photo_url?: string | null } | null;
     vehicles?: { vehicle_photo_url?: string | null } | null;
   },
->(supabase: Awaited<ReturnType<typeof createSupabaseClient>> | SupabaseStorageClient, trips: T[]): Promise<T[]> {
-  return Promise.all(trips.map((trip) => resolveTripMediaUrls(supabase, trip)));
+>(supabase: Awaited<ReturnType<typeof createSupabaseClient>> | SupabaseStorageClient, routes: T[]): Promise<T[]> {
+  return Promise.all(routes.map((route) => resolveRouteMediaUrls(supabase, route)));
 }

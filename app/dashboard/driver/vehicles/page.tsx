@@ -80,7 +80,7 @@ export default async function VehiclesPage() {
           <div className="bg-white rounded-xl border border-slate-200 p-6 text-center">
             <Car className="w-12 h-12 text-slate-300 mx-auto mb-3" />
             <h3 className="text-sm font-semibold text-slate-900 mb-1">No vehicles yet</h3>
-            <p className="text-xs text-slate-600">Use the Add New Vehicle button above to start offering trips</p>
+            <p className="text-xs text-slate-600">Use the Add New Vehicle button above to start offering routes</p>
           </div>
         )}
 
@@ -110,7 +110,7 @@ function VehicleCard({ vehicle }: { vehicle: DriverVehicleRow }) {
       subTextColor: 'text-emerald-700',
       icon: <CheckCircle className="w-4 h-4 text-emerald-600" />,
       label: 'Verified',
-      description: 'Ready to use for trips'
+      description: 'Ready to use on routes'
     },
     pending: {
       color: 'border-amber-300',

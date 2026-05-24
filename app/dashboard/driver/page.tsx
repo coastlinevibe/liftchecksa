@@ -5,6 +5,9 @@ import { createClient } from '@/lib/supabase/server';
 import { getDriverRouteDashboard } from '@/lib/routes/actions';
 import { redirect } from 'next/navigation';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 type DriverVehicleSummary = {
   is_active?: boolean | null;
   verification_status?: string | null;
@@ -17,7 +20,7 @@ type DriverRouteSummary = {
   seats_available: number;
   days_active: string[];
   weekly_price?: number | string | null;
-  single_trip_price?: number | string | null;
+  single_route_price?: number | string | null;
   passenger_request_count?: number;
   official_route?: {
     id: string;
@@ -282,7 +285,7 @@ export default async function DriverDashboard() {
                                 Weekly: R{assignment.weekly_price ?? '0'}
                               </span>
                               <span className="rounded-full bg-violet-50 px-2 py-0.5 font-semibold text-violet-700">
-                                Single: R{assignment.single_trip_price ?? '0'}
+                                Single: R{assignment.single_route_price ?? '0'}
                               </span>
                               <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 font-semibold text-rose-600">
                                 <Bell className="w-3 h-3" />

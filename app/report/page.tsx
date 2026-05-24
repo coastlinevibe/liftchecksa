@@ -87,13 +87,13 @@ export default function ReportScammerPage() {
             </div>
           </div>
 
-          {/* Trip Details (Optional) */}
+          {/* Route Details (Optional) */}
           <div className="bg-white rounded-xl border border-slate-200 p-4">
-            <h2 className="text-base font-bold text-slate-900 mb-3">Trip Details (Optional)</h2>
+            <h2 className="text-base font-bold text-slate-900 mb-3">Route Details (Optional)</h2>
             
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Trip ID or Route</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Route ID or Route</label>
                 <input
                   type="text"
                   placeholder="e.g., Cape Town → Mthatha"

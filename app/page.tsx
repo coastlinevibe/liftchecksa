@@ -242,7 +242,7 @@ export default function Home() {
                 <span className="text-emerald-400 group-open:rotate-180 transition-transform">▼</span>
               </summary>
               <div className="px-3 pb-3 pt-1 text-[10px] text-slate-300 leading-relaxed">
-                No. You can browse official routes for free. Only sign up when you&apos;re ready to request a seat. LiftCheck handles membership and verification while trip payments follow the approved route flow.
+                No. You can browse official routes for free. Only sign up when you&apos;re ready to request a seat. LiftCheck handles membership and verification while route payments follow the approved flow.
               </div>
             </details>
 
@@ -286,7 +286,7 @@ export default function Home() {
                 <span className="text-emerald-400 group-open:rotate-180 transition-transform">▼</span>
               </summary>
               <div className="px-3 pb-3 pt-1 text-[10px] text-slate-300 leading-relaxed">
-                You can report issues directly in the app. Our admin team reviews all reports within 24 hours. Serious violations result in account suspension. You can also rate drivers after each trip to help other members.
+                You can report issues directly in the app. Our admin team reviews all reports within 24 hours. Serious violations result in account suspension. You can also rate drivers after each route interaction to help other members.
               </div>
             </details>
 
@@ -297,7 +297,7 @@ export default function Home() {
                 <span className="text-emerald-400 group-open:rotate-180 transition-transform">▼</span>
               </summary>
               <div className="px-3 pb-3 pt-1 text-[10px] text-slate-300 leading-relaxed">
-                Yes. We use bank-level encryption for all data. Your phone number and full name are only visible to drivers you&apos;ve requested trips with. License plate numbers are hidden until you sign up and request a specific trip.
+                Yes. We use bank-level encryption for all data. Your phone number and full name are only visible to drivers you&apos;ve requested seats from. License plate numbers are hidden until you sign up and request a specific route.
               </div>
             </details>
           </div>

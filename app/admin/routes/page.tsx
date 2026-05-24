@@ -120,9 +120,9 @@ export default async function AdminRoutesPage() {
                               </span>
                             </div>
                             <div>
-                              <span className="text-slate-500">Single trip price:</span>{' '}
+                              <span className="text-slate-500">Single route price:</span>{' '}
                               <span className="font-semibold text-slate-900">
-                                {assignment.single_trip_price ? `R${assignment.single_trip_price}` : 'Not set'}
+                                {assignment.single_route_price ? `R${assignment.single_route_price}` : 'Not set'}
                               </span>
                             </div>
                             <div>

@@ -4,16 +4,14 @@ import { Bell } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 type NotificationState = {
-  tripAlerts: boolean;
-  messages: boolean;
   routeAlerts: boolean;
+  messages: boolean;
   marketing: boolean;
 };
 
 const DEFAULT_NOTIFICATIONS: NotificationState = {
-  tripAlerts: true,
+  routeAlerts: true,
   messages: true,
-  routeAlerts: false,
   marketing: false,
 };
 
@@ -28,9 +26,8 @@ export default function NotificationPreferences({ storageKey }: { storageKey: st
     try {
       const parsed = JSON.parse(stored) as Partial<NotificationState>;
       const nextState: NotificationState = {
-        tripAlerts: parsed.tripAlerts ?? DEFAULT_NOTIFICATIONS.tripAlerts,
-        messages: parsed.messages ?? DEFAULT_NOTIFICATIONS.messages,
         routeAlerts: parsed.routeAlerts ?? DEFAULT_NOTIFICATIONS.routeAlerts,
+        messages: parsed.messages ?? DEFAULT_NOTIFICATIONS.messages,
         marketing: parsed.marketing ?? DEFAULT_NOTIFICATIONS.marketing,
       };
 
@@ -50,19 +47,14 @@ export default function NotificationPreferences({ storageKey }: { storageKey: st
 
   const items = [
     {
-      key: 'tripAlerts',
-      title: 'Trip Alerts',
-      description: 'Booking confirmations & updates',
+      key: 'routeAlerts',
+      title: 'Route Alerts',
+      description: 'Seat confirmations & updates',
     },
     {
       key: 'messages',
       title: 'Messages',
       description: 'New chat messages',
-    },
-    {
-      key: 'routeAlerts',
-      title: 'Route Alerts',
-      description: 'New trips on saved routes',
     },
     {
       key: 'marketing',
