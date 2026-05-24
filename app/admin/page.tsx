@@ -38,6 +38,12 @@ type VerificationReviewRow = {
   updated_at: string | null;
 };
 
+type VerificationReviewSummaryRow = {
+  status: string | null;
+  createdAt: string;
+  reviewedAt: string;
+};
+
 type ReportStatusRow = {
   status: string;
 };
@@ -165,7 +171,7 @@ async function getAdminStats() {
       createdAt: row.created_at,
       reviewedAt: row.updated_at,
     })),
-  ].filter((row) => row.reviewedAt);
+  ].filter((row): row is VerificationReviewSummaryRow => !!row.reviewedAt);
 
   const reviewedVerificationCount = verificationReviewRows.length;
   const approvedVerificationCount = verificationReviewRows.filter((row) => row.status === 'approved').length;
