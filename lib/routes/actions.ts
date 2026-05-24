@@ -978,11 +978,21 @@ export async function getDriverRouteDashboard() {
     return { error: 'Driver access required' };
   }
 
+  const { data: driverProfileRow } = await supabase
+    .from('driver_profiles')
+    .select('id, user_id')
+    .eq('user_id', profile.user_id)
+    .maybeSingle();
+
+  const driverIds = Array.from(
+    new Set([profile.id, driverProfileRow?.id].filter((value): value is string => Boolean(value)))
+  );
+
   const [assignmentsResult, requestsResult] = await Promise.all([
     supabase
       .from('driver_route_assignments')
       .select('id, driver_id, vehicle_id, route_id, status, seats_available, days_active, weekly_price, single_route_price, admin_notes, approved_by, approved_at, created_at, official_routes(id, name, start_area, end_area, status)')
-      .eq('driver_id', profile.id)
+      .in('driver_id', driverIds)
       .order('created_at', { ascending: false }),
     supabase
       .from('route_seat_requests')

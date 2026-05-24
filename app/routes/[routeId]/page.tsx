@@ -36,6 +36,7 @@ export default async function RouteDetailPage({
         .eq('user_id', user.id)
         .maybeSingle()
     : { data: null };
+  const isLoggedIn = Boolean(user);
   const canRequestSeat = profile?.role === 'member' && profile.membership_status === 'active';
   const primaryAssignment = assignments.find((assignment) => ['approved', 'active'].includes(assignment.status)) || assignments[0] || null;
   const canUseRouteChat = Boolean(
@@ -178,7 +179,13 @@ export default async function RouteDetailPage({
             </section>
           ) : null}
 
-          <RouteSeatRequestForm routeId={route.id} stops={stops} canRequestSeat={canRequestSeat} />
+          <RouteSeatRequestForm
+            routeId={route.id}
+            stops={stops}
+            canRequestSeat={canRequestSeat}
+            isLoggedIn={isLoggedIn}
+            membershipStatus={profile?.membership_status || null}
+          />
         </div>
       </div>
     </div>

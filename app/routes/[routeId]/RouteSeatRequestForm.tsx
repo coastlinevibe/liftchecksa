@@ -17,10 +17,14 @@ export default function RouteSeatRequestForm({
   routeId,
   stops,
   canRequestSeat,
+  isLoggedIn,
+  membershipStatus,
 }: {
   routeId: string;
   stops: RouteStop[];
   canRequestSeat: boolean;
+  isLoggedIn: boolean;
+  membershipStatus: string | null;
 }) {
   const [pickupStopId, setPickupStopId] = useState(stops[0]?.id || '');
   const [dropoffStopId, setDropoffStopId] = useState(stops[stops.length - 1]?.id || '');
@@ -54,25 +58,45 @@ export default function RouteSeatRequestForm({
     stops.length < 2;
 
   if (!canRequestSeat) {
+    const promptTitle = !isLoggedIn
+      ? 'Login required'
+      : membershipStatus === 'active'
+        ? 'Member access required'
+        : 'Membership approval required';
+    const promptBody = !isLoggedIn
+      ? 'Log in or register as an active member to request a weekly seat.'
+      : membershipStatus === 'active'
+        ? 'Something is off with your member access. Please refresh or contact support.'
+        : 'Your membership is not active yet. Complete payment verification to request a seat.';
     return (
       <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="text-base font-bold text-slate-900">Member access required</h2>
-        <p className="text-sm text-slate-600">
-          New users can browse routes first. To request a weekly seat, register as a member.
-        </p>
-        <Link
-          href="/register?type=member"
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-600"
-        >
-          <Send className="h-4 w-4" />
-          Request weekly seat
-        </Link>
-        <Link
-          href="/login"
-          className="inline-flex w-full items-center justify-center rounded-lg border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-        >
-          Already registered? Log in
-        </Link>
+        <h2 className="text-base font-bold text-slate-900">{promptTitle}</h2>
+        <p className="text-sm text-slate-600">{promptBody}</p>
+        {!isLoggedIn ? (
+          <>
+            <Link
+              href="/register?type=member"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-600"
+            >
+              <Send className="h-4 w-4" />
+              Request weekly seat
+            </Link>
+            <Link
+              href="/login"
+              className="inline-flex w-full items-center justify-center rounded-lg border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Already registered? Log in
+            </Link>
+          </>
+        ) : (
+          <Link
+            href="/settings/membership"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-600"
+          >
+            <Send className="h-4 w-4" />
+            Review membership
+          </Link>
+        )}
       </section>
     );
   }
