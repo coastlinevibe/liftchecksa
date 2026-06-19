@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/middleware';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { isAdminRole, isSuperAdminEmail } from '@/lib/auth/routing';
 
 export async function middleware(request: NextRequest) {
   const client = createClient(request);
@@ -24,7 +25,7 @@ export async function middleware(request: NextRequest) {
       .eq('user_id', user?.id)
       .maybeSingle();
 
-    if (profile?.role === 'platform_admin' || profile?.role === 'group_admin') {
+    if (isAdminRole(profile?.role) || isSuperAdminEmail(user?.email)) {
       return '/admin';
     }
 
@@ -42,7 +43,7 @@ export async function middleware(request: NextRequest) {
       .eq('user_id', user?.id)
       .maybeSingle();
 
-    return profile?.role === 'platform_admin' || profile?.role === 'group_admin';
+    return isAdminRole(profile?.role) || isSuperAdminEmail(user?.email);
   }
 
   // Protected routes that require authentication

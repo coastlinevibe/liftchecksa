@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { Users, Car, CheckCircle, Clock, TrendingUp, CreditCard, AlertTriangle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import LogoutButton from '@/components/LogoutButton';
+import { isAdminRole, isSuperAdminEmail } from '@/lib/auth/routing';
 
 type RecentMemberRow = {
   id: string;
@@ -95,7 +96,7 @@ async function getAdminStats() {
     .eq('user_id', user.id)
     .maybeSingle();
 
-  if (profile?.role !== 'platform_admin' && profile?.role !== 'group_admin') {
+  if (!isAdminRole(profile?.role) && !isSuperAdminEmail(user.email)) {
     redirect('/dashboard/member');
   }
 
@@ -111,6 +112,7 @@ async function getAdminStats() {
     { count: pendingDriverVerifications },
     { count: pendingVehicleVerifications },
     { count: pendingPayments },
+    { count: pendingDriverSubscriptionProofs },
     { count: activeReports },
     { data: recentMembers },
     { data: recentDrivers },
@@ -122,7 +124,6 @@ async function getAdminStats() {
     { data: ratingRows },
     { data: suspendedMemberRows },
     { data: suspendedDriverRows },
-    { count: groupAdmins },
   ] = await Promise.all([
     supabase.from('profiles').select('*', { count: 'exact', head: true }).in('role', ['member', 'driver']),
     supabase.from('driver_profiles').select('*', { count: 'exact', head: true }).eq('verification_status', 'approved'),
@@ -130,6 +131,7 @@ async function getAdminStats() {
     supabase.from('driver_profiles').select('*', { count: 'exact', head: true }).eq('verification_status', 'pending'),
     supabase.from('vehicles').select('*', { count: 'exact', head: true }).eq('verification_status', 'pending'),
     supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+    supabase.from('driver_profiles').select('*', { count: 'exact', head: true }).eq('provider_payment_status', 'pending').not('provider_payment_proof_url', 'is', null),
     supabase.from('reports').select('*', { count: 'exact', head: true }).in('status', ['new', 'under_review']),
     supabase.from('profiles').select('id, user_id, first_name, surname, phone, role, membership_status, created_at').eq('role', 'member').order('created_at', { ascending: false }).limit(5),
     supabase.from('driver_profiles').select('id, user_id, verification_status, completed_trips, rating_average, created_at').order('created_at', { ascending: false }).limit(5),
@@ -141,7 +143,6 @@ async function getAdminStats() {
     supabase.from('ratings').select('rating'),
     supabase.from('profiles').select('id').eq('membership_status', 'suspended'),
     supabase.from('driver_profiles').select('user_id').eq('is_suspended', true),
-    supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'group_admin'),
   ]);
 
   const driversWithProfiles: DriverWithProfile[] = [];
@@ -207,7 +208,8 @@ async function getAdminStats() {
     pendingVerifications: (pendingDriverVerifications || 0) + (pendingVehicleVerifications || 0),
     pendingDriverVerifications: pendingDriverVerifications || 0,
     pendingVehicleVerifications: pendingVehicleVerifications || 0,
-    pendingPayments: pendingPayments || 0,
+    pendingPayments: (pendingPayments || 0) + (pendingDriverSubscriptionProofs || 0),
+    pendingDriverSubscriptionProofs: pendingDriverSubscriptionProofs || 0,
     activeReports: activeReports || 0,
     recentMembers: recentMembers || [],
     recentDrivers: driversWithProfiles || [],
@@ -218,7 +220,6 @@ async function getAdminStats() {
     tripsThisMonth: routesThisMonth || 0,
     averageRating,
     suspendedAccounts: suspendedAccountIds.size,
-    groupAdmins: groupAdmins || 0,
   };
 }
 
@@ -297,7 +298,7 @@ export default async function AdminDashboard() {
                 {stats.pendingDriverVerifications}
               </div>
             </div>
-            <p className="text-xs text-amber-800">Driver applications awaiting review</p>
+            <p className="text-xs text-amber-800">Driver registrations awaiting review</p>
           </Link>
 
           <Link
@@ -356,7 +357,7 @@ export default async function AdminDashboard() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <div className="text-sm font-bold text-emerald-900">Official Routes</div>
-              <p className="text-xs text-emerald-800">Create, review, and assign official routes.</p>
+              <p className="text-xs text-emerald-800">Create routes, then review driver applications against them.</p>
             </div>
             <CheckCircle className="h-5 w-5 text-emerald-600" />
           </div>
@@ -482,10 +483,6 @@ export default async function AdminDashboard() {
               <div className="flex items-center justify-between">
                 <span className="text-xs text-slate-600">Suspended Accounts</span>
                 <span className="text-sm font-bold text-red-600">{stats.suspendedAccounts}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-slate-600">Group Admins</span>
-                <span className="text-sm font-bold text-slate-900">{stats.groupAdmins}</span>
               </div>
             </div>
           </div>

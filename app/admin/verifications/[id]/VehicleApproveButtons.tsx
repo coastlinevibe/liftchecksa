@@ -38,18 +38,26 @@ export default function VehicleApproveButtons({ vehicleId, driverProfileId }: Pr
 
       if (vehicleError) throw vehicleError;
 
+      const { data: currentDriverProfile, error: profileError } = await supabase
+        .from('driver_profiles')
+        .select('id_status')
+        .eq('id', driverProfileId)
+        .maybeSingle();
+
+      if (profileError) throw profileError;
+
       // Update driver profile
       const { error: driverError } = await supabase
         .from('driver_profiles')
         .update({ 
           vehicle_status: 'approved',
-          verification_status: 'approved' // Fully verified
+          verification_status: currentDriverProfile?.id_status === 'approved' ? 'approved' : 'pending'
         })
         .eq('id', driverProfileId);
 
       if (driverError) throw driverError;
 
-      alert('Vehicle approved!');
+      alert('Vehicle reviewed successfully!');
       router.refresh();
     } catch (err: unknown) {
       setError(getErrorMessage(err));
@@ -74,7 +82,17 @@ export default function VehicleApproveButtons({ vehicleId, driverProfileId }: Pr
 
       if (error) throw error;
 
-      alert('Vehicle rejected');
+      const { error: driverError } = await supabase
+        .from('driver_profiles')
+        .update({
+          vehicle_status: 'rejected',
+          verification_status: 'rejected',
+        })
+        .eq('id', driverProfileId);
+
+      if (driverError) throw driverError;
+
+      alert('Vehicle review rejected');
       router.refresh();
     } catch (err: unknown) {
       setError(getErrorMessage(err));
@@ -99,7 +117,7 @@ export default function VehicleApproveButtons({ vehicleId, driverProfileId }: Pr
           className="flex-1 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-300 text-white py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1"
         >
           <CheckCircle className="w-3.5 h-3.5" />
-          {loading ? 'Processing...' : 'Approve Vehicle'}
+          {loading ? 'Processing...' : 'Approve Registration'}
         </button>
         <button
           onClick={handleReject}
@@ -107,7 +125,7 @@ export default function VehicleApproveButtons({ vehicleId, driverProfileId }: Pr
           className="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-slate-300 text-white py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1"
         >
           <XCircle className="w-3.5 h-3.5" />
-          Reject
+          Reject Registration
         </button>
       </div>
     </div>

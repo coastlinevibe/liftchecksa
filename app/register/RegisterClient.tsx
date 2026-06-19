@@ -7,7 +7,7 @@ import { ArrowLeft, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import { signUp } from '@/lib/auth/actions';
 import { createClient } from '@/lib/supabase/client';
 
-type Step = 'member' | 'driver' | 'group_admin';
+type Step = 'member' | 'driver';
 
 function getDriverPlanFromQuery(plan: string | null): 'provider_quarterly' | 'provider_annual' {
   if (plan === 'quarterly' || plan === 'provider_quarterly' || plan === '3months') {
@@ -22,7 +22,7 @@ export default function RegisterClient() {
   const initialType = searchParams.get('type');
   const initialDriverPlan = getDriverPlanFromQuery(searchParams.get('plan'));
   const [step] = useState<Step>(
-    initialType === 'driver' || initialType === 'group_admin' ? initialType : 'member'
+    initialType === 'driver' ? 'driver' : 'member'
   );
 
   const handleBack = () => {
@@ -30,7 +30,6 @@ export default function RegisterClient() {
   };
 
   if (step === 'driver') return <DriverForm initialPlan={initialDriverPlan} onBack={handleBack} />;
-  if (step === 'group_admin') return <GroupAdminForm onBack={handleBack} />;
   return <MemberForm onBack={handleBack} />;
 }
 
@@ -192,7 +191,7 @@ function DriverForm({
         email: formData.email,
         password: formData.password,
       });
-      router.push('/dashboard/driver');
+      router.push('/dashboard/driver/vehicles/add');
     }, 2000);
     return () => clearTimeout(timer);
   }, [success, formData.email, formData.password, router]);
@@ -225,7 +224,7 @@ function DriverForm({
               <CheckCircle className="w-8 h-8 text-emerald-600" />
             </div>
             <h1 className="text-2xl font-bold text-slate-900 mb-2">Driver Account Created!</h1>
-            <p className="text-sm text-slate-600 mb-2">Complete payment to activate</p>
+            <p className="text-sm text-slate-600 mb-2">Next step: add your vehicle</p>
           </div>
           <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-4">
             <div className="text-center mb-3">
@@ -234,6 +233,9 @@ function DriverForm({
             </div>
             <div className="text-xs text-emerald-800">
               <strong>Amount:</strong> R{plan === 'provider_quarterly' ? '120' : '300'}.00
+            </div>
+            <div className="mt-2 text-xs text-emerald-800">
+              After login you will be taken straight to vehicle setup so you can register your car before applying for routes.
             </div>
           </div>
         </div>
@@ -251,7 +253,7 @@ function DriverForm({
         <h1 className="text-2xl font-bold text-slate-900 mb-2">Driver Sign Up</h1>
 
         <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900">
-          Choose a 3-month or 12-month verified provider plan.
+          Choose a 3-month or 12-month provider plan, then add your vehicle after signup.
         </div>
 
         <div className="mb-4">
@@ -285,83 +287,6 @@ function DriverForm({
             className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-300 text-white py-3 rounded-lg text-sm font-semibold"
           >
             {loading ? 'Creating...' : 'Continue'}
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-function GroupAdminForm({ onBack }: { onBack: () => void }) {
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [formData, setFormData] = useState({
-    firstName: '',
-    surname: '',
-    phone: '',
-    email: '',
-    password: '',
-    groupName: '',
-  });
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    const result = await signUp({
-      email: formData.email,
-      password: formData.password,
-      firstName: formData.firstName,
-      surname: formData.surname,
-      phone: formData.phone,
-      role: 'group_admin',
-      membershipType: 'basic',
-      groupName: formData.groupName,
-    });
-    if (result.success) setSuccess(true);
-    setLoading(false);
-  };
-
-  if (success) {
-    return (
-      <div className="min-h-screen bg-white">
-        <div className="px-4 py-6 max-w-md mx-auto">
-          <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
-              <CheckCircle className="w-8 h-8 text-blue-600" />
-            </div>
-            <h1 className="text-2xl font-bold text-slate-900 mb-2">Group Admin Account Created!</h1>
-            <p className="text-sm text-slate-600">Your account is being reviewed</p>
-          </div>
-          <Link href="/login" className="block w-full bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg text-sm font-semibold text-center">
-            Go to Login
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-white">
-      <div className="px-4 py-6 max-w-md mx-auto">
-        <button onClick={onBack} className="inline-flex items-center text-slate-600 text-sm mb-4">
-          <ArrowLeft className="w-4 h-4 mr-1" />
-          Back
-        </button>
-        <h1 className="text-2xl font-bold text-slate-900 mb-2">Group Admin Sign Up</h1>
-
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <TextField label="First Name" value={formData.firstName} onChange={(firstName) => setFormData({ ...formData, firstName })} />
-          <TextField label="Surname" value={formData.surname} onChange={(surname) => setFormData({ ...formData, surname })} />
-          <TextField label="Phone" value={formData.phone} onChange={(phone) => setFormData({ ...formData, phone })} type="tel" />
-          <TextField label="Group Name" value={formData.groupName} onChange={(groupName) => setFormData({ ...formData, groupName })} />
-          <TextField label="Email" value={formData.email} onChange={(email) => setFormData({ ...formData, email })} type="email" />
-          <PasswordField value={formData.password} onChange={(password) => setFormData({ ...formData, password })} />
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-slate-300 text-white py-3 rounded-lg text-sm font-semibold"
-          >
-            {loading ? 'Creating...' : 'Create Account'}
           </button>
         </form>
       </div>

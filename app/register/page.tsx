@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import RegisterClient from './RegisterClient';
+import { isAdminRole, isSuperAdminEmail } from '@/lib/auth/routing';
 
 export default async function RegisterPage() {
   const supabase = await createClient();
@@ -16,7 +17,7 @@ export default async function RegisterPage() {
       .eq('user_id', user.id)
       .maybeSingle();
 
-    if (profile?.role === 'platform_admin' || profile?.role === 'group_admin') {
+    if (isAdminRole(profile?.role) || isSuperAdminEmail(user.email)) {
       redirect('/admin');
     }
 
@@ -24,7 +25,7 @@ export default async function RegisterPage() {
       redirect('/dashboard/driver');
     }
 
-    redirect('/dashboard/member');
+    redirect('/dashboard');
   }
 
   return (

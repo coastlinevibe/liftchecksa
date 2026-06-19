@@ -5,9 +5,9 @@ import { isAdminRole, isSuperAdminEmail } from '@/lib/auth/routing';
 
 export async function GET(
   _request: Request,
-  { params }: { params: Promise<{ paymentId: string }> }
+  { params }: { params: Promise<{ driverProfileId: string }> }
 ) {
-  const { paymentId } = await params;
+  const { driverProfileId } = await params;
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -25,18 +25,18 @@ export async function GET(
     return new NextResponse('Forbidden', { status: 403 });
   }
 
-  const { data: payment, error } = await supabase
-    .from('payments')
-    .select('proof_url, proof_image')
-    .eq('id', paymentId)
+  const { data: driverProfile, error } = await supabase
+    .from('driver_profiles')
+    .select('provider_payment_proof_url')
+    .eq('id', driverProfileId)
     .single();
 
-  if (error || !payment) {
+  if (error || !driverProfile) {
     return new NextResponse('Not found', { status: 404 });
   }
 
-  const proofSource = payment.proof_url || payment.proof_image;
-  const proofPath = extractStoragePath(proofSource, 'payment-proofs');
+  const proofSource = driverProfile.provider_payment_proof_url;
+  const proofPath = extractStoragePath(proofSource || '', 'payment-proofs');
 
   if (proofPath) {
     const { data: proofBlob } = await supabase.storage

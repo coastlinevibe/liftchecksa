@@ -31,8 +31,8 @@ export default async function ProfilePage() {
   const roleLabel =
     profile?.role === 'driver'
       ? `${getPlanLabel(driverProfile?.provider_plan)}`
-      : profile?.role === 'group_admin'
-        ? 'Group Admin'
+      : profile?.role === 'platform_admin'
+        ? 'Admin'
         : getPlanLabel(profile?.membership_type);
 
   const backHref = getSettingsBackHref(profile?.role, !!driverProfile);

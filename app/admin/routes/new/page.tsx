@@ -18,7 +18,7 @@ export default function NewRoutePage() {
             </Link>
           </div>
           <h1 className="text-xl font-bold text-slate-900">Create Official Route</h1>
-          <p className="text-xs text-slate-600">Build the ordered route before assigning any driver.</p>
+          <p className="text-xs text-slate-600">Build the ordered route before reviewing any driver application.</p>
         </div>
       </div>
 

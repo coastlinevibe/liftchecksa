@@ -33,17 +33,25 @@ export default function ApproveRejectButtons({ driverProfileId }: Props) {
       const supabase = createClient();
 
       if (decision === 'approve') {
+        const { data: currentDriverProfile, error: profileError } = await supabase
+          .from('driver_profiles')
+          .select('vehicle_status')
+          .eq('id', driverProfileId)
+          .maybeSingle();
+
+        if (profileError) throw profileError;
+
         const { error: driverError } = await supabase
           .from('driver_profiles')
           .update({ 
             id_status: 'approved',
-            verification_status: 'pending'
+            verification_status: currentDriverProfile?.vehicle_status === 'approved' ? 'approved' : 'pending'
           })
           .eq('id', driverProfileId);
 
         if (driverError) throw driverError;
 
-        alert('Basic registration approved successfully!');
+        alert('Driver registration reviewed successfully!');
         router.push('/admin');
       } else {
         // Reject
@@ -69,7 +77,7 @@ export default function ApproveRejectButtons({ driverProfileId }: Props) {
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-4">
-      <h2 className="text-base font-bold text-slate-900 mb-3">Basic Registration Review</h2>
+      <h2 className="text-base font-bold text-slate-900 mb-3">Driver Registration Review</h2>
       
       {error && (
         <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
@@ -91,7 +99,7 @@ export default function ApproveRejectButtons({ driverProfileId }: Props) {
             decision === 'approve' ? 'text-emerald-500' : 'text-slate-400'
           }`} />
           <div className="text-sm font-semibold text-slate-900">Approve</div>
-          <div className="text-xs text-slate-600 mt-1">Basic details and ID look correct</div>
+          <div className="text-xs text-slate-600 mt-1">Driver details and ID look correct</div>
         </button>
 
         <button
@@ -120,7 +128,7 @@ export default function ApproveRejectButtons({ driverProfileId }: Props) {
               : 'bg-red-500 hover:bg-red-600 text-white'
           }`}
         >
-          {loading ? 'Processing...' : decision === 'approve' ? 'Approve Basic Registration' : 'Reject Application'}
+          {loading ? 'Processing...' : decision === 'approve' ? 'Approve Registration' : 'Reject Application'}
         </button>
       )}
     </div>

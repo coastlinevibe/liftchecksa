@@ -42,6 +42,7 @@ export default async function SettingsPage() {
   const backHref = getSettingsBackHref(role, !!driverProfile);
   const displayName = `${profile?.first_name ?? user.email?.split('@')[0] ?? 'User'} ${profile?.surname ?? ''}`.trim();
   const membershipExpiry = getMembershipExpiry(profile, latestPayment);
+  const normalizedAdminStatusLabel = role === 'platform_admin' ? 'Admin • Active' : null;
 
   const statusLabel =
     role === 'driver'
@@ -88,7 +89,7 @@ export default async function SettingsPage() {
             </div>
             <div className="flex-1">
               <div className="text-base font-bold text-slate-900 mb-1">{displayName}</div>
-              <div className="text-xs text-slate-600">{statusLabel}</div>
+              <div className="text-xs text-slate-600">{normalizedAdminStatusLabel || statusLabel}</div>
             </div>
           </div>
 

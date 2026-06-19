@@ -6,6 +6,7 @@ import { unstable_noStore as noStore } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import ApproveRejectButtons from './[id]/ApproveRejectButtons';
 import VehicleApproveButtons from './[id]/VehicleApproveButtons';
+import { isAdminRole, isSuperAdminEmail } from '@/lib/auth/routing';
 
 type DriverVerificationRow = {
   id: string;
@@ -67,7 +68,7 @@ async function getPendingVerifications() {
     .eq('user_id', user.id)
     .maybeSingle();
 
-  if (profile?.role !== 'platform_admin' && profile?.role !== 'group_admin') {
+  if (!isAdminRole(profile?.role) && !isSuperAdminEmail(user.email)) {
     redirect('/dashboard/member');
   }
 
@@ -235,10 +236,10 @@ export default async function AdminVerificationsPage() {
             <ArrowLeft className="w-4 h-4 mr-1" />
             Back to admin
           </Link>
-          <h1 className="text-xl font-bold text-slate-900 mb-1">Pending Verifications</h1>
+          <h1 className="text-xl font-bold text-slate-900 mb-1">Pending Reviews</h1>
           <p className="text-xs text-slate-600">
-            {applications.driverApplications.length} driver application{applications.driverApplications.length !== 1 ? 's' : ''}
-            {' '}and {applications.vehicleApplications.length} vehicle application{applications.vehicleApplications.length !== 1 ? 's' : ''} awaiting review
+            {applications.driverApplications.length} driver registration{applications.driverApplications.length !== 1 ? 's' : ''}
+            {' '}and {applications.vehicleApplications.length} vehicle registration{applications.vehicleApplications.length !== 1 ? 's' : ''} awaiting review
           </p>
         </div>
       </div>
@@ -248,7 +249,7 @@ export default async function AdminVerificationsPage() {
           <div className="space-y-3">
             {applications.driverApplications.map((application) => (
               <div key={application.id} className="bg-white rounded-xl border border-slate-200 p-4">
-                <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-3">Basic Registration</div>
+                <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-3">Driver Registration</div>
                 <div className="grid grid-cols-1 gap-2 text-sm mb-4">
                   <div className="rounded-lg bg-slate-50 px-3 py-2">
                     <div className="text-slate-500 mb-0.5">Plan</div>
@@ -278,8 +279,8 @@ export default async function AdminVerificationsPage() {
           </div>
         ) : (
           <div className="text-center py-12">
-            <h3 className="text-base font-semibold text-slate-900 mb-1">No pending verifications</h3>
-            <p className="text-sm text-slate-600">All driver applications have been reviewed</p>
+            <h3 className="text-base font-semibold text-slate-900 mb-1">No pending driver reviews</h3>
+            <p className="text-sm text-slate-600">All driver registrations have been reviewed</p>
           </div>
         )}
 
@@ -343,7 +344,7 @@ export default async function AdminVerificationsPage() {
             </div>
           ) : (
             <div className="text-center py-8">
-              <h3 className="text-base font-semibold text-slate-900 mb-1">No pending vehicle applications</h3>
+              <h3 className="text-base font-semibold text-slate-900 mb-1">No pending vehicle reviews</h3>
               <p className="text-sm text-slate-600">All submitted vehicles have been reviewed</p>
             </div>
           )}

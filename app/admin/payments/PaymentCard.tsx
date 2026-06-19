@@ -1,12 +1,12 @@
 'use client';
 
-import Image from 'next/image';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CheckCircle, XCircle, Eye, AlertCircle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 type PaymentCardPayment = {
+  source?: 'member' | 'driver';
   id: string;
   user_id: string;
   plan_type: string;
@@ -14,7 +14,11 @@ type PaymentCardPayment = {
   payment_reference: string;
   proof_url?: string | null;
   proof_image?: string | null;
+  proof_image_url?: string | null;
   created_at: string;
+  provider_payment_status?: string | null;
+  provider_payment_proof_url?: string | null;
+  provider_next_payment_at?: string | null;
   profiles?: {
     first_name?: string | null;
     surname?: string | null;
@@ -33,8 +37,14 @@ export default function PaymentCard({ payment }: { payment: PaymentCardPayment }
     surname: 'User',
     phone: '',
   };
-  const hasProof = Boolean(payment.proof_url || payment.proof_image);
-  const proofUrl = `/admin/payments/${payment.id}/proof`;
+  const isDriver = payment.source === 'driver';
+  const hasProof = Boolean(payment.proof_url || payment.proof_image || payment.provider_payment_proof_url);
+  const proofUrl = isDriver
+    ? `/admin/driver-subscriptions/${payment.id}/proof`
+    : `/admin/payments/${payment.id}/proof`;
+  const proofImageUrl = payment.proof_image_url && /^https?:\/\//i.test(payment.proof_image_url)
+    ? payment.proof_image_url
+    : proofUrl;
   const timeAgo = new Date(payment.created_at).toLocaleDateString('en-ZA', { 
     year: 'numeric', 
     month: '2-digit', 
@@ -48,10 +58,9 @@ export default function PaymentCard({ payment }: { payment: PaymentCardPayment }
     try {
       const supabase = createClient();
 
-      // Calculate expiry date based on plan
       const now = new Date();
       const expiresAt = new Date(now);
-      
+
       if (payment.plan_type.includes('monthly')) {
         expiresAt.setMonth(expiresAt.getMonth() + 1);
       } else if (payment.plan_type.includes('quarterly')) {
@@ -60,30 +69,60 @@ export default function PaymentCard({ payment }: { payment: PaymentCardPayment }
         expiresAt.setFullYear(expiresAt.getFullYear() + 1);
       }
 
-      // Update payment
-      const { error: paymentError } = await supabase
-        .from('payments')
-        .update({ 
-          status: 'approved',
-          activated_at: now.toISOString(),
-          expires_at: expiresAt.toISOString()
-        })
-        .eq('id', payment.id);
+      if (isDriver) {
+        const { error: driverError } = await supabase
+          .from('driver_profiles')
+          .update({
+            provider_payment_status: 'approved',
+            provider_payment_proof_url: payment.provider_payment_proof_url || payment.proof_url || payment.proof_image || null,
+            provider_last_paid_at: now.toISOString(),
+            provider_next_payment_at: expiresAt.toISOString(),
+            provider_expires_at: expiresAt.toISOString(),
+            verification_status: 'approved',
+            is_suspended: false,
+            suspension_reason: null,
+          })
+          .eq('id', payment.id);
 
-      if (paymentError) throw paymentError;
+        if (driverError) throw driverError;
 
-      // Update profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ 
-          membership_status: 'active',
-          membership_expires_at: expiresAt.toISOString()
-        })
-        .eq('user_id', payment.user_id);
+        if (payment.payment_reference) {
+          await supabase
+            .from('payments')
+            .update({
+              status: 'approved',
+              activated_at: now.toISOString(),
+              expires_at: expiresAt.toISOString(),
+            })
+            .eq('payment_reference', payment.payment_reference);
+        }
 
-      if (profileError) throw profileError;
+        alert('Driver subscription approved!');
+      } else {
+        const { error: paymentError } = await supabase
+          .from('payments')
+          .update({
+            status: 'approved',
+            activated_at: now.toISOString(),
+            expires_at: expiresAt.toISOString()
+          })
+          .eq('id', payment.id);
 
-      alert('Payment approved!');
+        if (paymentError) throw paymentError;
+
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({
+            membership_status: 'active',
+            membership_expires_at: expiresAt.toISOString()
+          })
+          .eq('user_id', payment.user_id);
+
+        if (profileError) throw profileError;
+
+        alert('Payment approved!');
+      }
+
       router.refresh();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -101,14 +140,30 @@ export default function PaymentCard({ payment }: { payment: PaymentCardPayment }
     try {
       const supabase = createClient();
 
-      const { error } = await supabase
-        .from('payments')
-        .update({ status: 'rejected' })
-        .eq('id', payment.id);
+      if (isDriver) {
+        const { error } = await supabase
+          .from('driver_profiles')
+          .update({
+            provider_payment_status: 'rejected',
+            is_suspended: true,
+            suspension_reason: 'Subscription payment rejected',
+          })
+          .eq('id', payment.id);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      alert('Payment rejected');
+        alert('Driver subscription rejected');
+      } else {
+        const { error } = await supabase
+          .from('payments')
+          .update({ status: 'rejected' })
+          .eq('id', payment.id);
+
+        if (error) throw error;
+
+        alert('Payment rejected');
+      }
+
       router.refresh();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -171,12 +226,12 @@ export default function PaymentCard({ payment }: { payment: PaymentCardPayment }
           
           {showProof && (
             <div className="bg-slate-100 rounded-lg p-4">
-              <Image
-                src={proofUrl}
-                alt="Payment Proof"
-                width={768}
-                height={512}
+              <img
+                src={proofImageUrl}
+                alt={isDriver ? 'Driver Subscription Proof' : 'Payment Proof'}
                 className="h-auto w-full max-w-md rounded-lg"
+                loading="lazy"
+                referrerPolicy="no-referrer"
               />
             </div>
           )}
@@ -191,7 +246,7 @@ export default function PaymentCard({ payment }: { payment: PaymentCardPayment }
           className="flex-1 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-300 text-white py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2"
         >
           <CheckCircle className="w-4 h-4" />
-          {loading ? 'Processing...' : 'Approve & Activate'}
+          {loading ? 'Processing...' : isDriver ? 'Approve Driver' : 'Approve & Activate'}
         </button>
         <button 
           onClick={handleReject}

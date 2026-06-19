@@ -6,6 +6,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, AlertCircle, CheckCircle, Camera, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { formatVehicleCapacity, formatPassengerSeats } from '@/lib/types/pilot-routes';
+
+const seatCapacityOptions = [4, 5, 7, 10, 12] as const;
 
 export default function AddVehiclePage() {
   const router = useRouter();
@@ -13,6 +16,7 @@ export default function AddVehiclePage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [vehiclePhoto, setVehiclePhoto] = useState<File | null>(null);
+  const [idDocument, setIdDocument] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string>('');
 
   const [formData, setFormData] = useState({
@@ -20,6 +24,7 @@ export default function AddVehiclePage() {
     model: '',
     colour: '',
     licencePlate: '',
+    seatCapacity: '',
   });
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -71,6 +76,39 @@ export default function AddVehiclePage() {
       let vehiclePhotoUrl = '';
 
       // Upload vehicle photo if provided
+      if (!idDocument) {
+        setError('Please upload your ID document before saving the vehicle.');
+        setLoading(false);
+        return;
+      }
+
+      const idDocumentPath = `${user.id}/${Date.now()}-${idDocument.name.replace(/\s+/g, '-')}`;
+      const { error: idUploadError } = await supabase.storage
+        .from('id-documents')
+        .upload(idDocumentPath, idDocument, {
+          upsert: true,
+          contentType: idDocument.type || undefined,
+        });
+
+      if (idUploadError) {
+        throw idUploadError;
+      }
+
+      const { data: idDocumentUrlData } = supabase.storage.from('id-documents').getPublicUrl(idDocumentPath);
+      const idDocumentUrl = idDocumentUrlData.publicUrl;
+
+      const { error: idUpdateError } = await supabase
+        .from('driver_profiles')
+        .update({
+          id_document_url: idDocumentUrl,
+          id_status: 'pending',
+        })
+        .eq('id', driverProfile.id);
+
+      if (idUpdateError) {
+        throw idUpdateError;
+      }
+
       if (vehiclePhoto) {
         const photoExt = vehiclePhoto.name.split('.').pop();
         const photoPath = `${user.id}/vehicle-${Date.now()}.${photoExt}`;
@@ -95,7 +133,9 @@ export default function AddVehiclePage() {
           model: formData.model,
           colour: formData.colour,
           licence_plate: formData.licencePlate.toUpperCase(),
+          seat_capacity: Number(formData.seatCapacity),
           vehicle_photo_url: vehiclePhotoUrl || null,
+          is_active: true,
           verification_status: 'pending',
         });
 
@@ -104,7 +144,7 @@ export default function AddVehiclePage() {
       } else {
         setSuccess(true);
         setTimeout(() => {
-          router.push('/dashboard/driver/vehicles');
+        router.push('/dashboard/driver');
         }, 2000);
       }
     } catch {
@@ -121,12 +161,12 @@ export default function AddVehiclePage() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-emerald-100 rounded-full mb-4">
             <CheckCircle className="w-8 h-8 text-emerald-600" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 mb-2">Vehicle Added!</h1>
+          <h1 className="text-2xl font-bold text-slate-900 mb-2">Vehicle and ID Submitted!</h1>
           <p className="text-sm text-slate-600 mb-4">
-            Your vehicle has been submitted for verification
+            Your ID and vehicle have been saved for review
           </p>
           <p className="text-xs text-slate-500">
-            Redirecting to vehicles page...
+            Redirecting to your driver dashboard...
           </p>
         </div>
       </div>
@@ -138,12 +178,12 @@ export default function AddVehiclePage() {
       {/* Header */}
       <div className="bg-white border-b border-slate-200">
         <div className="px-4 py-4 max-w-md mx-auto">
-          <Link href="/dashboard/driver/vehicles" className="inline-flex items-center text-slate-600 text-sm mb-2">
+          <Link href="/dashboard/driver" className="inline-flex items-center text-slate-600 text-sm mb-2">
             <ArrowLeft className="w-4 h-4 mr-1" />
-            Back to vehicles
+            Back to dashboard
           </Link>
           <h1 className="text-xl font-bold text-slate-900">Add New Vehicle</h1>
-          <p className="text-xs text-slate-600">Register a vehicle for your trips</p>
+          <p className="text-xs text-slate-600">Upload your ID and register a vehicle in one step</p>
         </div>
       </div>
 
@@ -210,6 +250,47 @@ export default function AddVehiclePage() {
               </div>
 
               <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Seat Capacity</label>
+                <select
+                  value={formData.seatCapacity}
+                  onChange={(e) => setFormData({ ...formData, seatCapacity: e.target.value })}
+                  required
+                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="">Select seat capacity</option>
+                  {seatCapacityOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {formatVehicleCapacity(option)}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-slate-500 mt-1">
+                  This must match the route&apos;s total seating capacity. {formData.seatCapacity ? formatPassengerSeats(Number(formData.seatCapacity)) : 'Passenger seats will be shown after selection.'}
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">ID Document</label>
+                <p className="text-xs text-slate-600 mb-2">
+                  Upload your ID here. Verification is complete only after the ID and vehicle are both approved.
+                </p>
+                <label className="block w-full border-2 border-dashed border-slate-300 rounded-lg p-4 text-center cursor-pointer hover:border-emerald-500 bg-white">
+                  <input
+                    type="file"
+                    accept="image/*,.pdf"
+                    onChange={(e) => setIdDocument(e.target.files?.[0] ?? null)}
+                    required
+                    className="hidden"
+                  />
+                  <p className="text-xs text-slate-700 font-semibold">Tap to upload ID document</p>
+                  <p className="text-[10px] text-slate-500 mt-1">JPG, PNG, or PDF</p>
+                </label>
+                {idDocument ? (
+                  <p className="mt-2 text-xs text-emerald-600 font-medium">Selected: {idDocument.name}</p>
+                ) : null}
+              </div>
+
+              <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">Vehicle Photo</label>
                 <p className="text-xs text-slate-600 mb-2">Clear photo showing licence plate</p>
                 {!photoPreview ? (
@@ -245,18 +326,18 @@ export default function AddVehiclePage() {
             </div>
           </div>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <p className="text-xs text-blue-800">
-              <strong>Verification:</strong> Your vehicle will be reviewed by our admin team within 24-48 hours.
-            </p>
-          </div>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <p className="text-xs text-blue-800">
+            <strong>Next step:</strong> Your ID and vehicle will be reviewed together before routes unlock.
+          </p>
+        </div>
 
           <button
             type="submit"
             disabled={loading}
             className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white py-3 rounded-lg text-sm font-semibold"
           >
-            {loading ? 'Adding Vehicle...' : 'Add Vehicle'}
+            {loading ? 'Saving...' : 'Submit Vehicle & ID'}
           </button>
         </form>
       </div>

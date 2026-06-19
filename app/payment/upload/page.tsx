@@ -12,7 +12,25 @@ type PaymentRecord = {
   payment_reference?: string | null;
   amount?: number | string | null;
   plan_type?: string | null;
+  status?: string | null;
+  source?: 'member' | 'driver';
+  proof_url?: string | null;
+  proof_image?: string | null;
+  provider_last_paid_at?: string | null;
+  provider_next_payment_at?: string | null;
 };
+
+function addPlanMonths(baseDate: Date, planType?: string | null) {
+  const next = new Date(baseDate);
+  if (planType?.includes('monthly')) {
+    next.setMonth(next.getMonth() + 1);
+  } else if (planType?.includes('quarterly')) {
+    next.setMonth(next.getMonth() + 3);
+  } else {
+    next.setFullYear(next.getFullYear() + 1);
+  }
+  return next;
+}
 
 export default function PaymentUploadPage() {
   const [copied, setCopied] = useState(false);
@@ -22,24 +40,66 @@ export default function PaymentUploadPage() {
   const [paymentProof, setPaymentProof] = useState<File | null>(null);
   const [proofPreview, setProofPreview] = useState<string>('');
   const [paymentData, setPaymentData] = useState<PaymentRecord | null>(null);
+  const [nextPath, setNextPath] = useState('/dashboard/member');
 
   const loadPendingPayment = async () => {
     const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user) return;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
 
-    const { data } = await supabase
-      .from('payments')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
+      if (!user) return;
 
-    if (data) {
-      setPaymentData(data);
+      const { data: driverProfile } = await supabase
+        .from('driver_profiles')
+        .select(`
+          id,
+          provider_plan,
+          provider_payment_reference,
+          provider_payment_amount,
+          provider_payment_status,
+          provider_payment_proof_url,
+          provider_last_paid_at,
+          provider_next_payment_at
+        `)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (driverProfile) {
+        setPaymentData({
+          id: driverProfile.id,
+          payment_reference: driverProfile.provider_payment_reference || null,
+          amount: driverProfile.provider_payment_amount ?? null,
+          plan_type: driverProfile.provider_plan || null,
+          status: driverProfile.provider_payment_status || 'pending',
+          source: 'driver',
+          proof_url: driverProfile.provider_payment_proof_url || null,
+          provider_last_paid_at: driverProfile.provider_last_paid_at || null,
+          provider_next_payment_at: driverProfile.provider_next_payment_at || null,
+        });
+        setNextPath('/dashboard/driver');
+        return;
+      }
+
+      const { data } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (data) {
+        setPaymentData({
+          ...(data as PaymentRecord),
+          source: 'member',
+        });
+        setNextPath('/dashboard/member');
+      } else {
+        setError('No pending payment found');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load payment details');
     }
   };
 
@@ -47,6 +107,16 @@ export default function PaymentUploadPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadPendingPayment();
   }, []);
+
+  useEffect(() => {
+    if (!success) return;
+
+    const timer = window.setTimeout(() => {
+      window.location.href = nextPath;
+    }, 1800);
+
+    return () => window.clearTimeout(timer);
+  }, [nextPath, success]);
 
   const handleProofChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -131,18 +201,62 @@ export default function PaymentUploadPage() {
 
       const proofUrl = fileName;
 
-      const { error: updateError } = await supabase
-        .from('payments')
-        .update({
-          proof_url: proofUrl,
-          proof_image: proofUrl,
-        })
-        .eq('id', paymentData.id);
+      if (paymentData.source === 'driver') {
+        const nextPaymentAt = addPlanMonths(new Date(), paymentData.plan_type);
+        const { error: driverUpdateError } = await supabase
+          .from('driver_profiles')
+          .update({
+            provider_payment_proof_url: proofUrl,
+            provider_payment_status: 'pending',
+            provider_last_paid_at: new Date().toISOString(),
+            provider_next_payment_at: nextPaymentAt.toISOString(),
+            provider_expires_at: nextPaymentAt.toISOString(),
+          })
+          .eq('id', paymentData.id);
 
-      if (updateError) {
-        setError('Failed to update payment: ' + updateError.message);
-      } else {
+        if (driverUpdateError) {
+          setError('Failed to update driver subscription: ' + driverUpdateError.message);
+          setLoading(false);
+          return;
+        }
+
+        const { error: updateError } = await supabase
+          .from('payments')
+          .update({
+            proof_url: proofUrl,
+            status: 'pending',
+            activated_at: new Date().toISOString(),
+            expires_at: nextPaymentAt.toISOString(),
+          })
+          .eq('payment_reference', paymentData.payment_reference || '');
+
+        if (updateError) {
+          console.warn('[payment/upload] Failed to mirror driver payment row', updateError.message);
+        }
+
+        setNextPath('/dashboard/driver');
         setSuccess(true);
+      } else {
+        const { error: updateError } = await supabase
+          .from('payments')
+          .update({
+            proof_url: proofUrl,
+            proof_image: proofUrl,
+          })
+          .eq('id', paymentData.id);
+
+        if (updateError) {
+          setError('Failed to update payment: ' + updateError.message);
+        } else {
+          const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+          setNextPath(profile?.role === 'driver' ? '/dashboard/driver' : '/dashboard/member');
+          setSuccess(true);
+        }
       }
 
       setLoading(false);
@@ -163,9 +277,7 @@ export default function PaymentUploadPage() {
           <p className="text-sm text-slate-600 mb-4">
             We&apos;ll review your payment within 24 hours
           </p>
-          <Link href="/" className="inline-block px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-sm font-semibold">
-            Back to Home
-          </Link>
+          <p className="text-xs text-slate-500">Redirecting to your dashboard...</p>
         </div>
       </div>
     );
@@ -175,7 +287,16 @@ export default function PaymentUploadPage() {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center px-4">
         <div className="text-center">
-          <p className="text-sm text-slate-600">Loading payment details...</p>
+          {error ? (
+            <>
+              <p className="text-sm font-semibold text-red-600 mb-2">{error}</p>
+              <Link href="/dashboard/driver" className="text-sm font-semibold text-emerald-600">
+                Back to dashboard
+              </Link>
+            </>
+          ) : (
+            <p className="text-sm text-slate-600">Loading payment details...</p>
+          )}
         </div>
       </div>
     );

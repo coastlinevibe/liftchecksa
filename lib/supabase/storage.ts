@@ -9,7 +9,7 @@ type SupabaseStorageClient = {
   };
 };
 
-function extractStoragePath(url: string, bucket: string) {
+export function extractStoragePath(url: string, bucket: string) {
   let normalized = url;
 
   try {

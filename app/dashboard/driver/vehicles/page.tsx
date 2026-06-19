@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ArrowLeft, Plus, Car, CheckCircle, Clock, XCircle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
+import { formatVehicleCapacity } from '@/lib/types/pilot-routes';
 import { redirect } from 'next/navigation';
 
 type DriverVehicleRow = {
@@ -9,6 +10,7 @@ type DriverVehicleRow = {
   model: string | null;
   colour: string | null;
   licence_plate: string | null;
+  seat_capacity: number | null;
   verification_status: 'approved' | 'pending' | 'rejected' | string | null;
 };
 
@@ -35,7 +37,7 @@ async function getDriverVehicles() {
   // Query vehicles using driver_profile.id
   const { data: vehicles } = await supabase
     .from('vehicles')
-    .select('*')
+    .select('id, make, model, colour, licence_plate, seat_capacity, verification_status, is_active')
     .eq('driver_id', driverProfile.id)
     .order('created_at', { ascending: false });
 
@@ -155,6 +157,10 @@ function VehicleCard({ vehicle }: { vehicle: DriverVehicleRow }) {
             <div>
               <span className="text-slate-600">Colour:</span>
               <span className="font-semibold text-slate-900 ml-1">{vehicle.colour}</span>
+            </div>
+            <div>
+              <span className="text-slate-600">Seats:</span>
+              <span className="font-semibold text-slate-900 ml-1">{formatVehicleCapacity(vehicle.seat_capacity)}</span>
             </div>
           </div>
           <div className="bg-slate-900 text-white px-3 py-1 rounded text-center text-sm font-bold inline-block">

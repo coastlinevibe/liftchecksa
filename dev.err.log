@@ -1,0 +1,56 @@
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+[browser] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior (file://E:/wind new/Liftcheck/liftcheck/.next/dev/static/chunks/node_modules_next_dist_115brz8._.js:2477:13)
+[Server] Supabase auth error: Error [AuthApiError]: Invalid login credentials
+    at async signIn (lib\auth\actions.ts:159:29)
+  157 |     console.log('[Server] Supabase client created');
+  158 |
+> 159 |     const { data, error } = await supabase.auth.signInWithPassword({
+      |                             ^
+  160 |       email,
+  161 |       password,
+  162 |     }); {
+  __isAuthError: true,
+  status: 400,
+  code: 'invalid_credentials'
+}
+[Server] Profile fetch error: {
+  code: '42P17',
+  details: null,
+  hint: null,
+  message: 'infinite recursion detected in policy for relation "profiles"'
+}
+[browser] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior (file://E:/wind new/Liftcheck/liftcheck/.next/dev/static/chunks/node_modules_next_dist_115brz8._.js:2477:13)
+[Server] Profile fetch error: {
+  code: '42P17',
+  details: null,
+  hint: null,
+  message: 'infinite recursion detected in policy for relation "profiles"'
+}
+[browser] Uncaught Error: Rendered more hooks than during the previous render.
+    at updateWorkInProgressHook (file://E:/wind new/Liftcheck/liftcheck/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:4734:23)
+    at updateMemo (file://E:/wind new/Liftcheck/liftcheck/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:5409:20)
+    at Object.useMemo (file://E:/wind new/Liftcheck/liftcheck/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:15465:24)
+    at <unknown> (file://E:/wind new/Liftcheck/liftcheck/.next/dev/static/chunks/node_modules_next_dist_compiled_0rpq4pf._.js:1742:36)
+    at Router (file://E:/wind new/Liftcheck/liftcheck/.next/dev/static/chunks/node_modules_next_dist_client_0fhqo1d._.js:14290:59)
+    at Object.react_stack_bottom_frame (file://E:/wind new/Liftcheck/liftcheck/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:15037:24)
+    at renderWithHooks (file://E:/wind new/Liftcheck/liftcheck/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:4620:24)
+    at updateFunctionComponent (file://E:/wind new/Liftcheck/liftcheck/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:6081:21)
+    at beginWork (file://E:/wind new/Liftcheck/liftcheck/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:6691:24)
+    at runWithFiberInDEV (file://E:/wind new/Liftcheck/liftcheck/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:965:74)
+    at performUnitOfWork (file://E:/wind new/Liftcheck/liftcheck/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:9555:97)
+    at workLoopSync (file://E:/wind new/Liftcheck/liftcheck/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:9449:40)
+    at renderRootSync (file://E:/wind new/Liftcheck/liftcheck/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:9433:13)
+    at performWorkOnRoot (file://E:/wind new/Liftcheck/liftcheck/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:9098:47)
+    at performWorkOnRootViaSchedulerTask (file://E:/wind new/Liftcheck/liftcheck/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:10255:9)
+    at MessagePort.performWorkUntilDeadline (file://E:/wind new/Liftcheck/liftcheck/.next/dev/static/chunks/node_modules_next_dist_compiled_0rpq4pf._.js:2647:64)
+    at AppRouter (file://E:/wind new/Liftcheck/liftcheck/.next/dev/static/chunks/node_modules_next_dist_client_0fhqo1d._.js:14618:54)
+    at ServerRoot (file://E:/wind new/Liftcheck/liftcheck/.next/dev/static/chunks/node_modules_next_dist_client_0fhqo1d._.js:15102:54)
+[Server] Profile fetch error: {
+  code: '42P17',
+  details: null,
+  hint: null,
+  message: 'infinite recursion detected in policy for relation "profiles"'
+}
+[browser] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior (file://E:/wind new/Liftcheck/liftcheck/.next/dev/static/chunks/node_modules_next_dist_115brz8._.js:2477:13)
+⨯ The requested resource isn't a valid image for /image/car1.png received null
+⨯ The requested resource isn't a valid image for /image/car1.png received null

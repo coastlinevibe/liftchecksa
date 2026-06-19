@@ -5,6 +5,7 @@ import { getDisplayName } from '@/lib/display-name';
 import { createClient } from '@/lib/supabase/server';
 import { formatMembershipExpiry, getMembershipExpiry, getPlanLabel } from '@/lib/membership';
 import { redirect } from 'next/navigation';
+import { isAdminRole, isSuperAdminEmail } from '@/lib/auth/routing';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -50,7 +51,7 @@ async function getMemberData() {
     .eq('user_id', user.id)
     .maybeSingle();
 
-  if (roleProfile?.role === 'platform_admin' || roleProfile?.role === 'group_admin') {
+  if (isAdminRole(roleProfile?.role) || isSuperAdminEmail(user.email)) {
     redirect('/admin');
   }
 

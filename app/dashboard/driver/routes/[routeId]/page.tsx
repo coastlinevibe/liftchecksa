@@ -1,10 +1,12 @@
 import Link from 'next/link';
 import { redirect, notFound } from 'next/navigation';
-import { ArrowLeft, Bell, CalendarDays, MapPin, MessageSquare, Route as RouteIcon, Users } from 'lucide-react';
+import { ArrowLeft, BadgeCheck, Bell, CalendarDays, MapPin, MessageSquare, Route as RouteIcon, Users } from 'lucide-react';
 import { getDisplayName } from '@/lib/display-name';
 import { createClient } from '@/lib/supabase/server';
 import { getRouteDetail, sendRouteChatMessageFromForm } from '@/lib/routes/actions';
 import RouteChatThread, { type RouteChatMessage } from '@/components/RouteChatThread';
+import { isAdminRole, isSuperAdminEmail } from '@/lib/auth/routing';
+import { formatVehicleCapacity } from '@/lib/types/pilot-routes';
 
 function badgeClass(status: string) {
   if (status === 'active' || status === 'approved') return 'bg-emerald-100 text-emerald-700';
@@ -52,11 +54,11 @@ export default async function DriverRouteDetailPage({
 
   const { data: driverProfile } = await supabase
     .from('driver_profiles')
-    .select('id, user_id')
+    .select('id, user_id, id_status, vehicle_status, id_document_url')
     .eq('user_id', user.id)
     .maybeSingle();
 
-  if (profile?.role === 'platform_admin' || profile?.role === 'group_admin') {
+  if (isAdminRole(profile?.role) || isSuperAdminEmail(user.email)) {
     redirect(`/admin/routes/${routeId}`);
   }
 
@@ -89,8 +91,9 @@ export default async function DriverRouteDetailPage({
     assignments.find((entry) => ['approved', 'active', 'pending', 'paused'].includes(entry.status)) ||
     assignments[0] ||
     null;
+  const routeIsLive = Boolean(assignment && ['approved', 'active'].includes(assignment.status));
 
-  const { data: routeChatMessages } = assignment
+  const { data: routeChatMessages } = assignment && routeIsLive
     ? await supabase
         .from('route_chats')
         .select('id, route_id, assignment_id, sender_id, receiver_id, message, created_at')
@@ -127,6 +130,11 @@ export default async function DriverRouteDetailPage({
   const memberName = routeChatPeer
     ? `${routeChatPeer.first_name || ''} ${routeChatPeer.surname || ''}`.trim() || 'Member'
     : 'Member';
+  const verifiedDriver = Boolean(
+    driverProfile?.id_document_url &&
+      driverProfile?.id_status === 'approved' &&
+      driverProfile?.vehicle_status === 'approved'
+  );
 
   return (
     <div className="min-h-screen bg-slate-50 pb-28 md:pb-0">
@@ -146,6 +154,12 @@ export default async function DriverRouteDetailPage({
                 >
                   {assignment?.status || 'unassigned'}
                 </span>
+                {verifiedDriver ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                    <BadgeCheck className="h-3 w-3" />
+                    Verified driver
+                  </span>
+                ) : null}
               </div>
               <p className="text-sm text-slate-600">
                 {route.start_area} &rarr; {route.end_area}
@@ -157,7 +171,7 @@ export default async function DriverRouteDetailPage({
                 {assignment?.passenger_request_count || 0} requests
               </div>
               <div className="mt-2 inline-flex items-center rounded-full bg-sky-100 px-2 py-1 font-semibold text-sky-700">
-                {assignment?.seats_available ?? 0} seats available
+                {assignment?.seats_available ?? 0} passenger seats available
               </div>
             </div>
           </div>
@@ -222,9 +236,17 @@ export default async function DriverRouteDetailPage({
 
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
               <div className="mb-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
-                Chat with {memberName} on this route
+                <div className="flex flex-wrap items-center gap-2">
+                  <span>Chat with {memberName} on this route</span>
+                  {verifiedDriver ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                      <BadgeCheck className="h-3 w-3" />
+                      Verified driver
+                    </span>
+                  ) : null}
+                </div>
               </div>
-              {assignment ? (
+              {assignment && routeIsLive ? (
                 <RouteChatThread
                   key={`${route.id}:${assignment.id}:${(routeChatMessages || []).length}`}
                   routeId={route.id}
@@ -265,7 +287,7 @@ export default async function DriverRouteDetailPage({
                 </form>
               ) : assignment ? (
                 <div className="mt-3 rounded-lg border border-dashed border-slate-300 bg-white px-3 py-3 text-sm text-slate-600">
-                  No active member conversation yet.
+                  This route application is not live yet. Chat will unlock after admin approves the assignment.
                 </div>
               ) : !profile?.id ? (
                 <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800">

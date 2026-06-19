@@ -23,6 +23,37 @@ export const WEEKDAY_OPTIONS = [
 
 export type Weekday = (typeof WEEKDAY_OPTIONS)[number];
 
+export const VEHICLE_CAPACITY_OPTIONS = [4, 5, 7, 10, 12] as const;
+export type VehicleCapacity = (typeof VEHICLE_CAPACITY_OPTIONS)[number];
+
+export function getPassengerSeatCapacity(totalSeats?: number | null) {
+  if (!totalSeats || totalSeats < 1) {
+    return null;
+  }
+
+  return Math.max(0, totalSeats - 1);
+}
+
+export function formatVehicleCapacity(totalSeats?: number | null) {
+  if (!totalSeats) {
+    return 'Capacity pending';
+  }
+
+  const passengerSeats = getPassengerSeatCapacity(totalSeats);
+  return passengerSeats !== null
+    ? `${totalSeats} seater (${passengerSeats} passenger seats)`
+    : `${totalSeats} seater`;
+}
+
+export function formatPassengerSeats(totalSeats?: number | null) {
+  const passengerSeats = getPassengerSeatCapacity(totalSeats);
+  if (passengerSeats === null) {
+    return 'Passenger seats pending';
+  }
+
+  return `${passengerSeats} passenger seat${passengerSeats === 1 ? '' : 's'}`;
+}
+
 export interface RouteStopInput {
   stop_name: string;
   area?: string;
@@ -40,6 +71,7 @@ export interface OfficialRoute {
   start_area: string;
   end_area: string;
   route_type: string;
+  vehicle_capacity?: VehicleCapacity | null;
   status: PilotRouteStatus;
   created_by?: string | null;
   created_at: string;
@@ -151,6 +183,7 @@ export interface OfficialRouteWithStops extends OfficialRoute {
     driver_id: string;
     status: string;
     driver_name: string;
+    driver_verified?: boolean;
     phone?: string | null;
     email?: string | null;
     seats_available?: number | null;
@@ -166,5 +199,6 @@ export interface RouteAssignmentSummary extends DriverRouteAssignment {
   route_stops?: RouteStop[];
   passenger_request_count?: number;
   driver_name?: string;
+  driver_verified?: boolean;
   vehicle_plate?: string | null;
 }

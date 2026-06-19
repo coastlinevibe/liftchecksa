@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { isSuperAdminEmail } from '@/lib/auth/routing';
+import { VEHICLE_CAPACITY_OPTIONS } from '@/lib/types/pilot-routes';
 import type {
   ContactUnlock,
   DriverRouteAssignment,
@@ -14,6 +16,7 @@ import type {
   RouteStop,
   RouteStopInput,
   Weekday,
+  VehicleCapacity,
 } from '@/lib/types/pilot-routes';
 
 const DEFAULT_WEEKDAYS: Weekday[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
@@ -21,6 +24,9 @@ const DEFAULT_WEEKDAYS: Weekday[] = ['monday', 'tuesday', 'wednesday', 'thursday
 type DriverProfileLookupRow = {
   id: string;
   user_id: string;
+  id_status?: string | null;
+  vehicle_status?: string | null;
+  id_document_url?: string | null;
 };
 
 type DriverMemberProfileRow = {
@@ -41,6 +47,7 @@ type PassengerProfileRow = {
 
 type VehicleLookupRow = {
   id: string;
+  seat_capacity: number | null;
   make: string | null;
   model: string | null;
   licence_plate: string | null;
@@ -100,13 +107,25 @@ async function getCurrentProfile(supabase: Awaited<ReturnType<typeof createClien
     .from('profiles')
     .select('id, user_id, role, membership_status, first_name, surname')
     .eq('user_id', user.id)
-    .single();
+    .maybeSingle();
 
-  if (error || !profile) {
+  if (error) {
     return { error: 'Profile not found' as const };
   }
 
-  return { user, profile };
+  return { user, profile: profile ?? null };
+}
+
+async function getCurrentUser(supabase: Awaited<ReturnType<typeof createClient>>) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: 'Not authenticated' as const };
+  }
+
+  return { user };
 }
 
 function countAssignmentsByRequest(requests: RouteSeatRequest[]) {
@@ -121,6 +140,16 @@ function countAssignmentsByRequest(requests: RouteSeatRequest[]) {
   }
 
   return counts;
+}
+
+async function hasVehicleCapacityColumn(supabase: Awaited<ReturnType<typeof createClient>>) {
+  const { error } = await supabase.from('official_routes').select('vehicle_capacity').limit(1);
+  return !error;
+}
+
+async function hasVehicleSeatCapacityColumn(supabase: Awaited<ReturnType<typeof createClient>>) {
+  const { error } = await supabase.from('vehicles').select('seat_capacity').limit(1);
+  return !error;
 }
 
 async function isPlatformAdmin(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
@@ -140,7 +169,7 @@ async function isRouteAdmin(supabase: Awaited<ReturnType<typeof createClient>>, 
     .eq('user_id', userId)
     .maybeSingle();
 
-  return data?.role === 'platform_admin' || data?.role === 'group_admin';
+  return data?.role === 'platform_admin';
 }
 
 function normalizeStops(stops: RouteStopInput[]) {
@@ -165,28 +194,47 @@ export async function createOfficialRoute(input: {
   startArea: string;
   endArea: string;
   routeType?: string;
+  vehicleCapacity?: VehicleCapacity;
   status?: 'draft' | 'active' | 'paused';
   stops: RouteStopInput[];
 }) {
   const supabase = await createClient();
-  const current = await getCurrentProfile(supabase);
+  const current = await getCurrentUser(supabase);
   if ('error' in current) {
     return { error: current.error };
   }
 
-  const { user, profile } = current;
-  const adminAllowed = await isPlatformAdmin(supabase, user.id);
+  const { user } = current;
+  const isSuperAdmin = isSuperAdminEmail(user.email);
+  const adminAllowed = isSuperAdmin || (await isPlatformAdmin(supabase, user.id));
   if (!adminAllowed) {
     return { error: 'Platform admin access required' };
   }
+
+  const profile = isSuperAdmin
+    ? null
+    : await (async () => {
+        const { data: currentProfile } = await supabase
+          .from('profiles')
+          .select('id, user_id, role, membership_status, first_name, surname')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        return currentProfile ?? null;
+      })();
 
   const name = input.name.trim();
   const startArea = input.startArea.trim();
   const endArea = input.endArea.trim();
   const normalizedStops = normalizeStops(input.stops);
+  const supportsVehicleCapacity = await hasVehicleCapacityColumn(supabase);
 
   if (!name || !startArea || !endArea) {
     return { error: 'Route name, start area, and end area are required' };
+  }
+
+  if (supportsVehicleCapacity && (!input.vehicleCapacity || !VEHICLE_CAPACITY_OPTIONS.includes(input.vehicleCapacity))) {
+    return { error: 'Select a vehicle type' };
   }
 
   if (normalizedStops.length < 2) {
@@ -205,7 +253,8 @@ export async function createOfficialRoute(input: {
       end_area: endArea,
       route_type: input.routeType || 'work_commute',
       status: input.status || 'draft',
-      created_by: profile.id,
+      created_by: profile?.id ?? null,
+      ...(supportsVehicleCapacity ? { vehicle_capacity: input.vehicleCapacity } : {}),
     })
     .select('*')
     .single();
@@ -258,8 +307,78 @@ export async function createOfficialRouteFromForm(formData: FormData) {
     startArea: String(formData.get('start_area') || ''),
     endArea: String(formData.get('end_area') || ''),
     routeType: String(formData.get('route_type') || 'work_commute'),
+    vehicleCapacity: Number(formData.get('vehicle_capacity') || 0) as VehicleCapacity,
     status: (String(formData.get('status') || 'draft') as 'draft' | 'active' | 'paused'),
     stops: parsedStops,
+  });
+}
+
+export async function deleteOfficialRoute(routeId: string) {
+  const supabase = await createClient();
+  const current = await getCurrentProfile(supabase);
+  if ('error' in current) {
+    return { error: current.error };
+  }
+
+  const { user } = current;
+  const adminAllowed = (await isPlatformAdmin(supabase, user.id)) || isSuperAdminEmail(user.email);
+  if (!adminAllowed) {
+    return { error: 'Platform admin access required' };
+  }
+
+  const { error } = await supabase.from('official_routes').delete().eq('id', routeId);
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath('/admin/routes');
+  revalidatePath('/admin');
+  revalidatePath('/routes');
+
+  redirect('/admin/routes');
+}
+
+export async function updateOfficialRouteStatus(input: {
+  routeId: string;
+  status: 'draft' | 'active' | 'paused';
+}) {
+  const supabase = await createClient();
+  const current = await getCurrentProfile(supabase);
+  if ('error' in current) {
+    return { error: current.error };
+  }
+
+  const { user } = current;
+  const adminAllowed = (await isPlatformAdmin(supabase, user.id)) || isSuperAdminEmail(user.email);
+  if (!adminAllowed) {
+    return { error: 'Platform admin access required' };
+  }
+
+  if (!['draft', 'active', 'paused'].includes(input.status)) {
+    return { error: 'Invalid route status' };
+  }
+
+  const { error } = await supabase
+    .from('official_routes')
+    .update({ status: input.status })
+    .eq('id', input.routeId);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath('/admin/routes');
+  revalidatePath(`/admin/routes/${input.routeId}`);
+  revalidatePath('/dashboard/driver/routes');
+  revalidatePath('/routes');
+
+  redirect(`/admin/routes/${input.routeId}`);
+}
+
+export async function updateOfficialRouteStatusFromForm(formData: FormData) {
+  return updateOfficialRouteStatus({
+    routeId: String(formData.get('routeId') || ''),
+    status: String(formData.get('status') || 'draft') as 'draft' | 'active' | 'paused',
   });
 }
 
@@ -280,19 +399,31 @@ export async function assignDriverToRoute(input: {
   }
 
   const { user } = current;
-  const adminAllowed = await isPlatformAdmin(supabase, user.id);
+  const isSuperAdmin = isSuperAdminEmail(user.email);
+  const adminAllowed = isSuperAdmin || (await isPlatformAdmin(supabase, user.id));
   if (!adminAllowed) {
     return { error: 'Platform admin access required' };
   }
 
+  const supportsVehicleCapacity = await hasVehicleCapacityColumn(supabase);
+  const supportsVehicleSeatCapacity = await hasVehicleSeatCapacityColumn(supabase);
+
   const { data: route } = await supabase
     .from('official_routes')
-    .select('id')
+    .select(supportsVehicleCapacity ? 'id, vehicle_capacity' : 'id')
     .eq('id', input.routeId)
     .single();
 
   if (!route) {
     return { error: 'Route not found' };
+  }
+
+  const routeVehicleCapacity = supportsVehicleCapacity
+    ? (route as { vehicle_capacity?: number | null }).vehicle_capacity ?? null
+    : null;
+
+  if (supportsVehicleCapacity && !routeVehicleCapacity) {
+    return { error: 'Route vehicle seating type not set' };
   }
 
   const { data: driverProfile } = await supabase
@@ -315,9 +446,24 @@ export async function assignDriverToRoute(input: {
     return { error: 'Driver must be approved before assignment' };
   }
 
+  const { data: driverSubscription } = await supabase
+    .from('driver_profiles')
+    .select('provider_payment_status, provider_next_payment_at, provider_expires_at')
+    .eq('user_id', driverProfile.user_id)
+    .maybeSingle();
+
+  const driverSubscriptionDue = driverSubscription?.provider_next_payment_at || driverSubscription?.provider_expires_at || null;
+  const driverSubscriptionActive =
+    driverSubscription?.provider_payment_status === 'approved' &&
+    (!driverSubscriptionDue || new Date(driverSubscriptionDue) > new Date());
+
+  if (!driverSubscriptionActive) {
+    return { error: 'Driver subscription payment required' };
+  }
+
   const { data: vehicle } = await supabase
     .from('vehicles')
-    .select('id, driver_id, verification_status, is_active')
+    .select(supportsVehicleSeatCapacity ? 'id, driver_id, verification_status, is_active, seat_capacity' : 'id, driver_id, verification_status, is_active')
     .eq('id', input.vehicleId)
     .single();
 
@@ -325,17 +471,33 @@ export async function assignDriverToRoute(input: {
     return { error: 'Vehicle not found' };
   }
 
+  const vehicleSeatCapacity = supportsVehicleSeatCapacity
+    ? (vehicle as { seat_capacity?: number | null }).seat_capacity ?? null
+    : null;
+  const vehicleDriverId = (vehicle as { driver_id?: string }).driver_id || null;
+  const vehicleVerificationStatus = (vehicle as { verification_status?: string | null }).verification_status || null;
+  const vehicleIsActive = (vehicle as { is_active?: boolean | null }).is_active;
+
+  if (
+    supportsVehicleCapacity &&
+    supportsVehicleSeatCapacity &&
+    routeVehicleCapacity !== null &&
+    vehicleSeatCapacity !== routeVehicleCapacity
+  ) {
+    return { error: 'not the correct vehicle seating type' };
+  }
+
   const { data: owningDriver } = await supabase
     .from('driver_profiles')
     .select('id, user_id')
-    .eq('id', vehicle.driver_id)
+    .eq('id', vehicleDriverId)
     .single();
 
   if (!owningDriver || owningDriver.user_id !== driverProfile.user_id) {
     return { error: 'Selected vehicle does not belong to this driver' };
   }
 
-  if (vehicle.verification_status !== 'approved' || vehicle.is_active === false) {
+  if (vehicleVerificationStatus !== 'approved' || vehicleIsActive === false) {
     return { error: 'Vehicle must be active and approved' };
   }
 
@@ -351,7 +513,7 @@ export async function assignDriverToRoute(input: {
       weekly_price: input.weeklyPrice,
       single_route_price: input.singleRoutePrice,
       admin_notes: input.adminNotes || null,
-      approved_by: current.profile.id,
+      approved_by: isSuperAdmin ? null : (await getCurrentProfile(supabase)).profile?.id ?? null,
       approved_at: new Date().toISOString(),
     })
     .select('*')
@@ -393,6 +555,158 @@ export async function assignDriverToRouteFromForm(formData: FormData) {
   });
 }
 
+export async function applyDriverToRoute(input: {
+  routeId: string;
+  vehicleId: string;
+}) {
+  const supabase = await createClient();
+  const current = await getCurrentProfile(supabase);
+  if ('error' in current) {
+    return { error: current.error };
+  }
+
+  const { user, profile } = current;
+  if (!profile || profile.role !== 'driver') {
+    return { error: 'Driver access required' };
+  }
+
+  const supportsVehicleCapacity = await hasVehicleCapacityColumn(supabase);
+  const supportsVehicleSeatCapacity = await hasVehicleSeatCapacityColumn(supabase);
+
+  const { data: route } = await supabase
+    .from('official_routes')
+    .select(supportsVehicleCapacity ? 'id, status, vehicle_capacity' : 'id, status')
+    .eq('id', input.routeId)
+    .maybeSingle();
+
+  if (!route) {
+    return { error: 'Route not found' };
+  }
+
+  const routeVehicleCapacity = supportsVehicleCapacity
+    ? (route as { vehicle_capacity?: number | null }).vehicle_capacity ?? null
+    : null;
+  const routeStatus = (route as { status?: string | null }).status || null;
+
+  if (routeStatus !== 'active') {
+    return { error: 'Route is not accepting applications' };
+  }
+
+  const { data: driverProfile } = await supabase
+    .from('driver_profiles')
+    .select('id, user_id')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (!driverProfile) {
+    return { error: 'Driver profile not found' };
+  }
+
+  const { data: driverSubscription } = await supabase
+    .from('driver_profiles')
+    .select('provider_payment_status, provider_next_payment_at, provider_expires_at')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  const driverSubscriptionDue = driverSubscription?.provider_next_payment_at || driverSubscription?.provider_expires_at || null;
+  const driverSubscriptionActive =
+    driverSubscription?.provider_payment_status === 'approved' &&
+    (!driverSubscriptionDue || new Date(driverSubscriptionDue) > new Date());
+
+  if (!driverSubscriptionActive) {
+    return { error: 'Driver subscription payment required' };
+  }
+
+  const { data: vehicle } = await supabase
+    .from('vehicles')
+    .select(
+      supportsVehicleSeatCapacity
+        ? 'id, driver_id, verification_status, is_active, seat_capacity, make, model, licence_plate'
+        : 'id, driver_id, verification_status, is_active, make, model, licence_plate'
+    )
+    .eq('id', input.vehicleId)
+    .maybeSingle();
+
+  if (!vehicle) {
+    return { error: 'Vehicle not found' };
+  }
+
+  const vehicleSeatCapacity = supportsVehicleSeatCapacity
+    ? (vehicle as { seat_capacity?: number | null }).seat_capacity ?? null
+    : null;
+  const vehicleDriverId = (vehicle as { driver_id?: string }).driver_id || null;
+  const vehicleIsActive = (vehicle as { is_active?: boolean | null }).is_active;
+
+  if (vehicleDriverId !== driverProfile.id) {
+    return { error: 'Selected vehicle does not belong to your driver profile' };
+  }
+
+  if (vehicleIsActive === false) {
+    return { error: 'Vehicle must be active' };
+  }
+
+  if (supportsVehicleCapacity && supportsVehicleSeatCapacity) {
+    if (!routeVehicleCapacity || !vehicleSeatCapacity || vehicleSeatCapacity !== routeVehicleCapacity) {
+      return { error: 'not the correct vehicle seating type' };
+    }
+  }
+
+  const { data: existingApplication } = await supabase
+    .from('driver_route_assignments')
+    .select('id, status')
+    .eq('route_id', input.routeId)
+    .eq('driver_id', profile.id)
+    .in('status', ['pending', 'approved', 'active', 'paused', 'suspended'])
+    .maybeSingle();
+
+  if (existingApplication) {
+    return { error: 'You already applied for this route' };
+  }
+
+  const seatsAvailable = Math.max(
+    1,
+    Number(
+      supportsVehicleSeatCapacity && vehicleSeatCapacity
+        ? Math.max(0, vehicleSeatCapacity - 1)
+        : Math.max(0, (routeVehicleCapacity || 1) - 1)
+    )
+  );
+
+  const { error } = await supabase.from('driver_route_assignments').insert({
+    route_id: input.routeId,
+    driver_id: profile.id,
+    vehicle_id: input.vehicleId,
+    status: 'pending',
+    seats_available: seatsAvailable,
+    days_active: DEFAULT_WEEKDAYS,
+    weekly_price: null,
+    single_route_price: null,
+    admin_notes: null,
+    approved_by: null,
+    approved_at: null,
+  });
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath(`/routes/${input.routeId}`);
+  revalidatePath('/routes');
+  revalidatePath('/dashboard/driver/routes');
+  revalidatePath('/dashboard/driver');
+  revalidatePath(`/admin/routes/${input.routeId}`);
+  revalidatePath('/admin/routes');
+
+  return { success: true };
+}
+
+export async function applyDriverToRouteFromForm(formData: FormData) {
+  return applyDriverToRoute({
+    routeId: String(formData.get('route_id') || ''),
+    vehicleId: String(formData.get('vehicle_id') || ''),
+  });
+}
+
 export async function requestRouteSeat(input: {
   routeId: string;
   pickupStopId: string;
@@ -410,12 +724,16 @@ export async function requestRouteSeat(input: {
   }
 
   const { profile } = current;
+  if (!profile) {
+    return { error: 'Profile not found' };
+  }
+  const passengerProfileId = profile.id;
 
   const { data: existing } = await supabase
     .from('route_seat_requests')
     .select('id, status')
     .eq('route_id', input.routeId)
-    .eq('passenger_id', profile.id)
+    .eq('passenger_id', passengerProfileId)
     .maybeSingle();
 
   const seatsRequested = Number.isFinite(input.seatsRequested)
@@ -423,7 +741,7 @@ export async function requestRouteSeat(input: {
     : 1;
 
   const payload = {
-    passenger_id: profile.id,
+    passenger_id: passengerProfileId,
     route_id: input.routeId,
     pickup_stop_id: input.pickupStopId,
     dropoff_stop_id: input.dropoffStopId,
@@ -497,6 +815,9 @@ export async function recordContactUnlock(input: {
   }
 
   const { profile } = current;
+  if (!profile) {
+    return { error: 'Profile not found' };
+  }
 
   const { data: request } = await supabase
     .from('route_seat_requests')
@@ -569,6 +890,9 @@ export async function sendRouteChatMessage(input: {
   }
 
   const { profile } = current;
+  if (!profile) {
+    redirect(`/routes/${input.routeId}?chat_error=${encodeURIComponent('Profile not found')}`);
+  }
   const message = input.message.trim();
   const fallbackPath = profile.role === 'driver'
     ? `/dashboard/driver/routes/${input.routeId || ''}`
@@ -603,7 +927,8 @@ export async function sendRouteChatMessage(input: {
     .eq('id', input.routeId)
     .single();
 
-  if (!route || route.status !== 'active') {
+  const routeStatus = route ? (route as { status?: string | null }).status || null : null;
+  if (!route || routeStatus !== 'active') {
     redirect(`/routes/${input.routeId}?chat_error=${encodeURIComponent('Route is not active')}`);
   }
 
@@ -732,10 +1057,13 @@ export async function sendRouteChatMessageFromForm(formData: FormData) {
 
 export async function getOfficialRoutes(includeInactive = false) {
   const supabase = await createClient();
+  const supportsVehicleCapacity = await hasVehicleCapacityColumn(supabase);
 
   const query = supabase
     .from('official_routes')
-    .select('id, name, slug, start_area, end_area, route_type, status, created_by, created_at, updated_at');
+    .select(
+      `id, name, slug, start_area, end_area, route_type${supportsVehicleCapacity ? ', vehicle_capacity' : ''}, status, created_by, created_at, updated_at`
+    );
 
   const { data: routes, error } = includeInactive
     ? await query.order('created_at', { ascending: false })
@@ -745,7 +1073,8 @@ export async function getOfficialRoutes(includeInactive = false) {
     return { error: error.message };
   }
 
-  const routeIds = (routes || []).map((route) => route.id);
+  const typedRoutes = (routes || []) as unknown as OfficialRoute[];
+  const routeIds = typedRoutes.map((route) => route.id);
   const { data: stops } = routeIds.length
     ? await supabase
         .from('route_stops')
@@ -782,7 +1111,7 @@ export async function getOfficialRoutes(includeInactive = false) {
   const { data: driverProfiles } = driverProfileIds.length
     ? await supabase
         .from('driver_profiles')
-        .select('id, user_id')
+        .select('id, user_id, id_status, vehicle_status, id_document_url')
         .in('id', driverProfileIds)
     : { data: [] };
 
@@ -813,7 +1142,7 @@ export async function getOfficialRoutes(includeInactive = false) {
   const { data: vehicles } = includeInactive && vehicleIds.length
     ? await supabase
         .from('vehicles')
-        .select('id, make, model, licence_plate')
+        .select('id, seat_capacity, make, model, licence_plate')
         .in('id', vehicleIds)
     : { data: [] };
 
@@ -828,6 +1157,7 @@ export async function getOfficialRoutes(includeInactive = false) {
       driver_id: string;
       status: string;
       driver_name: string;
+      driver_verified?: boolean;
       phone?: string | null;
       email?: string | null;
       seats_available?: number | null;
@@ -856,6 +1186,11 @@ export async function getOfficialRoutes(includeInactive = false) {
       driver_id: assignment.driver_id,
       status: assignment.status,
       driver_name: driverName || 'Assigned driver',
+      driver_verified: Boolean(
+        driverProfileRow?.id_document_url &&
+          driverProfileRow?.id_status === 'approved' &&
+          driverProfileRow?.vehicle_status === 'approved'
+      ),
       phone: includeInactive ? driverProfile?.phone || null : null,
       email: includeInactive ? driverProfile?.email || null : null,
       seats_available: assignment.seats_available,
@@ -867,7 +1202,7 @@ export async function getOfficialRoutes(includeInactive = false) {
     assignmentsByRoute.set(assignment.route_id, list);
   }
 
-  const normalizedRoutes = (routes || []).map((route) => ({
+  const normalizedRoutes = typedRoutes.map((route) => ({
     ...(route as OfficialRoute),
     route_stops: stopsByRoute.get(route.id) || [],
     assigned_drivers: assignmentsByRoute.get(route.id) || [],
@@ -878,11 +1213,14 @@ export async function getOfficialRoutes(includeInactive = false) {
 
 export async function getRouteDetail(routeId: string) {
   const supabase = await createClient();
+  const supportsVehicleCapacity = await hasVehicleCapacityColumn(supabase);
 
   const [{ data: route, error: routeError }, { data: stops }, { data: assignments }, { data: requests }, { data: ledger }] = await Promise.all([
     supabase
       .from('official_routes')
-      .select('id, name, slug, start_area, end_area, route_type, status, created_by, created_at, updated_at')
+      .select(
+        `id, name, slug, start_area, end_area, route_type${supportsVehicleCapacity ? ', vehicle_capacity' : ''}, status, created_by, created_at, updated_at`
+      )
       .eq('id', routeId)
       .single(),
     supabase
@@ -911,7 +1249,33 @@ export async function getRouteDetail(routeId: string) {
     return { error: routeError?.message || 'Route not found' };
   }
 
+  const typedRoute = route as unknown as OfficialRoute;
+
   const stopById = new Map((stops || []).map((stop) => [stop.id, stop] as const));
+  const driverIds = Array.from(
+    new Set(((assignments || []) as DriverRouteAssignment[]).map((assignment) => assignment.driver_id).filter(Boolean))
+  );
+  const { data: driverProfiles } = driverIds.length
+    ? await supabase
+        .from('driver_profiles')
+        .select('id, user_id, id_status, vehicle_status, id_document_url')
+        .in('id', driverIds)
+    : { data: [] };
+  const driverProfilesById = new Map(
+    ((driverProfiles || []) as DriverProfileLookupRow[]).map((profile) => [profile.id, profile])
+  );
+  const driverUserIds = Array.from(
+    new Set(((driverProfiles || []) as DriverProfileLookupRow[]).map((profile) => profile.user_id).filter(Boolean))
+  );
+  const { data: driverMemberProfiles } = driverUserIds.length
+    ? await supabase
+        .from('profiles')
+        .select('user_id, first_name, surname, phone, email')
+        .in('user_id', driverUserIds)
+    : { data: [] };
+  const driverMemberProfilesByUserId = new Map(
+    ((driverMemberProfiles || []) as DriverMemberProfileRow[]).map((profile) => [profile.user_id, profile])
+  );
   const passengerIds = Array.from(
     new Set(((requests || []) as RouteSeatRequest[]).map((request) => request.passenger_id).filter(Boolean))
   );
@@ -941,12 +1305,27 @@ export async function getRouteDetail(routeId: string) {
   const requestCounts = countAssignmentsByRequest((requests || []) as RouteSeatRequest[]);
 
   return {
-    route: route as OfficialRoute,
+    route: typedRoute,
     stops: (stops || []) as RouteStop[],
     assignments: (assignments || []).map((assignment) => ({
       ...(assignment as DriverRouteAssignment),
       passenger_request_count: requestCounts.get(assignment.id) || 0,
-      driver_name: assignmentDetailsById.get(assignment.id)?.driver_name || `Driver ${assignment.driver_id.slice(0, 8)}`,
+      driver_name:
+        assignmentDetailsById.get(assignment.id)?.driver_name ||
+        (() => {
+          const driverProfile = driverProfilesById.get(assignment.driver_id);
+          const memberProfile = driverProfile ? driverMemberProfilesByUserId.get(driverProfile.user_id) : null;
+          return (
+            memberProfile
+              ? `${memberProfile.first_name || ''} ${memberProfile.surname || ''}`.trim()
+              : `Driver ${assignment.driver_id.slice(0, 8)}`
+          );
+        })(),
+      driver_verified: Boolean(
+        driverProfilesById.get(assignment.driver_id)?.id_document_url &&
+          driverProfilesById.get(assignment.driver_id)?.id_status === 'approved' &&
+          driverProfilesById.get(assignment.driver_id)?.vehicle_status === 'approved'
+      ),
       vehicle_plate: assignmentDetailsById.get(assignment.id)?.vehicle_plate || null,
     })) as RouteAssignmentSummary[],
     requests: ((requests || []) as RouteSeatRequest[]).map((request) => {
@@ -974,6 +1353,9 @@ export async function getDriverRouteDashboard() {
   }
 
   const { profile } = current;
+  if (!profile) {
+    return { error: 'Profile not found' };
+  }
   if (profile.role !== 'driver') {
     return { error: 'Driver access required' };
   }

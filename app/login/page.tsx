@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import LoginClient from './LoginClient';
+import { isAdminRole, isSuperAdminEmail } from '@/lib/auth/routing';
 
 function safeRedirectPath(value?: string) {
   if (!value) return '';
@@ -33,7 +34,7 @@ export default async function LoginPage({
       .eq('user_id', user.id)
       .maybeSingle();
 
-    if (profile?.role === 'platform_admin' || profile?.role === 'group_admin') {
+    if (isAdminRole(profile?.role) || isSuperAdminEmail(user.email)) {
       redirect('/admin');
     }
 
@@ -41,7 +42,7 @@ export default async function LoginPage({
       redirect('/dashboard/driver');
     }
 
-    redirect('/dashboard/member');
+    redirect('/dashboard');
   }
 
   return <LoginClient redirectTo={redirectTo || undefined} />;

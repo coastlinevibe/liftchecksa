@@ -87,6 +87,7 @@ CREATE TABLE vehicles (
     colour VARCHAR(50) NOT NULL,
     licence_plate VARCHAR(20) NOT NULL,
     year INTEGER,
+    seat_capacity INTEGER,
     licence_disc_url TEXT,
     vehicle_photo_url TEXT,
     verification_status verification_status NOT NULL DEFAULT 'pending',

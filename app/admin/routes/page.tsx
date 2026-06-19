@@ -1,6 +1,7 @@
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, ChevronDown, Plus } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BadgeCheck, ChevronDown, Plus } from 'lucide-react';
 import { getOfficialRoutes } from '@/lib/routes/actions';
+import { formatVehicleCapacity } from '@/lib/types/pilot-routes';
 
 function badgeClass(status: string) {
   if (status === 'active') return 'bg-emerald-100 text-emerald-700';
@@ -24,7 +25,7 @@ export default async function AdminRoutesPage() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <h1 className="text-xl font-bold text-slate-900">Official Routes</h1>
-              <p className="text-xs text-slate-600">Admin-created routes for approved drivers and members.</p>
+              <p className="text-xs text-slate-600">Admin-created routes for active drivers and members.</p>
             </div>
             <Link
               href="/admin/routes/new"
@@ -59,13 +60,20 @@ export default async function AdminRoutesPage() {
                   <p className="text-sm text-slate-600">
                     {route.start_area} &rarr; {route.end_area}
                   </p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {route.route_stops.length} stop{route.route_stops.length === 1 ? '' : 's'}
-                  </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+                    <span className="rounded-full bg-violet-50 px-2 py-0.5 font-semibold text-violet-700">
+                      {formatVehicleCapacity(route.vehicle_capacity)}
+                    </span>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">
+                      {route.route_stops.length} stop{route.route_stops.length === 1 ? '' : 's'}
+                    </span>
+                  </div>
                   <p className="mt-1 text-xs text-slate-600">
                     Assigned driver{route.assigned_drivers?.length === 1 ? '' : 's'}:{' '}
                     {route.assigned_drivers && route.assigned_drivers.length > 0
-                      ? route.assigned_drivers.map((assignment) => assignment.driver_name).join(', ')
+                      ? route.assigned_drivers
+                          .map((assignment) => assignment.driver_name)
+                          .join(', ')
                       : 'None yet'}
                   </p>
                 </div>
@@ -92,6 +100,12 @@ export default async function AdminRoutesPage() {
                       {route.assigned_drivers.map((assignment) => (
                         <div key={assignment.id} className="rounded-lg border border-slate-200 bg-white p-3">
                           <div className="mb-2 text-sm font-semibold text-slate-900">{assignment.driver_name}</div>
+                          {assignment.driver_verified ? (
+                            <div className="mb-2 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">
+                              <BadgeCheck className="h-3 w-3" />
+                              Verified driver
+                            </div>
+                          ) : null}
                           <div className="grid gap-2 text-xs text-slate-700">
                             <div>
                               <span className="text-slate-500">Status:</span>{' '}

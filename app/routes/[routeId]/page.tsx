@@ -1,9 +1,11 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, MapPin, MessageSquare, Route as RouteIcon, Send, Shield } from 'lucide-react';
+import { ArrowLeft, BadgeCheck, MapPin, MessageSquare, Route as RouteIcon, Send, Shield } from 'lucide-react';
 import { getRouteDetail, sendRouteChatMessageFromForm } from '@/lib/routes/actions';
+import { formatVehicleCapacity } from '@/lib/types/pilot-routes';
 import { createClient } from '@/lib/supabase/server';
 import RouteChatThread, { type RouteChatMessage } from '@/components/RouteChatThread';
+import DriverRouteApplicationForm from '@/components/DriverRouteApplicationForm';
 import RouteSeatRequestForm from './RouteSeatRequestForm';
 
 export const dynamic = 'force-dynamic';
@@ -45,6 +47,13 @@ export default async function RouteDetailPage({
         .eq('user_id', user.id)
         .maybeSingle()
     : { data: null };
+  const { data: driverProfile } = user
+    ? await supabase
+        .from('driver_profiles')
+        .select('id, user_id, verification_status, id_status, vehicle_status, id_document_url')
+        .eq('user_id', user.id)
+        .maybeSingle()
+    : { data: null };
   const { data: latestPayment } = user
     ? await supabase
         .from('payments')
@@ -57,13 +66,32 @@ export default async function RouteDetailPage({
   const isLoggedIn = Boolean(user);
   const membershipActive = profile?.membership_status === 'active' || latestPayment?.status === 'approved';
   const isMemberUser = profile?.role === 'member' || latestPayment?.status === 'approved';
+  const isDriverUser = Boolean(profile?.role === 'driver' || driverProfile);
   const canRequestSeat = Boolean(isLoggedIn && isMemberUser && membershipActive);
-  const primaryAssignment = assignments.find((assignment) => ['approved', 'active'].includes(assignment.status)) || assignments[0] || null;
+  const primaryAssignment = assignments.find((assignment) => ['approved', 'active'].includes(assignment.status)) || null;
   const canUseRouteChat = Boolean(
     canRequestSeat &&
       primaryAssignment &&
       (Number(primaryAssignment.seats_available || 0) > 0)
   );
+  const { data: driverVehicles } = user && driverProfile
+    ? await supabase
+        .from('vehicles')
+        .select('id, make, model, licence_plate, seat_capacity, verification_status, is_active')
+        .eq('driver_id', driverProfile.id)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+    : { data: [] };
+  const { data: driverApplication } = user && isDriverUser && profile?.id
+    ? await supabase
+        .from('driver_route_assignments')
+        .select('id, route_id, vehicle_id, status, created_at')
+        .eq('route_id', route.id)
+        .eq('driver_id', profile.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    : { data: null };
 
   const { data: routeChatMessages } = primaryAssignment && profile?.id
     ? await supabase
@@ -78,6 +106,19 @@ export default async function RouteDetailPage({
   const chatVehicleLabel = primaryAssignment?.vehicle_plate
     ? `Vehicle plate ${primaryAssignment.vehicle_plate}`
     : null;
+  const { data: assignedDriverProfile } = primaryAssignment?.driver_id
+    ? await supabase
+        .from('driver_profiles')
+        .select('id, id_status, vehicle_status, id_document_url')
+        .eq('id', primaryAssignment.driver_id)
+        .maybeSingle()
+    : { data: null };
+  const verifiedDriver = Boolean(
+    primaryAssignment &&
+      assignedDriverProfile?.id_document_url &&
+      assignedDriverProfile?.id_status === 'approved' &&
+      assignedDriverProfile?.vehicle_status === 'approved'
+  );
 
   return (
     <div className="min-h-screen bg-slate-50 pb-28 md:pb-0">
@@ -96,6 +137,11 @@ export default async function RouteDetailPage({
               <p className="text-sm text-slate-600">
                 {route.start_area} &rarr; {route.end_area}
               </p>
+              <div className="mt-2">
+                <span className="inline-flex rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-700">
+                  {formatVehicleCapacity(route.vehicle_capacity)}
+                </span>
+              </div>
             </div>
             <Shield className="h-4 w-4 text-emerald-500" />
           </div>
@@ -146,6 +192,28 @@ export default async function RouteDetailPage({
         </div>
 
         <div className="space-y-4">
+          {isDriverUser ? (
+            <DriverRouteApplicationForm
+              routeId={route.id}
+              routeVehicleCapacity={route.vehicle_capacity}
+              driverVerified={Boolean(
+                driverProfile?.id_document_url &&
+                  driverProfile?.id_status === 'approved' &&
+                  driverProfile?.vehicle_status === 'approved'
+              )}
+              vehicles={(driverVehicles || []).map((vehicle) => ({
+                id: vehicle.id,
+                make: vehicle.make,
+                model: vehicle.model,
+                licence_plate: vehicle.licence_plate,
+                seat_capacity: vehicle.seat_capacity,
+              }))}
+              existingApplication={(driverApplication || null) as
+                | { id: string; status: string; vehicle_id: string; created_at: string }
+                | null}
+            />
+          ) : null}
+
           {canUseRouteChat && primaryAssignment ? (
             <section className="rounded-xl border border-slate-200 bg-white p-4">
               <div className="mb-3 flex items-start justify-between gap-3">
@@ -162,6 +230,13 @@ export default async function RouteDetailPage({
                   Seats available
                 </div>
               </div>
+
+              {verifiedDriver ? (
+                <div className="mb-3 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                  <BadgeCheck className="h-3.5 w-3.5" />
+                  Verified driver
+                </div>
+              ) : null}
 
               <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
                 {chatDriverName}

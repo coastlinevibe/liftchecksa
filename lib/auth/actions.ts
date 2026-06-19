@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { isAdminRole, isSuperAdminEmail } from '@/lib/auth/routing';
 
 export async function signUp(formData: {
   email: string;
@@ -8,12 +9,11 @@ export async function signUp(formData: {
   firstName: string;
   surname: string;
   phone: string;
-  role: 'member' | 'driver' | 'group_admin';
+  role: 'member' | 'driver';
   membershipType: 'basic' | 'plus' | 'provider_monthly' | 'provider_quarterly' | 'provider_annual';
   homeProvince?: string;
   idDocument?: File;
   selfie?: File;
-  groupName?: string;
 }) {
   const supabase = await createClient();
 
@@ -76,7 +76,7 @@ export async function signUp(formData: {
     phone: formData.phone,
     email: formData.email,
     membership_type: formData.membershipType,
-    membership_status: formData.role === 'group_admin' ? 'pending' : 'pending',
+    membership_status: 'pending',
     home_province: formData.homeProvince,
     id_document_url: idDocUrl || null,
     profile_photo_url: selfieUrl || null,
@@ -84,34 +84,6 @@ export async function signUp(formData: {
 
   if (profileError) {
     return { error: profileError.message };
-  }
-
-  // If group admin, no payment needed
-  if (formData.role === 'group_admin') {
-    // Store group name in a note or separate field if needed
-    return { success: true, message: 'Group admin account created. Awaiting approval.' };
-  }
-
-  // If driver, create driver profile
-  if (formData.role === 'driver') {
-    // Extract plan duration from membership type
-    const planMap = {
-      'provider_monthly': 'monthly',
-      'provider_quarterly': 'quarterly',
-      'provider_annual': 'annual'
-    };
-    const providerPlan = planMap[formData.membershipType as keyof typeof planMap] || 'annual';
-
-    const { error: driverError } = await supabase.from('driver_profiles').insert({
-      user_id: userId,
-      verification_status: 'pending',
-      provider_plan: providerPlan,
-      id_document_url: idDocUrl || null,
-    });
-
-    if (driverError) {
-      return { error: driverError.message };
-    }
   }
 
   // Generate payment reference
@@ -131,6 +103,34 @@ export async function signUp(formData: {
     'provider_annual': 300
   };
   const amount = amountMap[formData.membershipType as keyof typeof amountMap] || 300;
+
+  // If driver, create driver profile
+  if (formData.role === 'driver') {
+    // Extract plan duration from membership type
+    const planMap = {
+      'provider_monthly': 'monthly',
+      'provider_quarterly': 'quarterly',
+      'provider_annual': 'annual'
+    };
+    const providerPlan = planMap[formData.membershipType as keyof typeof planMap] || 'annual';
+
+    const { error: driverError } = await supabase.from('driver_profiles').insert({
+      user_id: userId,
+      verification_status: 'pending',
+      provider_plan: providerPlan,
+      provider_payment_reference: paymentReference,
+      provider_payment_amount: amount,
+      provider_payment_status: 'pending',
+      provider_payment_proof_url: null,
+      provider_last_paid_at: null,
+      provider_next_payment_at: null,
+      id_document_url: idDocUrl || null,
+    });
+
+    if (driverError) {
+      return { error: driverError.message };
+    }
+  }
 
   await supabase.from('payments').insert({
     user_id: userId,
@@ -173,38 +173,55 @@ export async function signIn(email: string, password: string, redirectTo?: strin
       return { error: 'Login failed - no user returned' };
     }
 
-    console.log('[Server] User authenticated:', data.user.id);
+  console.log('[Server] User authenticated:', data.user.id);
 
-    // Get user profile to determine role
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('user_id', data.user.id)
-      .single();
+  // Get user profile to determine role
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('user_id', data.user.id)
+    .maybeSingle();
 
-    console.log('[Server] Profile fetch:', { profile, error: profileError?.message });
+  console.log('[Server] Profile fetch:', { profile, error: profileError?.message });
 
-    if (profileError) {
-      console.error('[Server] Profile fetch error:', profileError);
-      return { error: 'Failed to fetch user profile' };
-    }
+  // Drivers should be routed by either their profile role or the presence of a driver profile.
+  const { data: driverProfile } = await supabase
+    .from('driver_profiles')
+    .select('id, id_status, vehicle_status, verification_status, provider_payment_status')
+    .eq('user_id', data.user.id)
+    .maybeSingle();
 
-    // Drivers should be routed by either their profile role or the presence of a driver profile.
-    const { data: driverProfile } = await supabase
-      .from('driver_profiles')
-      .select('id')
-      .eq('user_id', data.user.id)
-      .maybeSingle();
+  const { data: activeDriverVehicle } = driverProfile?.id
+    ? await supabase
+        .from('vehicles')
+        .select('id')
+        .eq('driver_id', driverProfile.id)
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle()
+    : { data: null };
     
-    // Determine redirect URL based on role
-    const safeTarget = safeRedirectPath(redirectTo);
-    let redirectUrl = safeTarget || '/dashboard/member';
+  // Determine redirect URL based on role
+  const safeTarget = safeRedirectPath(redirectTo);
+  let redirectUrl = safeTarget || '/dashboard';
 
-    if (!safeTarget && (profile?.role === 'driver' || driverProfile)) {
+  if (!safeTarget && (profile?.role === 'driver' || driverProfile)) {
+    const isDriverFullyVerified =
+      !!driverProfile &&
+      driverProfile.id_status === 'approved' &&
+      driverProfile.vehicle_status === 'approved' &&
+      driverProfile.provider_payment_status === 'approved';
+
+    if (isDriverFullyVerified && activeDriverVehicle) {
+      redirectUrl = '/dashboard/driver/routes';
+    } else if (activeDriverVehicle) {
       redirectUrl = '/dashboard/driver';
-    } else if (!safeTarget && (profile?.role === 'platform_admin' || profile?.role === 'group_admin')) {
-      redirectUrl = '/admin';
+    } else {
+      redirectUrl = '/dashboard/driver/vehicles/add';
     }
+  } else if (!safeTarget && (isAdminRole(profile?.role) || isSuperAdminEmail(data.user.email))) {
+    redirectUrl = '/admin';
+  }
 
     console.log('[Server] Login successful, redirecting to:', redirectUrl);
     return { success: true, redirectUrl };

@@ -1,9 +1,11 @@
 import Link from 'next/link';
-import { Bell, Calendar, Clock, MapPin, Settings } from 'lucide-react';
+import { Bell, Calendar, Clock, MapPin, Settings, BadgeCheck } from 'lucide-react';
 import LogoutButton from '@/components/LogoutButton';
 import { getDisplayName } from '@/lib/display-name';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
+import { isAdminRole, isSuperAdminEmail } from '@/lib/auth/routing';
+import { formatPassengerSeats } from '@/lib/types/pilot-routes';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -31,6 +33,35 @@ type DriverRouteSummary = {
   } | null;
 };
 
+type DriverAssignmentRow = {
+  id: string;
+  driver_id: string;
+  vehicle_id: string;
+  route_id: string;
+  status: string;
+  seats_available: number;
+  days_active: string[];
+  weekly_price?: number | string | null;
+  single_route_price?: number | string | null;
+  created_at: string;
+  official_routes:
+    | {
+        id: string;
+        name?: string | null;
+        start_area?: string | null;
+        end_area?: string | null;
+        status?: string | null;
+      }
+    | {
+        id: string;
+        name?: string | null;
+        start_area?: string | null;
+        end_area?: string | null;
+        status?: string | null;
+      }[]
+    | null;
+};
+
 async function getDriverData() {
   const supabase = await createClient();
 
@@ -46,19 +77,19 @@ async function getDriverData() {
     .from('profiles')
     .select('id, first_name, surname, role, membership_status')
     .eq('user_id', user.id)
-    .single();
+    .maybeSingle();
 
-  const { data: driverProfile } = await supabase
+  const { data: driverProfile, error: driverProfileError } = await supabase
     .from('driver_profiles')
-    .select('id, rating_average, verification_status, id_status, vehicle_status')
+    .select('id, rating_average, verification_status, id_status, vehicle_status, id_document_url, provider_plan, provider_payment_reference, provider_payment_amount, provider_payment_status, provider_payment_proof_url, provider_last_paid_at, provider_next_payment_at, provider_expires_at')
     .eq('user_id', user.id)
-    .single();
+    .maybeSingle();
 
-  if (!driverProfile) {
+  if (driverProfileError || !driverProfile) {
     redirect('/login');
   }
 
-  if (profile?.role === 'platform_admin' || profile?.role === 'group_admin') {
+  if (isAdminRole(profile?.role) || isSuperAdminEmail(user.email)) {
     redirect('/admin');
   }
 
@@ -73,7 +104,7 @@ async function getDriverData() {
     .order('created_at', { ascending: false });
 
   const routeAssignments = (driverAssignments || []).map((assignment) => {
-    const typedAssignment = assignment as any;
+    const typedAssignment = assignment as DriverAssignmentRow;
     return {
       ...typedAssignment,
       official_route: Array.isArray(typedAssignment.official_routes)
@@ -93,11 +124,11 @@ async function getDriverData() {
 
   const { data: payment } = await supabase
     .from('payments')
-    .select('payment_reference, status, proof_url, proof_image, plan_type, created_at, activated_at, expires_at')
+    .select('payment_reference, amount, status, proof_url, proof_image, plan_type, created_at, activated_at, expires_at')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle();
 
   const { data: vehicles } = await supabase
     .from('vehicles')
@@ -125,20 +156,32 @@ export default async function DriverDashboard() {
     fallback: 'Driver',
   });
 
-  const paymentProof = data.payment?.proof_url || data.payment?.proof_image;
-  const paymentApproved = data.payment?.status === 'approved';
-  const basicApproved = data.driverProfile?.id_status === 'approved';
-  const approvedVehicles = data.vehicles.filter(
-    (vehicle: DriverVehicleSummary) => vehicle.is_active !== false && vehicle.verification_status === 'approved'
-  );
-  const vehicleApproved = approvedVehicles.length > 0;
+  const paymentProof = data.driverProfile?.provider_payment_proof_url || data.payment?.proof_url || data.payment?.proof_image;
+  const paymentStatus = data.driverProfile?.provider_payment_status || data.payment?.status || null;
+  const paymentReference = data.driverProfile?.provider_payment_reference || data.payment?.payment_reference || null;
+  const paymentAmount = data.driverProfile?.provider_payment_amount ?? data.payment?.amount ?? null;
+  const paymentDueAt = data.driverProfile?.provider_next_payment_at || data.driverProfile?.provider_expires_at || data.payment?.expires_at || null;
+  const paymentApproved = paymentStatus === 'approved' && (!paymentDueAt || new Date(paymentDueAt) > new Date());
+  const idApproved = data.driverProfile?.id_status === 'approved';
+  const vehicleApproved = data.driverProfile?.vehicle_status === 'approved';
+  const registeredVehicles = data.vehicles.filter((vehicle: DriverVehicleSummary) => vehicle.is_active !== false);
+  const vehicleRegistered = registeredVehicles.length > 0;
   const routeAssignments = data.routeAssignments ?? [];
   const routeRequests = data.routeRequests ?? [];
-  const isActiveDriver = paymentApproved && basicApproved && vehicleApproved;
-  const needsPaymentProof = !!data.payment && !paymentProof && !paymentApproved;
-  const awaitingPaymentReview = !!paymentProof && data.payment?.status === 'pending';
-  const awaitingBasicApproval = paymentApproved && !basicApproved;
-  const awaitingVehicleApproval = paymentApproved && basicApproved && !vehicleApproved;
+  const driverFullyVerified = paymentApproved && idApproved && vehicleApproved && vehicleRegistered;
+  const canViewDriverRoutes = driverFullyVerified;
+  const driverBadgeVisible = Boolean(data.driverProfile?.id_document_url && idApproved && vehicleApproved);
+  const needsPaymentProof = !!data.driverProfile && !paymentProof && !paymentApproved;
+  const awaitingPaymentReview = !!paymentProof && paymentStatus === 'pending';
+  const awaitingBasicApproval = paymentApproved && !idApproved;
+  const showVehicleCta = paymentApproved;
+  const driverStatusMessage = !paymentApproved
+    ? 'Complete payment verification to unlock your driver routes.'
+    : !vehicleRegistered
+      ? 'Add a registered vehicle before your driver verification can be completed.'
+      : !idApproved || !vehicleApproved
+        ? 'Complete ID and vehicle verification to unlock your driver routes.'
+        : 'Your driver account is active.';
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -150,6 +193,12 @@ export default async function DriverDashboard() {
               <p className="text-xs text-slate-600">
                 Welcome back, {driverDisplayName}
               </p>
+              {driverBadgeVisible ? (
+                <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                  <BadgeCheck className="h-3.5 w-3.5" />
+                  Verified driver
+                </div>
+              ) : null}
             </div>
             <div className="flex items-center gap-2">
               <Link href="/settings" className="p-2 hover:bg-slate-100 rounded-lg">
@@ -162,14 +211,14 @@ export default async function DriverDashboard() {
           <div className="grid grid-cols-3 gap-2">
             <div className="bg-emerald-50 rounded-lg p-2.5 text-center">
               <div className="text-lg font-bold text-emerald-600">{routeAssignments.length}</div>
-              <div className="text-[10px] text-slate-600">Routes</div>
+              <div className="text-[10px] text-slate-600">Applications</div>
             </div>
             <div className="bg-blue-50 rounded-lg p-2.5 text-center">
               <div className="text-lg font-bold text-blue-600">{routeRequests.length}</div>
               <div className="text-[10px] text-slate-600">Requests</div>
             </div>
             <div className="bg-purple-50 rounded-lg p-2.5 text-center">
-              <div className="text-lg font-bold text-purple-600">{approvedVehicles.length}</div>
+              <div className="text-lg font-bold text-purple-600">{registeredVehicles.length}</div>
               <div className="text-[10px] text-slate-600">Vehicles</div>
             </div>
           </div>
@@ -186,11 +235,15 @@ export default async function DriverDashboard() {
               <div className="flex-1">
                 <h3 className="text-base font-bold text-amber-900 mb-1">Payment Proof Required</h3>
                 <p className="text-sm text-amber-800 mb-3">
-                  Please upload your proof of payment to activate your account.
+                  Please upload your subscription proof to activate your driver account.
                 </p>
                 <div className="bg-white rounded-lg p-3 mb-3">
                   <div className="text-xs text-slate-600 mb-1">Payment Reference</div>
-                  <div className="text-lg font-bold text-slate-900 font-mono">{data.payment?.payment_reference}</div>
+                  <div className="text-lg font-bold text-slate-900 font-mono">{paymentReference}</div>
+                </div>
+                <div className="bg-white rounded-lg p-3 mb-3">
+                  <div className="text-xs text-slate-600 mb-1">Amount</div>
+                  <div className="text-lg font-bold text-slate-900">R{paymentAmount}</div>
                 </div>
                 <div className="bg-white rounded-lg p-3 mb-3">
                   <div className="text-xs text-slate-600 mb-1">Banking Details</div>
@@ -218,7 +271,7 @@ export default async function DriverDashboard() {
               <div className="flex-1">
                 <h3 className="text-sm font-bold text-blue-900 mb-1">Verification In Progress</h3>
                 <p className="text-xs text-blue-800 mb-1.5">
-                  Your payment proof has been submitted and is being reviewed by our admin team.
+                  Your subscription proof has been submitted and is being reviewed by our admin team.
                 </p>
                 <p className="text-[11px] text-blue-700">
                   You&apos;ll be notified once your account is verified. This usually takes 24-48 hours.
@@ -235,39 +288,43 @@ export default async function DriverDashboard() {
                 <Clock className="w-4 h-4 text-white" />
               </div>
               <div className="flex-1">
-                <h3 className="text-sm font-bold text-purple-900 mb-1">Basic Registration Approved</h3>
+                <h3 className="text-sm font-bold text-purple-900 mb-1">ID Verification Required</h3>
                 <p className="text-xs text-purple-800">
-                  Your payment is approved. Complete vehicle registration and approval to activate the driver dashboard.
+                  Your payment is approved. Upload and approve your ID before your vehicle and routes can be fully activated.
                 </p>
               </div>
             </div>
           </div>
         )}
 
-        {awaitingVehicleApproval && (
+        {showVehicleCta && (
           <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
             <div className="flex items-start gap-3">
               <div className="w-8 h-8 bg-amber-400 rounded-full flex items-center justify-center flex-shrink-0">
                 <Calendar className="w-4 h-4 text-white" />
               </div>
               <div className="flex-1">
-                <h3 className="text-sm font-bold text-amber-900 mb-1">Vehicle Registration Pending</h3>
+                <h3 className="text-sm font-bold text-amber-900 mb-1">
+                  {vehicleRegistered ? 'Vehicle Registration In Progress' : 'Add Your Vehicle'}
+                </h3>
                 <p className="text-xs text-amber-800 mb-3">
-                  Payment and basic registration are approved. Submit your vehicle information to continue.
+                  {vehicleRegistered
+                    ? 'Your vehicle details are saved. Open your vehicle page to review or update them.'
+                    : 'Payment is approved. Add your vehicle now so you can continue with route applications.'}
                 </p>
-                {data.vehicles.length > 0 ? (
+                {vehicleRegistered ? (
                   <Link
                     href="/dashboard/driver/vehicles"
                     className="inline-flex items-center justify-center rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-600"
                   >
-                    View Vehicle Status
+                    View Vehicles
                   </Link>
                 ) : (
                   <Link
                     href="/dashboard/driver/vehicles/add"
                     className="inline-flex items-center justify-center rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-600"
                   >
-                    Submit Vehicle Info
+                    Add Vehicle
                   </Link>
                 )}
               </div>
@@ -275,11 +332,14 @@ export default async function DriverDashboard() {
           </div>
         )}
 
-        {isActiveDriver ? (
+        {canViewDriverRoutes ? (
           <>
             <div id="assigned-routes" className="mb-6 scroll-mt-4">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-semibold text-slate-700">Assigned Routes</h2>
+                <h2 className="text-sm font-semibold text-slate-700">Route applications & assignments</h2>
+                <Link href="/dashboard/driver/routes" className="text-xs font-semibold text-emerald-600">
+                  Browse routes
+                </Link>
               </div>
 
               {routeAssignments.length > 0 ? (
@@ -295,18 +355,24 @@ export default async function DriverDashboard() {
                             <div className="flex items-center gap-2 mb-1">
                               <MapPin className="w-3.5 h-3.5 text-emerald-500" />
                               <span className="text-sm font-semibold text-slate-900">
-                                {route?.name || 'Assigned route'}
+                              {route?.name || 'Route application'}
                               </span>
                               <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
                                 {assignment.status}
                               </span>
+                              {driverBadgeVisible ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                                  <BadgeCheck className="h-3 w-3" />
+                                  Verified driver
+                                </span>
+                              ) : null}
                             </div>
                             <div className="text-xs text-slate-600 mb-2">
                               {route?.start_area || 'Start'} → {route?.end_area || 'Destination'}
                             </div>
                             <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-600">
                               <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">
-                                {assignment.seats_available} seats available
+                                {assignment.seats_available} passenger seats available
                               </span>
                               <span className="rounded-full bg-sky-50 px-2 py-0.5 font-semibold text-sky-700">
                                 Weekly: R{assignment.weekly_price ?? '0'}
@@ -338,8 +404,8 @@ export default async function DriverDashboard() {
                 </div>
               ) : (
                 <div className="bg-white border border-slate-200 rounded-xl p-6 text-center">
-                  <p className="text-sm text-slate-500">No assigned routes yet</p>
-                  <p className="text-xs text-slate-400 mt-1">Routes will appear here once admin assigns one</p>
+                  <p className="text-sm text-slate-500">No route applications yet</p>
+                  <p className="text-xs text-slate-400 mt-1">Browse routes and apply when you are ready</p>
                 </div>
               )}
             </div>
@@ -349,9 +415,11 @@ export default async function DriverDashboard() {
             <div className="w-16 h-16 bg-slate-300 rounded-full flex items-center justify-center mx-auto mb-3">
               <Calendar className="w-8 h-8 text-slate-500" />
             </div>
-            <h3 className="text-base font-bold text-slate-700 mb-2">Account Not Active</h3>
+            <h3 className="text-base font-bold text-slate-700 mb-2">
+              {!paymentApproved ? 'Account Not Active' : !vehicleRegistered ? 'Vehicle Required' : !idApproved || !vehicleApproved ? 'Verification Pending' : 'Driver Active'}
+            </h3>
             <p className="text-sm text-slate-600">
-              Complete payment verification to start viewing your assigned routes.
+              {driverStatusMessage}
             </p>
           </div>
         )}

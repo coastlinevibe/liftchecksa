@@ -54,14 +54,6 @@ export default function RouteChatThread({
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    setMessages(initialMessages);
-  }, [initialMessages]);
-
-  useEffect(() => {
-    setResolvedPeerProfileId(initialResolvedPeerProfileId);
-  }, [initialResolvedPeerProfileId]);
-
-  useEffect(() => {
     if (!routeId || !assignmentId || !currentProfileId) return;
 
     let cancelled = false;

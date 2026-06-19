@@ -3,10 +3,13 @@ import { redirect, notFound } from 'next/navigation';
 import { ArrowLeft, CheckCircle2, Route } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { assignDriverToRouteFromForm, getRouteDetail } from '@/lib/routes/actions';
+import { isAdminRole, isSuperAdminEmail } from '@/lib/auth/routing';
+import { formatPassengerSeats, formatVehicleCapacity } from '@/lib/types/pilot-routes';
 
 type AssignableVehicleRow = {
   id: string;
   driver_id: string;
+  seat_capacity: number | null;
   make: string | null;
   model: string | null;
   licence_plate: string | null;
@@ -37,7 +40,7 @@ export default async function AssignDriverPage({
     .eq('user_id', user.id)
     .maybeSingle();
 
-  if (!profile || !['platform_admin', 'group_admin'].includes(profile.role)) {
+  if (!isAdminRole(profile?.role) && !isSuperAdminEmail(user.email)) {
     redirect('/admin');
   }
 
@@ -69,7 +72,7 @@ export default async function AssignDriverPage({
 
   const { data: vehicles } = await supabase
     .from('vehicles')
-    .select('id, driver_id, make, model, colour, licence_plate, verification_status, is_active')
+    .select('id, driver_id, seat_capacity, make, model, colour, licence_plate, verification_status, is_active')
     .eq('verification_status', 'approved')
     .eq('is_active', true)
     .order('created_at', { ascending: false });
@@ -92,8 +95,8 @@ export default async function AssignDriverPage({
             <ArrowLeft className="mr-1 h-4 w-4" />
             Back to route
           </Link>
-          <h1 className="text-xl font-bold text-slate-900">Assign Driver</h1>
-          <p className="text-xs text-slate-600">Choose a verified driver and approved vehicle for this route.</p>
+          <h1 className="text-xl font-bold text-slate-900">Review Driver Application</h1>
+          <p className="text-xs text-slate-600">Choose a registered driver and matching vehicle for this route.</p>
         </div>
       </div>
 
@@ -115,19 +118,32 @@ export default async function AssignDriverPage({
           </div>
         </div>
 
+        <div className="mb-4 rounded-xl border border-violet-200 bg-violet-50 p-4">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-violet-700">Allowed seating type</div>
+          <div className="mt-1 text-sm font-bold text-violet-900">
+            {formatVehicleCapacity(detail.route.vehicle_capacity)}
+          </div>
+          <p className="mt-1 text-xs text-violet-800">
+            Only vehicles with this total capacity can be used for this route.
+          </p>
+          <div className="mt-1 text-[11px] text-violet-700">
+            {formatPassengerSeats(detail.route.vehicle_capacity)}
+          </div>
+        </div>
+
         <form action={assignDriverAction} className="space-y-4">
           <input type="hidden" name="route_id" value={routeId} />
 
           <div className="rounded-xl border border-slate-200 bg-white p-4">
             <div className="grid gap-3 md:grid-cols-2">
               <div>
-                <label className="mb-1.5 block text-xs font-semibold text-slate-700">Driver</label>
+              <label className="mb-1.5 block text-xs font-semibold text-slate-700">Driver</label>
                 <select
                   name="driver_profile_id"
                   required
                   className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
                 >
-                  <option value="">Select driver</option>
+                  <option value="">Select driver application</option>
                   {approvedDrivers.map((driver) => (
                     <option key={driver.id} value={driver.id}>
                       {driver.first_name} {driver.surname}
@@ -143,14 +159,14 @@ export default async function AssignDriverPage({
                   required
                   className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
                 >
-                  <option value="">Select vehicle</option>
+                  <option value="">Select registered vehicle</option>
                   {activeVehicles.map((vehicle) => {
                     const ownerDriverProfile = driverProfileById.get(vehicle.driver_id);
                     const owner = ownerDriverProfile ? profileByUserId.get(ownerDriverProfile.user_id) : null;
                     const ownerName = owner ? `${owner.first_name ?? ''} ${owner.surname ?? ''}`.trim() : 'Driver';
                     return (
                       <option key={vehicle.id} value={vehicle.id}>
-                        {ownerName} - {vehicle.make} {vehicle.model} ({vehicle.licence_plate})
+                        {ownerName} - {vehicle.make} {vehicle.model} ({vehicle.licence_plate}) - {formatVehicleCapacity(vehicle.seat_capacity)}
                       </option>
                     );
                   })}
@@ -158,7 +174,7 @@ export default async function AssignDriverPage({
               </div>
 
               <div>
-                <label className="mb-1.5 block text-xs font-semibold text-slate-700">Seats Available</label>
+                <label className="mb-1.5 block text-xs font-semibold text-slate-700">Passenger Seats Available</label>
                 <input
                   name="seats_available"
                   type="number"
@@ -217,12 +233,13 @@ export default async function AssignDriverPage({
           </div>
 
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
-            <div className="flex items-center gap-2 font-semibold">
+          <div className="flex items-center gap-2 font-semibold">
               <CheckCircle2 className="h-4 w-4" />
-              Assignment checks
+              Application checks
             </div>
             <p className="mt-1 text-sm text-emerald-800">
-              The server will verify that the chosen driver and vehicle are approved before the assignment is saved.
+              The server will verify that the chosen driver and vehicle belong together and match the route seating type before the assignment is saved.
+              Vehicles must also match the route&apos;s total seating capacity. Passenger seats are total seats minus the driver seat.
             </p>
           </div>
 
@@ -230,7 +247,7 @@ export default async function AssignDriverPage({
             type="submit"
             className="w-full rounded-lg bg-emerald-500 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-600"
           >
-            Assign Driver
+            Approve Application
           </button>
         </form>
       </div>

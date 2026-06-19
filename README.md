@@ -1,4 +1,4 @@
-# LiftCheck - Verified Lift Club Safety Platform
+﻿# LiftCheck - Verified Lift Club Safety Platform
 
 **Check the driver before you pay. Confirm before you ride.**
 
@@ -6,7 +6,7 @@ LiftCheck is a mobile-first PWA (Progressive Web App) for South African lift clu
 
 ## Core Features
 
-- ✅ **Driver Verification** - ID, licence and vehicle checks
+- ✅ **Driver Verification** - ID and vehicle checks
 - ✅ **Driver Identification Cards** - View driver, vehicle and trip details before paying
 - ✅ **In-App Chat** - Safe messaging with image sending
 - ✅ **Zii Verify** - Offline Bluetooth verification when no data available
@@ -64,8 +64,6 @@ In Supabase Dashboard > Storage, create these buckets:
 - `profile-photos` (public)
 - `vehicle-photos` (public)
 - `id-documents` (private, admin only)
-- `licence-documents` (private, admin only)
-- `proof-of-address` (private, admin only)
 - `payment-proofs` (private)
 - `chat-images` (private)
 - `evidence-uploads` (private)
@@ -113,7 +111,8 @@ liftcheck/
 - Generate shareable trip links
 - Accept/reject passenger requests
 - Build reputation through ratings
-- **Cost**: R300/year
+- Register account, complete vehicle setup, and then create trips
+- **Cost**: R120/3 months or R300/year
 
 ### Group Admin
 - Free access
@@ -135,6 +134,16 @@ liftcheck/
 4. User uploads proof of payment
 5. Admin reviews and activates membership
 6. Membership active for 365 days
+
+### Driver Onboarding Flow
+
+1. User chooses the driver registration path
+2. App creates the driver account and payment reference
+3. User is redirected to `/dashboard/driver/vehicles/add`
+4. Driver uploads ID document and vehicle photo while adding vehicle details
+5. Driver returns to dashboard and uploads payment proof
+6. Admin reviews payment, ID, and vehicle verification
+7. Driver is unlocked for route applications after approval
 
 ## Safety Features
 

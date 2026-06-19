@@ -27,7 +27,7 @@ export default async function MembershipPage() {
 
   const { data: driverProfile } = await supabase
     .from('driver_profiles')
-    .select('provider_plan, provider_expires_at, verification_status')
+    .select('provider_plan, provider_expires_at, provider_next_payment_at, provider_payment_reference, provider_payment_amount, provider_payment_status, provider_payment_proof_url, provider_last_paid_at, verification_status')
     .eq('user_id', user.id)
     .maybeSingle();
 
@@ -43,14 +43,26 @@ export default async function MembershipPage() {
   const planType = isDriver ? driverProfile?.provider_plan : profile?.membership_type;
   const latestPayment = payments?.[0] ?? null;
   const expiry = isDriver
-    ? driverProfile?.provider_expires_at
+    ? driverProfile?.provider_next_payment_at || driverProfile?.provider_expires_at
     : getMembershipExpiry(profile, latestPayment);
   const membershipActive =
     profile?.membership_status === 'active' ||
+    driverProfile?.provider_payment_status === 'approved' ||
     driverProfile?.verification_status === 'approved' ||
     latestPayment?.status === 'approved';
-  const paymentProof = latestPayment?.proof_url || latestPayment?.proof_image;
-  const needsPaymentProof = !membershipActive && !!latestPayment && !paymentProof;
+  const paymentProof = isDriver
+    ? driverProfile?.provider_payment_proof_url || latestPayment?.proof_url || latestPayment?.proof_image
+    : latestPayment?.proof_url || latestPayment?.proof_image;
+  const paymentReference = isDriver
+    ? driverProfile?.provider_payment_reference || latestPayment?.payment_reference
+    : latestPayment?.payment_reference;
+  const paymentAmount = isDriver
+    ? driverProfile?.provider_payment_amount || latestPayment?.amount
+    : latestPayment?.amount;
+  const lastPaidAt = isDriver
+    ? driverProfile?.provider_last_paid_at || latestPayment?.activated_at || latestPayment?.created_at
+    : latestPayment?.activated_at || latestPayment?.created_at;
+  const needsPaymentProof = !membershipActive && !!(isDriver ? driverProfile : latestPayment) && !paymentProof;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -70,10 +82,10 @@ export default async function MembershipPage() {
             <div className="bg-emerald-100 rounded-full p-3">
               <Shield className="w-5 h-5 text-emerald-600" />
             </div>
-            <div className="flex-1">
+              <div className="flex-1">
               <div className="text-sm font-bold text-slate-900">{membershipLabel(planType)}</div>
               <div className="text-xs text-slate-600">
-                {profile?.membership_status || driverProfile?.verification_status || 'pending'}
+                {profile?.membership_status || driverProfile?.provider_payment_status || driverProfile?.verification_status || 'pending'}
               </div>
             </div>
           </div>
@@ -89,6 +101,24 @@ export default async function MembershipPage() {
                 {expiry ? formatMembershipExpiry(expiry) : 'Not set'}
               </span>
             </div>
+            {isDriver ? (
+              <>
+                <div className="flex items-center justify-between rounded-lg bg-slate-50 p-3">
+                  <span className="text-xs text-slate-600">Reference</span>
+                  <span className="text-sm font-semibold text-slate-900 font-mono">{paymentReference || 'Pending'}</span>
+                </div>
+                <div className="flex items-center justify-between rounded-lg bg-slate-50 p-3">
+                  <span className="text-xs text-slate-600">Amount</span>
+                  <span className="text-sm font-semibold text-slate-900">R{paymentAmount || 0}</span>
+                </div>
+                <div className="flex items-center justify-between rounded-lg bg-slate-50 p-3">
+                  <span className="text-xs text-slate-600">Last Paid</span>
+                  <span className="text-sm font-semibold text-slate-900">
+                    {lastPaidAt ? formatMembershipExpiry(lastPaidAt) : 'Not set'}
+                  </span>
+                </div>
+              </>
+            ) : null}
             <div className="flex items-center justify-between rounded-lg bg-slate-50 p-3">
               <span className="text-xs text-slate-600">Account Type</span>
               <span className="text-sm font-semibold text-slate-900">
@@ -132,7 +162,7 @@ export default async function MembershipPage() {
               <div className="flex-1">
                 <div className="text-sm font-bold text-amber-900 mb-1">Need to upload proof?</div>
                 <p className="text-xs text-amber-800 mb-3">
-                  Upload your payment proof so the team can activate your account faster.
+                  Upload your subscription proof so the team can activate your account faster.
                 </p>
                 <Link
                   href="/payment/upload"

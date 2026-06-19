@@ -1,7 +1,8 @@
 import Link from 'next/link';
-import { ArrowLeft, MapPin, Search, Shield, Route as RouteIcon } from 'lucide-react';
+import { ArrowLeft, BadgeCheck, MapPin, Search, Shield, Route as RouteIcon } from 'lucide-react';
 import { getOfficialRoutes } from '@/lib/routes/actions';
 import { createClient } from '@/lib/supabase/server';
+import { formatVehicleCapacity } from '@/lib/types/pilot-routes';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -179,12 +180,21 @@ export default async function RoutesPage({
                     <p className="mt-1 text-[11px] text-slate-600">
                       {summaryDays} - {startTime} start | {returnTime} return
                     </p>
+                    {primaryAssignment?.driver_verified ? (
+                      <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                        <BadgeCheck className="h-3 w-3" />
+                        Verified driver
+                      </div>
+                    ) : null}
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
                       <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">
                         Weekly: {weeklyPrice}
                       </span>
                       <span className="rounded-full bg-blue-100 px-2 py-0.5 font-semibold text-blue-700">
-                        {seatsAvailable} seats available
+                        {seatsAvailable} passenger seats available
+                      </span>
+                      <span className="rounded-full bg-violet-100 px-2 py-0.5 font-semibold text-violet-700">
+                        {formatVehicleCapacity(route.vehicle_capacity)}
                       </span>
                     </div>
                   </div>

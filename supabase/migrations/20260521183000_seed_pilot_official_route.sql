@@ -12,6 +12,7 @@ route_upsert as (
     start_area,
     end_area,
     route_type,
+    vehicle_capacity,
     status,
     created_by
   )
@@ -21,6 +22,7 @@ route_upsert as (
     'Kraaifontein',
     'Cape Town CBD',
     'work_commute',
+    12,
     'active',
     admin_profile.id
   from admin_profile
@@ -29,6 +31,7 @@ route_upsert as (
         start_area = excluded.start_area,
         end_area = excluded.end_area,
         route_type = excluded.route_type,
+        vehicle_capacity = excluded.vehicle_capacity,
         status = excluded.status,
         created_by = excluded.created_by,
         updated_at = now()
