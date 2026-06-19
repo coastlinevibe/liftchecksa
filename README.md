@@ -1,4 +1,4 @@
-﻿# LiftCheck - Verified Lift Club Safety Platform
+# LiftCheck - Verified Lift Club Safety Platform
 
 **Check the driver before you pay. Confirm before you ride.**
 
@@ -139,11 +139,13 @@ liftcheck/
 
 1. User chooses the driver registration path
 2. App creates the driver account and payment reference
-3. User is redirected to `/dashboard/driver/vehicles/add`
-4. Driver uploads ID document and vehicle photo while adding vehicle details
-5. Driver returns to dashboard and uploads payment proof
-6. Admin reviews payment, ID, and vehicle verification
-7. Driver is unlocked for route applications after approval
+3. User is redirected to `/dashboard/driver`
+4. Driver uploads payment proof from the dashboard
+5. Admin reviews the payment proof
+6. Once payment is approved, the add-vehicle CTA appears on the dashboard
+7. Driver uploads ID document and vehicle photo on `/dashboard/driver/vehicles/add`
+8. Admin reviews the vehicle image and ID document together
+9. Driver is unlocked for route applications after approval and sees the verified badge
 
 ## Safety Features
 

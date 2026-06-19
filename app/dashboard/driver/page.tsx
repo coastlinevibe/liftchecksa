@@ -5,7 +5,6 @@ import { getDisplayName } from '@/lib/display-name';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { isAdminRole, isSuperAdminEmail } from '@/lib/auth/routing';
-import { formatPassengerSeats } from '@/lib/types/pilot-routes';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -170,18 +169,18 @@ export default async function DriverDashboard() {
   const routeRequests = data.routeRequests ?? [];
   const driverFullyVerified = paymentApproved && idApproved && vehicleApproved && vehicleRegistered;
   const canViewDriverRoutes = driverFullyVerified;
-  const driverBadgeVisible = Boolean(data.driverProfile?.id_document_url && idApproved && vehicleApproved);
+  const driverBadgeVisible = driverFullyVerified;
   const needsPaymentProof = !!data.driverProfile && !paymentProof && !paymentApproved;
   const awaitingPaymentReview = !!paymentProof && paymentStatus === 'pending';
-  const awaitingBasicApproval = paymentApproved && !idApproved;
   const showVehicleCta = paymentApproved;
+  const awaitingDriverReview = paymentApproved && vehicleRegistered && !driverFullyVerified;
   const driverStatusMessage = !paymentApproved
-    ? 'Complete payment verification to unlock your driver routes.'
+    ? 'Complete payment verification to unlock your driver dashboard.'
     : !vehicleRegistered
-      ? 'Add a registered vehicle before your driver verification can be completed.'
-      : !idApproved || !vehicleApproved
-        ? 'Complete ID and vehicle verification to unlock your driver routes.'
-        : 'Your driver account is active.';
+      ? 'Add your vehicle to continue driver verification.'
+      : awaitingDriverReview
+        ? 'Your car registration and ID verification are in progress. Admin will review your documents and email you once approval is complete.'
+        : 'Your driver account and car are approved. You can now browse available routes.';
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -281,21 +280,6 @@ export default async function DriverDashboard() {
           </div>
         )}
 
-        {awaitingBasicApproval && (
-          <div className="mb-3 rounded-lg border border-purple-200 bg-purple-50 px-3 py-3">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 bg-purple-400 rounded-full flex items-center justify-center flex-shrink-0">
-                <Clock className="w-4 h-4 text-white" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-sm font-bold text-purple-900 mb-1">ID Verification Required</h3>
-                <p className="text-xs text-purple-800">
-                  Your payment is approved. Upload and approve your ID before your vehicle and routes can be fully activated.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
 
         {showVehicleCta && (
           <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
@@ -305,14 +289,23 @@ export default async function DriverDashboard() {
               </div>
               <div className="flex-1">
                 <h3 className="text-sm font-bold text-amber-900 mb-1">
-                  {vehicleRegistered ? 'Vehicle Registration In Progress' : 'Add Your Vehicle'}
+                  {driverFullyVerified ? 'Driver and Car Approved' : vehicleRegistered ? 'Car and ID Verification In Progress' : 'Add Your Vehicle'}
                 </h3>
                 <p className="text-xs text-amber-800 mb-3">
-                  {vehicleRegistered
-                    ? 'Your vehicle details are saved. Open your vehicle page to review or update them.'
-                    : 'Payment is approved. Add your vehicle now so you can continue with route applications.'}
+                  {driverFullyVerified
+                    ? 'Your driver account and car are approved. You can now search available routes.'
+                    : vehicleRegistered
+                      ? 'Your car registration and ID verification are in progress. Admin will review your documents and email you once approval is complete.'
+                      : 'Payment is approved. Add your car details now so admin can review them.'}
                 </p>
-                {vehicleRegistered ? (
+                {driverFullyVerified ? (
+                  <Link
+                    href="/dashboard/driver/routes"
+                    className="inline-flex items-center justify-center rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-600"
+                  >
+                    Browse Routes
+                  </Link>
+                ) : vehicleRegistered ? (
                   <Link
                     href="/dashboard/driver/vehicles"
                     className="inline-flex items-center justify-center rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-600"
@@ -368,7 +361,7 @@ export default async function DriverDashboard() {
                               ) : null}
                             </div>
                             <div className="text-xs text-slate-600 mb-2">
-                              {route?.start_area || 'Start'} → {route?.end_area || 'Destination'}
+                              {route?.start_area || 'Start'} {' -> '} {route?.end_area || 'Destination'}
                             </div>
                             <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-600">
                               <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">
@@ -416,7 +409,7 @@ export default async function DriverDashboard() {
               <Calendar className="w-8 h-8 text-slate-500" />
             </div>
             <h3 className="text-base font-bold text-slate-700 mb-2">
-              {!paymentApproved ? 'Account Not Active' : !vehicleRegistered ? 'Vehicle Required' : !idApproved || !vehicleApproved ? 'Verification Pending' : 'Driver Active'}
+              {!paymentApproved ? 'Account Not Active' : !vehicleRegistered ? 'Vehicle Required' : awaitingDriverReview ? 'Car and ID Verification In Progress' : 'Driver and Car Approved'}
             </h3>
             <p className="text-sm text-slate-600">
               {driverStatusMessage}
@@ -427,3 +420,5 @@ export default async function DriverDashboard() {
     </div>
   );
 }
+
+

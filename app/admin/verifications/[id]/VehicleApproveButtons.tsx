@@ -37,21 +37,11 @@ export default function VehicleApproveButtons({ vehicleId, driverProfileId }: Pr
         .eq('id', vehicleId);
 
       if (vehicleError) throw vehicleError;
-
-      const { data: currentDriverProfile, error: profileError } = await supabase
-        .from('driver_profiles')
-        .select('id_status')
-        .eq('id', driverProfileId)
-        .maybeSingle();
-
-      if (profileError) throw profileError;
-
       // Update driver profile
       const { error: driverError } = await supabase
         .from('driver_profiles')
         .update({ 
-          vehicle_status: 'approved',
-          verification_status: currentDriverProfile?.id_status === 'approved' ? 'approved' : 'pending'
+          vehicle_status: 'approved'
         })
         .eq('id', driverProfileId);
 
@@ -86,7 +76,6 @@ export default function VehicleApproveButtons({ vehicleId, driverProfileId }: Pr
         .from('driver_profiles')
         .update({
           vehicle_status: 'rejected',
-          verification_status: 'rejected',
         })
         .eq('id', driverProfileId);
 

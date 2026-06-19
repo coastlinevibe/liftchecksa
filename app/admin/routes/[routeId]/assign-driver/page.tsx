@@ -57,7 +57,7 @@ export default async function AssignDriverPage({
 
   const { data: driverProfiles } = await supabase
     .from('driver_profiles')
-    .select('id, user_id')
+    .select('id, user_id, id_status, vehicle_status, provider_payment_status, provider_next_payment_at, provider_expires_at')
     .order('created_at', { ascending: false });
 
   const { data: profiles } = driverProfiles?.length
@@ -77,7 +77,19 @@ export default async function AssignDriverPage({
     .eq('is_active', true)
     .order('created_at', { ascending: false });
 
-  const approvedDrivers = (drivers || []).filter((driver) => driver.role === 'driver');
+  const approvedDriverUserIds = new Set(
+    (driverProfiles || [])
+      .filter((driverProfile) => {
+        const dueAt = driverProfile.provider_next_payment_at || driverProfile.provider_expires_at || null;
+        const paymentApproved =
+          driverProfile.provider_payment_status === 'approved' &&
+          (!dueAt || new Date(dueAt) > new Date());
+
+        return paymentApproved && driverProfile.id_status === 'approved' && driverProfile.vehicle_status === 'approved';
+      })
+      .map((driverProfile) => driverProfile.user_id)
+  );
+  const approvedDrivers = (drivers || []).filter((driver) => driver.role === 'driver' && approvedDriverUserIds.has(driver.user_id));
   const activeVehicles = (vehicles || []) as AssignableVehicleRow[];
   const driverProfileById = new Map((driverProfiles || []).map((driverProfile) => [driverProfile.id, driverProfile]));
   const profileByUserId = new Map((profiles || []).map((profile) => [profile.user_id, profile]));

@@ -1,9 +1,11 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowLeft, BadgeCheck } from 'lucide-react';
 import { unstable_noStore as noStore } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
 import ApproveRejectButtons from './ApproveRejectButtons';
+import { resolveSignedStorageUrl } from '@/lib/supabase/storage';
 
 async function getVerificationData(id: string) {
   noStore();
@@ -26,8 +28,13 @@ async function getVerificationData(id: string) {
     .eq('user_id', driverProfile.user_id)
     .maybeSingle();
 
+  const resolvedIdDocumentUrl = await resolveSignedStorageUrl(supabase, 'id-documents', driverProfile.id_document_url);
+
   return {
-    driverProfile,
+    driverProfile: {
+      ...driverProfile,
+      id_document_url: resolvedIdDocumentUrl || driverProfile.id_document_url,
+    },
     profile,
   };
 }
@@ -93,6 +100,22 @@ export default async function VerificationReviewPage({ params }: { params: Promi
             </div>
           </div>
         </div>
+
+        {driverProfile.id_document_url ? (
+          <div className="mb-4 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+            <Image
+              src={driverProfile.id_document_url}
+              alt={`${profile?.first_name || 'Driver'} ID document`}
+              width={1200}
+              height={800}
+              className="h-72 w-full object-cover"
+            />
+          </div>
+        ) : (
+          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Driver ID document missing
+          </div>
+        )}
 
         <ApproveRejectButtons driverProfileId={driverProfile.id} />
       </div>

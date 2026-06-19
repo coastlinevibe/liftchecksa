@@ -161,9 +161,9 @@ export default function AddVehiclePage() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-emerald-100 rounded-full mb-4">
             <CheckCircle className="w-8 h-8 text-emerald-600" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 mb-2">Vehicle and ID Submitted!</h1>
+          <h1 className="text-2xl font-bold text-slate-900 mb-2">Car Registration Submitted</h1>
           <p className="text-sm text-slate-600 mb-4">
-            Your ID and vehicle have been saved for review
+            Your ID document and vehicle details are now pending admin approval
           </p>
           <p className="text-xs text-slate-500">
             Redirecting to your driver dashboard...
@@ -183,7 +183,7 @@ export default function AddVehiclePage() {
             Back to dashboard
           </Link>
           <h1 className="text-xl font-bold text-slate-900">Add New Vehicle</h1>
-          <p className="text-xs text-slate-600">Upload your ID and register a vehicle in one step</p>
+          <p className="text-xs text-slate-600">Upload your ID document, vehicle photo, and registration details for admin review.</p>
         </div>
       </div>
 
@@ -328,7 +328,7 @@ export default function AddVehiclePage() {
 
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
           <p className="text-xs text-blue-800">
-            <strong>Next step:</strong> Your ID and vehicle will be reviewed together before routes unlock.
+            <strong>Next step:</strong> Your car registration stays pending until admin approves the ID document and vehicle details.
           </p>
         </div>
 
@@ -337,7 +337,7 @@ export default function AddVehiclePage() {
             disabled={loading}
             className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white py-3 rounded-lg text-sm font-semibold"
           >
-            {loading ? 'Saving...' : 'Submit Vehicle & ID'}
+            {loading ? 'Saving...' : 'Submit Car Registration'}
           </button>
         </form>
       </div>

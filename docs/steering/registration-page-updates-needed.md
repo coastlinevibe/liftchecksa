@@ -1,15 +1,15 @@
-﻿# Registration Page Notes
+# Registration Page Notes
 
 ## Status
 
-This note is obsolete. The file upload work described here has already been implemented, but the current official driver signup flow no longer uploads ID/selfie during `/register`.
+Obsolete. The old file-upload note below no longer reflects the official driver signup flow.
 
 ## Current Truth
 
 - Driver signup is basic-account-only on `/register?type=driver`
-- The driver is redirected to `/dashboard/driver/vehicles/add`
-- ID document upload now happens on the vehicle setup page
-- Vehicle photo upload also happens on the vehicle setup page
+- The driver uploads payment proof from `/payment/upload`
+- Vehicle setup happens later on `/dashboard/driver/vehicles/add`
+- The vehicle page uploads the ID document and vehicle image together
 
 ## Why Keep This File
 

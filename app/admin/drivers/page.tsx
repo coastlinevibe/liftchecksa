@@ -1,11 +1,13 @@
 import Link from 'next/link';
 import { ArrowLeft, Car } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
+import { getDriverApprovalStatus } from '@/lib/driver-status';
 
 type DriverListRow = {
   id: string;
   user_id: string;
-  verification_status: string | null;
+  id_status: string | null;
+  vehicle_status: string | null;
   completed_trips: number | null;
   rating_average: number | null;
   created_at: string;
@@ -21,7 +23,7 @@ async function getDrivers() {
 
   const { data } = await supabase
     .from('driver_profiles')
-    .select('id, user_id, verification_status, completed_trips, rating_average, created_at')
+    .select('id, user_id, id_status, vehicle_status, completed_trips, rating_average, created_at')
     .order('created_at', { ascending: false })
     .limit(50);
 
@@ -76,7 +78,7 @@ export default async function AdminDriversPage() {
                   </div>
                   <div className="text-right flex-shrink-0">
                     <div className="text-xs font-semibold text-slate-700 capitalize">
-                      {driver.verification_status}
+                      {getDriverApprovalStatus(driver)}
                     </div>
                     <div className="text-[10px] text-slate-500">
                       {driver.completed_trips || 0} trips

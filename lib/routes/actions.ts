@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { isSuperAdminEmail } from '@/lib/auth/routing';
+import { isDriverFullyApproved } from '@/lib/driver-status';
 import { VEHICLE_CAPACITY_OPTIONS } from '@/lib/types/pilot-routes';
 import type {
   ContactUnlock,
@@ -438,11 +439,11 @@ export async function assignDriverToRoute(input: {
 
   const { data: driverVerification } = await supabase
     .from('driver_profiles')
-    .select('id, verification_status, user_id')
+    .select('id, id_status, vehicle_status, user_id')
     .eq('user_id', driverProfile.user_id)
     .single();
 
-  if (!driverVerification || driverVerification.verification_status !== 'approved') {
+  if (!driverVerification || !isDriverFullyApproved(driverVerification)) {
     return { error: 'Driver must be approved before assignment' };
   }
 

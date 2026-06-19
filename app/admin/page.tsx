@@ -4,6 +4,7 @@ import { Users, Car, CheckCircle, Clock, TrendingUp, CreditCard, AlertTriangle }
 import { createClient } from '@/lib/supabase/server';
 import LogoutButton from '@/components/LogoutButton';
 import { isAdminRole, isSuperAdminEmail } from '@/lib/auth/routing';
+import { getDriverApprovalStatus, isDriverFullyApproved } from '@/lib/driver-status';
 
 type RecentMemberRow = {
   id: string;
@@ -19,7 +20,11 @@ type RecentMemberRow = {
 type RecentDriverRow = {
   id: string;
   user_id: string;
-  verification_status: string | null;
+  id_status: string | null;
+  vehicle_status: string | null;
+  provider_payment_status?: string | null;
+  provider_next_payment_at?: string | null;
+  provider_expires_at?: string | null;
   completed_trips: number | null;
   rating_average: number | null;
   created_at: string;
@@ -34,7 +39,9 @@ type DriverProfilePreviewRow = {
 };
 
 type VerificationReviewRow = {
-  verification_status: string | null;
+  verification_status?: string | null;
+  id_status?: string | null;
+  vehicle_status?: string | null;
   created_at: string;
   updated_at: string | null;
 };
@@ -107,9 +114,9 @@ async function getAdminStats() {
 
   const [
     { count: totalMembers },
-    { count: verifiedDrivers },
+    { data: verifiedDriverRows },
     { count: activeRoutes },
-    { count: pendingDriverVerifications },
+    { data: pendingDriverVerificationRows },
     { count: pendingVehicleVerifications },
     { count: pendingPayments },
     { count: pendingDriverSubscriptionProofs },
@@ -126,16 +133,16 @@ async function getAdminStats() {
     { data: suspendedDriverRows },
   ] = await Promise.all([
     supabase.from('profiles').select('*', { count: 'exact', head: true }).in('role', ['member', 'driver']),
-    supabase.from('driver_profiles').select('*', { count: 'exact', head: true }).eq('verification_status', 'approved'),
+    supabase.from('driver_profiles').select('id_status, vehicle_status, provider_payment_status, provider_next_payment_at, provider_expires_at'),
     supabase.from('official_routes').select('*', { count: 'exact', head: true }).eq('status', 'active'),
-    supabase.from('driver_profiles').select('*', { count: 'exact', head: true }).eq('verification_status', 'pending'),
+    supabase.from('driver_profiles').select('id_status, vehicle_status, provider_payment_status, provider_next_payment_at, provider_expires_at'),
     supabase.from('vehicles').select('*', { count: 'exact', head: true }).eq('verification_status', 'pending'),
     supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
     supabase.from('driver_profiles').select('*', { count: 'exact', head: true }).eq('provider_payment_status', 'pending').not('provider_payment_proof_url', 'is', null),
     supabase.from('reports').select('*', { count: 'exact', head: true }).in('status', ['new', 'under_review']),
     supabase.from('profiles').select('id, user_id, first_name, surname, phone, role, membership_status, created_at').eq('role', 'member').order('created_at', { ascending: false }).limit(5),
-    supabase.from('driver_profiles').select('id, user_id, verification_status, completed_trips, rating_average, created_at').order('created_at', { ascending: false }).limit(5),
-    supabase.from('driver_profiles').select('verification_status, created_at, updated_at').in('verification_status', ['approved', 'rejected', 'expired']),
+    supabase.from('driver_profiles').select('id, user_id, id_status, vehicle_status, provider_payment_status, provider_next_payment_at, provider_expires_at, completed_trips, rating_average, created_at').order('created_at', { ascending: false }).limit(5),
+    supabase.from('driver_profiles').select('id_status, vehicle_status, created_at, updated_at'),
     supabase.from('vehicles').select('verification_status, created_at, updated_at').in('verification_status', ['approved', 'rejected', 'expired']),
     supabase.from('reports').select('status'),
     supabase.from('zii_tokens').select('*', { count: 'exact', head: true }).eq('token_status', 'active').gte('expires_at', nowIso),
@@ -144,6 +151,24 @@ async function getAdminStats() {
     supabase.from('profiles').select('id').eq('membership_status', 'suspended'),
     supabase.from('driver_profiles').select('user_id').eq('is_suspended', true),
   ]);
+
+  const verifiedDrivers = ((verifiedDriverRows || []) as RecentDriverRow[]).filter((driver) => {
+    const dueAt = driver.provider_next_payment_at || driver.provider_expires_at || null;
+    const paymentApproved =
+      driver.provider_payment_status === 'approved' &&
+      (!dueAt || new Date(dueAt) > new Date());
+
+    return paymentApproved && isDriverFullyApproved(driver);
+  }).length;
+
+  const pendingDriverVerifications = ((pendingDriverVerificationRows || []) as RecentDriverRow[]).filter((driver) => {
+    const dueAt = driver.provider_next_payment_at || driver.provider_expires_at || null;
+    const paymentApproved =
+      driver.provider_payment_status === 'approved' &&
+      (!dueAt || new Date(dueAt) > new Date());
+
+    return paymentApproved && !isDriverFullyApproved(driver);
+  }).length;
 
   const driversWithProfiles: DriverWithProfile[] = [];
   if (recentDrivers && recentDrivers.length > 0) {
@@ -163,7 +188,7 @@ async function getAdminStats() {
 
   const verificationReviewRows = [
     ...((driverVerificationRows || []) as VerificationReviewRow[]).map((row) => ({
-      status: row.verification_status,
+      status: getDriverApprovalStatus(row),
       createdAt: row.created_at,
       reviewedAt: row.updated_at,
     })),
@@ -431,7 +456,7 @@ export default async function AdminDashboard() {
                       </div>
                       <div className="text-right flex-shrink-0">
                         <div className="text-xs font-semibold text-slate-700 capitalize">
-                          {driver.verification_status}
+                          {getDriverApprovalStatus(driver)}
                         </div>
                         <div className="text-[10px] text-slate-500">{timeAgo}</div>
                       </div>

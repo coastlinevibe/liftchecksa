@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import { signUp } from '@/lib/auth/actions';
@@ -191,7 +190,7 @@ function DriverForm({
         email: formData.email,
         password: formData.password,
       });
-      router.push('/dashboard/driver/vehicles/add');
+      router.push('/dashboard/driver');
     }, 2000);
     return () => clearTimeout(timer);
   }, [success, formData.email, formData.password, router]);
@@ -224,7 +223,7 @@ function DriverForm({
               <CheckCircle className="w-8 h-8 text-emerald-600" />
             </div>
             <h1 className="text-2xl font-bold text-slate-900 mb-2">Driver Account Created!</h1>
-            <p className="text-sm text-slate-600 mb-2">Next step: add your vehicle</p>
+            <p className="text-sm text-slate-600 mb-2">Next step: upload payment proof</p>
           </div>
           <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-4">
             <div className="text-center mb-3">
@@ -235,7 +234,7 @@ function DriverForm({
               <strong>Amount:</strong> R{plan === 'provider_quarterly' ? '120' : '300'}.00
             </div>
             <div className="mt-2 text-xs text-emerald-800">
-              After login you will be taken straight to vehicle setup so you can register your car before applying for routes.
+              After login you will land on your dashboard to upload payment proof first. Vehicle setup comes after payment approval.
             </div>
           </div>
         </div>
@@ -253,7 +252,7 @@ function DriverForm({
         <h1 className="text-2xl font-bold text-slate-900 mb-2">Driver Sign Up</h1>
 
         <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900">
-          Choose a 3-month or 12-month provider plan, then add your vehicle after signup.
+          Choose a 3-month or 12-month provider plan. After signup, upload payment proof from your dashboard.
         </div>
 
         <div className="mb-4">
@@ -414,3 +413,4 @@ function PasswordField({
     </div>
   );
 }
+

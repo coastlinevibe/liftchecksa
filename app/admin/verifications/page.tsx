@@ -4,6 +4,7 @@ import { ArrowLeft, Car } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import { unstable_noStore as noStore } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { resolveSignedStorageUrl } from '@/lib/supabase/storage';
 import ApproveRejectButtons from './[id]/ApproveRejectButtons';
 import VehicleApproveButtons from './[id]/VehicleApproveButtons';
 import { isAdminRole, isSuperAdminEmail } from '@/lib/auth/routing';
@@ -12,6 +13,7 @@ type DriverVerificationRow = {
   id: string;
   user_id: string;
   id_status: string | null;
+  id_document_url: string | null;
   provider_plan: string | null;
 };
 
@@ -39,6 +41,7 @@ type VehicleVerificationRow = {
 type DriverProfileLookupRow = {
   id: string;
   user_id: string;
+  id_document_url?: string | null;
 };
 
 type DriverApplication = DriverVerificationRow & {
@@ -47,6 +50,7 @@ type DriverApplication = DriverVerificationRow & {
 
 type VehicleApplication = VehicleVerificationRow & {
   driverProfileId: string;
+  driverProfile: DriverProfileLookupRow | null;
   profile: ProfileLookupRow | null;
 };
 
@@ -78,9 +82,10 @@ async function getPendingVerifications() {
       id,
       user_id,
       id_status,
+      id_document_url,
       provider_plan
     `)
-    .eq('verification_status', 'pending')
+
     .order('created_at', { ascending: false });
 
   if (driverRowsError) {
@@ -119,12 +124,15 @@ async function getPendingVerifications() {
     );
   }
 
-  const driverApplications = ((driverRows || []) as DriverVerificationRow[])
-    .filter((application) => application.id_status !== 'approved' && application.id_status !== 'rejected')
-    .map((application) => ({
-      ...application,
-      profile: profilesByUserId.get(application.user_id) || null,
-    })) as DriverApplication[];
+  const driverApplications = await Promise.all(
+    ((driverRows || []) as DriverVerificationRow[])
+      .filter((application) => application.id_status !== 'approved' && application.id_status !== 'rejected')
+      .map(async (application) => ({
+        ...application,
+        id_document_url: await resolveSignedStorageUrl(supabase, 'id-documents', application.id_document_url),
+        profile: profilesByUserId.get(application.user_id) || null,
+      }))
+  ) as DriverApplication[];
 
   const { data: vehicleRows, error: vehicleRowsError } = await supabase
     .from('vehicles')
@@ -161,7 +169,7 @@ async function getPendingVerifications() {
   if (vehicleDriverIds.length > 0) {
     const { data: vehicleDriverProfiles, error: vehicleDriverProfilesError } = await supabase
       .from('driver_profiles')
-      .select('id, user_id')
+      .select('id, user_id, id_document_url')
       .in('id', vehicleDriverIds);
 
     if (vehicleDriverProfilesError) {
@@ -208,16 +216,25 @@ async function getPendingVerifications() {
     );
   }
 
-  const vehicleApplications = ((vehicleRows || []) as VehicleVerificationRow[]).map((vehicle) => {
-    const driverProfile = driverProfilesById.get(vehicle.driver_id) || null;
-    const profile = driverProfile ? vehicleProfilesByUserId.get(driverProfile.user_id) || null : null;
+  const vehicleApplications = await Promise.all(
+    ((vehicleRows || []) as VehicleVerificationRow[]).map(async (vehicle) => {
+      const driverProfile = driverProfilesById.get(vehicle.driver_id) || null;
+      const profile = driverProfile ? vehicleProfilesByUserId.get(driverProfile.user_id) || null : null;
 
-    return {
-      ...vehicle,
-      driverProfileId: vehicle.driver_id,
-      profile,
-    };
-  }) as VehicleApplication[];
+      return {
+        ...vehicle,
+        vehicle_photo_url: await resolveSignedStorageUrl(supabase, 'vehicle-photos', vehicle.vehicle_photo_url),
+        driverProfileId: vehicle.driver_id,
+        driverProfile: driverProfile
+          ? {
+              ...driverProfile,
+              id_document_url: await resolveSignedStorageUrl(supabase, 'id-documents', driverProfile.id_document_url),
+            }
+          : null,
+        profile,
+      };
+    })
+  ) as VehicleApplication[];
 
   return {
     driverApplications,
@@ -273,6 +290,22 @@ export default async function AdminVerificationsPage() {
                   </div>
                 </div>
 
+                {application.id_document_url ? (
+                  <div className="mb-4 overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                    <Image
+                      src={application.id_document_url}
+                      alt={`${application.profile?.first_name || 'Driver'} ID document`}
+                      width={1200}
+                      height={800}
+                      className="h-56 w-full object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    ID document missing
+                  </div>
+                )}
+
                 <ApproveRejectButtons driverProfileId={application.id} />
               </div>
             ))}
@@ -321,6 +354,22 @@ export default async function AdminVerificationsPage() {
                     ) : null}
                   </div>
 
+                  {vehicle.driverProfile?.id_document_url ? (
+                    <div className="mb-4 overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                      <Image
+                        src={vehicle.driverProfile.id_document_url}
+                        alt={`${vehicle.profile ? `${vehicle.profile.first_name || ''} ${vehicle.profile.surname || ''}`.trim() : 'Driver'} ID document`}
+                        width={1200}
+                        height={800}
+                        className="h-56 w-full object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                      Driver ID document missing
+                    </div>
+                  )}
+
                   {vehicle.vehicle_photo_url ? (
                     <div className="mb-4 overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
                       <Image
@@ -353,3 +402,4 @@ export default async function AdminVerificationsPage() {
     </div>
   );
 }
+

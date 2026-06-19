@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { ArrowLeft, CreditCard, Receipt, Shield, Upload } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
+import { getDriverApprovalStatus, isDriverFullyApproved } from '@/lib/driver-status';
 import { getSettingsBackHref } from '../_lib';
 import { formatMembershipExpiry, getMembershipExpiry, getPlanLabel } from '@/lib/membership';
 
@@ -27,7 +28,7 @@ export default async function MembershipPage() {
 
   const { data: driverProfile } = await supabase
     .from('driver_profiles')
-    .select('provider_plan, provider_expires_at, provider_next_payment_at, provider_payment_reference, provider_payment_amount, provider_payment_status, provider_payment_proof_url, provider_last_paid_at, verification_status')
+    .select('provider_plan, provider_expires_at, provider_next_payment_at, provider_payment_reference, provider_payment_amount, provider_payment_status, provider_payment_proof_url, provider_last_paid_at, id_status, vehicle_status')
     .eq('user_id', user.id)
     .maybeSingle();
 
@@ -48,8 +49,9 @@ export default async function MembershipPage() {
   const membershipActive =
     profile?.membership_status === 'active' ||
     driverProfile?.provider_payment_status === 'approved' ||
-    driverProfile?.verification_status === 'approved' ||
+    isDriverFullyApproved(driverProfile) ||
     latestPayment?.status === 'approved';
+  const driverApprovalStatus = getDriverApprovalStatus(driverProfile);
   const paymentProof = isDriver
     ? driverProfile?.provider_payment_proof_url || latestPayment?.proof_url || latestPayment?.proof_image
     : latestPayment?.proof_url || latestPayment?.proof_image;
@@ -85,7 +87,7 @@ export default async function MembershipPage() {
               <div className="flex-1">
               <div className="text-sm font-bold text-slate-900">{membershipLabel(planType)}</div>
               <div className="text-xs text-slate-600">
-                {profile?.membership_status || driverProfile?.provider_payment_status || driverProfile?.verification_status || 'pending'}
+                {profile?.membership_status || driverProfile?.provider_payment_status || driverApprovalStatus || 'pending'}
               </div>
             </div>
           </div>

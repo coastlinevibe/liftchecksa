@@ -191,34 +191,12 @@ export async function signIn(email: string, password: string, redirectTo?: strin
     .eq('user_id', data.user.id)
     .maybeSingle();
 
-  const { data: activeDriverVehicle } = driverProfile?.id
-    ? await supabase
-        .from('vehicles')
-        .select('id')
-        .eq('driver_id', driverProfile.id)
-        .eq('is_active', true)
-        .limit(1)
-        .maybeSingle()
-    : { data: null };
-    
   // Determine redirect URL based on role
   const safeTarget = safeRedirectPath(redirectTo);
   let redirectUrl = safeTarget || '/dashboard';
 
   if (!safeTarget && (profile?.role === 'driver' || driverProfile)) {
-    const isDriverFullyVerified =
-      !!driverProfile &&
-      driverProfile.id_status === 'approved' &&
-      driverProfile.vehicle_status === 'approved' &&
-      driverProfile.provider_payment_status === 'approved';
-
-    if (isDriverFullyVerified && activeDriverVehicle) {
-      redirectUrl = '/dashboard/driver/routes';
-    } else if (activeDriverVehicle) {
-      redirectUrl = '/dashboard/driver';
-    } else {
-      redirectUrl = '/dashboard/driver/vehicles/add';
-    }
+    redirectUrl = '/dashboard/driver';
   } else if (!safeTarget && (isAdminRole(profile?.role) || isSuperAdminEmail(data.user.email))) {
     redirectUrl = '/admin';
   }

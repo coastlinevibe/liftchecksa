@@ -1,119 +1,74 @@
-﻿# LiftCheck Registration & Verification Flow
+# LiftCheck Registration & Verification Flow
 
 ## Status
 
-This document reflects the official signup flow currently implemented in the app.
+This document reflects the official driver signup flow currently implemented in the app.
 
 ---
 
-## Official Driver Signup Flow
+## Official Driver Flow
 
-### Step 1: Open Driver Signup
+### 1. Open Driver Signup
 - User starts on `/register?type=driver`
 - The register page loads the driver form when `type=driver`
 - Existing authenticated users are redirected away from `/register`
 
-### Step 2: Enter Basic Account Details
+### 2. Enter Basic Account Details
 - First name
 - Surname
 - Phone number
 - Email address
 - Password
-- Provider plan:
+- Provider plan
   - 3 months
   - 12 months
 
-### Step 3: Submit Signup
-- `signUp(...)` creates the Supabase Auth user
-- A `profiles` row is created with:
-  - `role = 'driver'`
-  - `membership_type`
-  - `membership_status = 'pending'`
-- A `driver_profiles` row is created with:
-  - `verification_status = 'pending'`
-  - `provider_plan`
-  - `provider_payment_reference`
-  - `provider_payment_amount`
-  - `provider_payment_status = 'pending'`
-- A `payments` row is created with:
-  - `plan_type`
-  - `amount`
-  - `payment_reference`
-  - `status = 'pending'`
+### 3. Submit Signup
+- `signUp(...)` creates the Supabase auth user
+- A `profiles` row is created with `role = 'driver'` and `membership_status = 'pending'`
+- A `driver_profiles` row is created with `verification_status = 'pending'`
+- A `payments` row is created with `status = 'pending'`
+- The page shows the payment reference and amount
+- The user is auto-signed in and sent to `/dashboard/driver`
 
-### Step 4: Success Screen
-- The page shows the generated payment reference
-- The page shows the selected plan amount
-- The user is auto-signed in after a short delay
-- Drivers are redirected to `/dashboard/driver/vehicles/add`
+### 4. Upload Proof of Payment
+- The driver uses the dashboard payment banner
+- The payment proof is uploaded on `/payment/upload`
+- The proof is stored in the `payment-proofs` bucket
+- The dashboard shows `Verification In Progress` while admin reviews the proof
 
-### Step 5: Vehicle and ID Setup
-- The driver uploads:
-  - ID document
-  - Vehicle photo
-- The driver enters:
+### 5. Payment Approved
+- Once admin approves payment, the driver dashboard shows the add-vehicle CTA
+- The dashboard no longer shows the payment banner
+- The driver can now continue to vehicle registration
+
+### 6. Add Vehicle and ID
+- The driver opens `/dashboard/driver/vehicles/add`
+- The form collects:
   - Make
   - Model
   - Colour
   - Licence plate
   - Seat capacity
+- The driver uploads:
+  - ID document
+  - Vehicle photo
 - The page uploads:
   - ID document to `id-documents`
   - Vehicle photo to `vehicle-photos`
-- The page writes:
-  - `driver_profiles.id_document_url`
-  - `driver_profiles.id_status = 'pending'`
-- The page inserts a new vehicle with:
-  - `verification_status = 'pending'`
-  - `is_active = true`
+- The page stores `driver_profiles.id_document_url`
+- The page creates a vehicle with `verification_status = 'pending'`
 
-### Step 6: Dashboard Review State
-- After vehicle submission, the driver is redirected to `/dashboard/driver`
-- The dashboard shows payment and verification status
-- If payment proof is missing, the payment banner is shown
-- If payment proof is pending review, the verification-in-progress banner is shown
-- If payment is approved, the dashboard shows the vehicle CTA
-- Full route access is available only after:
-  - payment approved
-  - ID approved
-  - vehicle approved
-  - at least one active vehicle exists
+### 7. Admin Review
+- Admin review screens display the driver ID document and the vehicle image before approval
+- Vehicle and ID are reviewed together
+- The vehicle application remains pending until approved
 
----
-
-## Member Signup Flow
-
-### Step 1: Open Member Signup
-- User starts on `/register?type=member`
-
-### Step 2: Enter Basic Account Details
-- First name
-- Surname
-- Phone number
-- Email address
-- Password
-- Home province
-- Membership plan:
-  - Basic
-  - Plus
-
-### Step 3: Submit Signup
-- `signUp(...)` creates the auth user
-- A `profiles` row is created with:
-  - `role = 'member'`
-  - `membership_type`
-  - `membership_status = 'pending'`
-  - `home_province`
-- A `payments` row is created with:
-  - `plan_type`
-  - `amount`
-  - `payment_reference`
-  - `status = 'pending'`
-
-### Step 4: Success Screen
-- The page shows the generated payment reference
-- The user is auto-signed in after a short delay
-- Members are redirected to `/dashboard/member`
+### 8. Approved Driver State
+- After approval, the driver dashboard shows a verified badge
+- The dashboard message changes to approved/active wording
+- The driver can browse and search available routes
+- Route application pages become available for the approved vehicle
 
 ---
 
@@ -139,55 +94,24 @@ This document reflects the official signup flow currently implemented in the app
 
 ---
 
-## Admin Review Process
+## Admin Review Summary
 
-### What Admin Reviews
-- Basic profile info
-- ID document
-- Payment proof
-- Vehicle photo and vehicle details for drivers
+### Driver Payment Review
+- Payment proof is checked first
+- If approved, the dashboard unlocks vehicle registration
 
-### Admin Actions
-- Approve payment
-- Approve or reject driver ID verification
-- Approve or reject vehicle verification
-- Approve or reject renewal payments
+### Driver Vehicle Review
+- Admin checks the ID document and vehicle image together
+- Vehicle details and plate must match the photo
+- Once approved, the driver is marked verified
 
 ---
 
-## Verification Status Summary
-
-### Members
-- `profiles.membership_status`: `pending` -> `active`
-- `payments.status`: `pending` -> `approved`
-
-### Drivers
-- `profiles.membership_status`: `pending` -> `active`
-- `payments.status`: `pending` -> `approved`
-- `driver_profiles.id_status`: `pending` -> `approved`
-- `vehicles.verification_status`: `pending` -> `approved`
-- `driver_profiles.vehicle_status`: `pending` -> `approved`
-- `driver_profiles.verification_status`: `pending` -> `approved`
-
-### Driver Unlock Condition
-- Payment approved
-- ID approved
-- At least 1 active vehicle
-- Vehicle approved
-
----
-
-## Database Fields Used
+## Status Fields Used
 
 ### profiles
-- `first_name`
-- `surname`
-- `phone`
-- `email`
-- `role`
-- `membership_type`
 - `membership_status`
-- `home_province`
+- `membership_type`
 - `profile_photo_url`
 - `id_document_url`
 
@@ -223,50 +147,12 @@ This document reflects the official signup flow currently implemented in the app
 
 ---
 
-## Removed Or Not Used
-
-### Not Part Of The Official Signup Flow
+## Not Part Of The Official Driver Signup Flow
 - Selfie upload during signup
 - Driver licence upload during signup
 - Proof of address upload
 - Licence disc upload
 
-### Note
-- The current code uploads the driver's ID document and vehicle photo on `/dashboard/driver/vehicles/add`
-- The old "upload ID and selfie during signup" flow is no longer the source of truth
-
----
-
-## Driver Route Application Flow
-
-### When It Happens
-- After the driver has a vehicle and is active enough to browse routes
-
-### Step
-- Open a route
-- Select a registered vehicle
-- Submit the route application for admin review
-
-### Guardrails
-- Driver must have a registered vehicle
-- Vehicle must belong to the driver
-- Vehicle must be active and approved
-- Driver must have an approved subscription payment
-
----
-
-## Storage Buckets Used
-
-- `id-documents` - private bucket for ID documents
-- `profile-photos` - selfies or profile photos where used
-- `payment-proofs` - private bucket for payment screenshots
-- `vehicle-photos` - vehicle images
-
----
-
-## Why This Flow Exists
-
-- Keeps signup quick
-- Moves heavier verification into the dashboard step
-- Makes the driver onboarding path explicit
-- Avoids the older ambiguous "upload everything during registration" flow
+## Note
+- The old flow that uploaded ID and selfie during `/register` is no longer the source of truth
+- The driver onboarding path is: signup, payment proof, vehicle + ID, admin approval, verified dashboard

@@ -78,7 +78,6 @@ export default function PaymentCard({ payment }: { payment: PaymentCardPayment }
             provider_last_paid_at: now.toISOString(),
             provider_next_payment_at: expiresAt.toISOString(),
             provider_expires_at: expiresAt.toISOString(),
-            verification_status: 'approved',
             is_suspended: false,
             suspension_reason: null,
           })

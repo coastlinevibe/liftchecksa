@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import LogoutButton from '@/components/LogoutButton';
 import NotificationPreferences from './notification-preferences';
 import { getSettingsBackHref } from './_lib';
+import { getDriverApprovalStatus, isDriverFullyApproved } from '@/lib/driver-status';
 import { formatMembershipExpiry, getMembershipExpiry, getPlanLabel } from '@/lib/membership';
 
 export default async function SettingsPage() {
@@ -25,7 +26,7 @@ export default async function SettingsPage() {
 
   const { data: driverProfile } = await supabase
     .from('driver_profiles')
-    .select('verification_status, provider_plan, completed_trips, rating_average, rating_count, is_suspended')
+    .select('id_status, vehicle_status, provider_plan, completed_trips, rating_average, rating_count, is_suspended')
     .eq('user_id', user.id)
     .maybeSingle();
 
@@ -43,10 +44,11 @@ export default async function SettingsPage() {
   const displayName = `${profile?.first_name ?? user.email?.split('@')[0] ?? 'User'} ${profile?.surname ?? ''}`.trim();
   const membershipExpiry = getMembershipExpiry(profile, latestPayment);
   const normalizedAdminStatusLabel = role === 'platform_admin' ? 'Admin • Active' : null;
+  const driverApprovalStatus = getDriverApprovalStatus(driverProfile);
 
   const statusLabel =
     role === 'driver'
-      ? `${getPlanLabel(driverProfile?.provider_plan)} • ${driverProfile?.verification_status === 'approved' ? 'Active' : 'Pending'}`
+      ? `${getPlanLabel(driverProfile?.provider_plan)} • ${isDriverFullyApproved(driverProfile) ? 'Active' : 'Pending'}`
       : role === 'group_admin'
         ? 'Group Admin • Active'
         : `${getPlanLabel(profile?.membership_type)} • ${profile?.membership_status === 'active' ? 'Active' : 'Pending'}`;
@@ -125,7 +127,7 @@ export default async function SettingsPage() {
               <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
                 <span className="text-xs text-slate-600">Verification</span>
                 <span className="text-sm font-semibold text-slate-900">
-                  {driverProfile.verification_status}
+                  {driverApprovalStatus}
                 </span>
               </div>
               <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
@@ -249,3 +251,4 @@ export default async function SettingsPage() {
     </div>
   );
 }
+

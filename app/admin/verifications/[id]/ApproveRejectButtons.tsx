@@ -33,19 +33,10 @@ export default function ApproveRejectButtons({ driverProfileId }: Props) {
       const supabase = createClient();
 
       if (decision === 'approve') {
-        const { data: currentDriverProfile, error: profileError } = await supabase
-          .from('driver_profiles')
-          .select('vehicle_status')
-          .eq('id', driverProfileId)
-          .maybeSingle();
-
-        if (profileError) throw profileError;
-
         const { error: driverError } = await supabase
           .from('driver_profiles')
           .update({ 
-            id_status: 'approved',
-            verification_status: currentDriverProfile?.vehicle_status === 'approved' ? 'approved' : 'pending'
+            id_status: 'approved'
           })
           .eq('id', driverProfileId);
 
@@ -58,8 +49,7 @@ export default function ApproveRejectButtons({ driverProfileId }: Props) {
         const { error: driverError } = await supabase
           .from('driver_profiles')
           .update({ 
-            id_status: 'rejected',
-            verification_status: 'rejected'
+            id_status: 'rejected'
           })
           .eq('id', driverProfileId);
 
