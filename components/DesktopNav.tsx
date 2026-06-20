@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -7,6 +8,18 @@ import { Home, Car, CreditCard, Info, Shield } from 'lucide-react';
 
 export default function DesktopNav() {
   const pathname = usePathname();
+  const [hash, setHash] = useState('');
+
+  useEffect(() => {
+    const syncHash = () => setHash(window.location.hash);
+
+    syncHash();
+    window.addEventListener('hashchange', syncHash);
+
+    return () => {
+      window.removeEventListener('hashchange', syncHash);
+    };
+  }, []);
 
   const navItems = [
     { href: '/', label: 'Home', icon: Home },
@@ -21,14 +34,21 @@ export default function DesktopNav() {
       <div className="inline-flex -space-x-px rounded-lg shadow-sm shadow-black/5 rtl:space-x-reverse">
         {navItems.map((item) => {
           const Icon = item.icon;
-          const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
-          
+          const [itemPath, itemHash = ''] = item.href.split('#');
+          const normalizedHash = itemHash ? `#${itemHash}` : '';
+          const isHashLink = normalizedHash.length > 0;
+          const isActive = isHashLink
+            ? pathname === itemPath && hash === normalizedHash
+            : pathname === item.href || pathname.startsWith(item.href + '/');
+
           return (
             <Button
               key={item.href}
               asChild
-              className={`rounded-none shadow-none text-slate-900 first:rounded-s-lg last:rounded-e-lg focus-visible:z-10 ${
-                isActive ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : ''
+              className={`rounded-none shadow-none first:rounded-s-lg last:rounded-e-lg focus-visible:z-10 ${
+                isActive
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-600'
+                  : 'bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'
               }`}
               variant="outline"
             >

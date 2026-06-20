@@ -85,6 +85,16 @@ export default function PaymentCard({ payment }: { payment: PaymentCardPayment }
 
         if (driverError) throw driverError;
 
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({
+            membership_status: 'active',
+            membership_expires_at: expiresAt.toISOString(),
+          })
+          .eq('user_id', payment.user_id);
+
+        if (profileError) throw profileError;
+
         if (payment.payment_reference) {
           await supabase
             .from('payments')
@@ -259,3 +269,4 @@ export default function PaymentCard({ payment }: { payment: PaymentCardPayment }
     </div>
   );
 }
+

@@ -278,14 +278,15 @@ export default async function RouteDetailPage({
               </form>
             </section>
           ) : null}
-
-          <RouteSeatRequestForm
-            routeId={route.id}
-            stops={stops}
-            canRequestSeat={canRequestSeat}
-            isLoggedIn={isLoggedIn}
-            membershipStatus={membershipActive ? 'active' : profile?.membership_status || latestPayment?.status || null}
-          />
+          {!isDriverUser ? (
+            <RouteSeatRequestForm
+              routeId={route.id}
+              stops={stops}
+              canRequestSeat={canRequestSeat}
+              isLoggedIn={isLoggedIn}
+              membershipStatus={membershipActive ? 'active' : profile?.membership_status || latestPayment?.status || null}
+            />
+          ) : null}
         </div>
       </div>
     </div>
