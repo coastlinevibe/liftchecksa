@@ -1,6 +1,7 @@
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, BadgeCheck, ChevronDown, Plus } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BadgeCheck, Bell, ChevronDown, Plus } from 'lucide-react';
 import { getOfficialRoutes } from '@/lib/routes/actions';
+import { createClient } from '@/lib/supabase/server';
 import { formatVehicleCapacity } from '@/lib/types/pilot-routes';
 
 function badgeClass(status: string) {
@@ -10,7 +11,24 @@ function badgeClass(status: string) {
 }
 
 export default async function AdminRoutesPage() {
-  const { routes, error } = await getOfficialRoutes(true);
+  const [routesResult, pendingResult] = await Promise.all([
+    getOfficialRoutes(true),
+    createClient().then((supabase) =>
+      supabase
+        .from('driver_route_assignments')
+        .select('route_id, status')
+        .eq('status', 'pending')
+    ),
+  ]);
+
+  const { routes, error } = routesResult;
+  const pendingByRoute = new Map<string, number>();
+
+  for (const row of pendingResult.data || []) {
+    const routeId = row.route_id as string | null;
+    if (!routeId) continue;
+    pendingByRoute.set(routeId, (pendingByRoute.get(routeId) || 0) + 1);
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -44,7 +62,10 @@ export default async function AdminRoutesPage() {
         ) : null}
 
         <div className="grid gap-3">
-          {(routes || []).map((route) => (
+          {(routes || []).map((route) => {
+            const pendingApplications = pendingByRoute.get(route.id) || 0;
+
+            return (
             <div
               key={route.id}
               className="rounded-xl border border-slate-200 bg-white p-4 transition hover:border-emerald-500"
@@ -56,6 +77,12 @@ export default async function AdminRoutesPage() {
                     <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${badgeClass(route.status)}`}>
                       {route.status}
                     </span>
+                    {pendingApplications > 0 ? (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-900">
+                        <Bell className="h-3 w-3" />
+                        {pendingApplications} pending
+                      </span>
+                    ) : null}
                   </div>
                   <p className="text-sm text-slate-600">
                     {route.start_area} &rarr; {route.end_area}
@@ -67,6 +94,11 @@ export default async function AdminRoutesPage() {
                     <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">
                       {route.route_stops.length} stop{route.route_stops.length === 1 ? '' : 's'}
                     </span>
+                    {pendingApplications > 0 ? (
+                      <span className="rounded-full border border-amber-300 bg-white px-2 py-0.5 font-semibold text-amber-900">
+                        Needs review
+                      </span>
+                    ) : null}
                   </div>
                   <p className="mt-1 text-xs text-slate-600">
                     Assigned driver{route.assigned_drivers?.length === 1 ? '' : 's'}:{' '}
@@ -149,7 +181,8 @@ export default async function AdminRoutesPage() {
                 </div>
               </details>
             </div>
-          ))}
+          );
+          })}
 
           {(routes || []).length === 0 ? (
             <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
