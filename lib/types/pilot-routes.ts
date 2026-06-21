@@ -184,21 +184,62 @@ export interface OfficialRouteWithStops extends OfficialRoute {
     status: string;
     driver_name: string;
     driver_verified?: boolean;
-    phone?: string | null;
-    email?: string | null;
+    driver_avatar_url?: string | null;
     seats_available?: number | null;
     weekly_price?: number | string | null;
     single_route_price?: number | string | null;
     days_active?: string[] | null;
+    vehicle_photo_url?: string | null;
     vehicle_label?: string | null;
+    rating_average?: number | string | null;
+    rating_count?: number | null;
   }[];
 }
 
-export interface RouteAssignmentSummary extends DriverRouteAssignment {
+export interface RouteAssignmentSummary {
+  id: string;
+  driver_id: string;
+  vehicle_id: string;
+  route_id: string;
+  status: PilotAssignmentStatus;
+  seats_available: number;
+  days_active: string[];
+  weekly_price?: number | string | null;
+  single_route_price?: number | string | null;
+  created_at: string;
   route?: OfficialRoute | null;
   route_stops?: RouteStop[];
   passenger_request_count?: number;
   driver_name?: string;
   driver_verified?: boolean;
+  driver_avatar_url?: string | null;
+  vehicle_photo_url?: string | null;
   vehicle_plate?: string | null;
+  rating_average?: number | string | null;
+  rating_count?: number | null;
+}
+
+export interface RouteReviewAssignmentSummary extends RouteAssignmentSummary {
+  admin_notes?: string | null;
+  approved_by?: string | null;
+  approved_at?: string | null;
+  phone_call_verified?: boolean | null;
+  driver_phone?: string | null;
+  driver_email?: string | null;
+  id_document_url?: string | null;
+}
+
+export interface PublicRouteDetail {
+  route: OfficialRoute;
+  stops: RouteStop[];
+  assignments: RouteAssignmentSummary[];
+}
+
+export interface DriverRouteDetail extends PublicRouteDetail {
+  requests: RouteSeatRequest[];
+  ledger: RidePaymentLedgerEntry[];
+}
+
+export interface AdminRouteReviewDetail extends Omit<DriverRouteDetail, 'assignments'> {
+  assignments: RouteReviewAssignmentSummary[];
 }

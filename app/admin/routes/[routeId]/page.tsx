@@ -2,9 +2,9 @@ import Link from 'next/link';
 import { redirect, notFound } from 'next/navigation';
 import { ArrowLeft, BadgeCheck, CalendarDays, ListOrdered, Plus, Route, Users } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
-import { deleteOfficialRoute, getRouteDetail, updateOfficialRouteStatusFromForm } from '@/lib/routes/actions';
+import { deleteOfficialRoute, getAdminRouteReviewDetail, updateOfficialRouteStatusFromForm } from '@/lib/routes/actions';
 import { isAdminRole, isSuperAdminEmail } from '@/lib/auth/routing';
-import { formatPassengerSeats, formatVehicleCapacity } from '@/lib/types/pilot-routes';
+import { formatPassengerSeats, formatVehicleCapacity, type RouteReviewAssignmentSummary } from '@/lib/types/pilot-routes';
 import DeleteRouteButton from './DeleteRouteButton';
 
 function badgeClass(status: string) {
@@ -45,12 +45,13 @@ export default async function AdminRouteDetailPage({
     redirect('/admin');
   }
 
-  const detail = await getRouteDetail(routeId);
+  const detail = await getAdminRouteReviewDetail(routeId);
   if ('error' in detail) {
     notFound();
   }
 
-  const { route, stops, assignments, requests, ledger } = detail;
+  const { route, stops, assignments: rawAssignments, requests, ledger } = detail;
+  const assignments = rawAssignments as RouteReviewAssignmentSummary[];
   const pendingApplications = assignments.filter((assignment) => assignment.status === 'pending');
   const assignedDrivers = assignments.filter((assignment) => ['approved', 'active'].includes(assignment.status));
 
@@ -167,7 +168,8 @@ export default async function AdminRouteDetailPage({
                     <div>
                       <div className="text-sm font-semibold text-slate-900">
                         {stop.stop_order}. {stop.stop_name}
-                      </div>                      <div className="text-xs text-slate-600">
+                      </div>
+                      <div className="text-xs text-slate-600">
                         {stop.area || 'No area set'}
                         {stop.is_start ? ' • Start' : ''}
                         {stop.is_end ? ' • Destination' : ''}
@@ -210,8 +212,9 @@ export default async function AdminRouteDetailPage({
                         </div>
                       ) : null}
                       <div className="text-xs text-slate-600">
-                        Status: {assignment.status} â€¢ Passenger seats: {assignment.seats_available}
-                      </div>                      <div className="text-xs text-slate-600">
+                        Status: {assignment.status} - Passenger seats: {assignment.seats_available}
+                      </div>
+                      <div className="text-xs text-slate-600">
                         Weekly: {assignment.weekly_price ? `R${assignment.weekly_price}` : 'TBA'} • Single:{' '}
                         {assignment.single_route_price ? `R${assignment.single_route_price}` : 'TBA'}
                       </div>

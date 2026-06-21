@@ -3,10 +3,9 @@ import { redirect, notFound } from 'next/navigation';
 import { ArrowLeft, BadgeCheck, Bell, CalendarDays, MapPin, MessageSquare, Route as RouteIcon, Users } from 'lucide-react';
 import { getDisplayName } from '@/lib/display-name';
 import { createClient } from '@/lib/supabase/server';
-import { getRouteDetail, sendRouteChatMessageFromForm } from '@/lib/routes/actions';
+import { getDriverRouteDetail, sendRouteChatMessageFromForm } from '@/lib/routes/actions';
 import RouteChatThread, { type RouteChatMessage } from '@/components/RouteChatThread';
 import { isAdminRole, isSuperAdminEmail } from '@/lib/auth/routing';
-import { formatVehicleCapacity } from '@/lib/types/pilot-routes';
 
 function badgeClass(status: string) {
   if (status === 'active' || status === 'approved') return 'bg-emerald-100 text-emerald-700';
@@ -54,7 +53,7 @@ export default async function DriverRouteDetailPage({
 
   const { data: driverProfile } = await supabase
     .from('driver_profiles')
-    .select('id, user_id, id_status, vehicle_status, id_document_url')
+    .select('id, user_id, id_status, vehicle_status')
     .eq('user_id', user.id)
     .maybeSingle();
 
@@ -67,7 +66,7 @@ export default async function DriverRouteDetailPage({
     redirect('/dashboard/member');
   }
 
-  const detail = await getRouteDetail(routeId);
+  const detail = await getDriverRouteDetail(routeId);
   if ('error' in detail) {
     notFound();
   }
@@ -77,7 +76,7 @@ export default async function DriverRouteDetailPage({
   const { data: directAssignment } = driverIds.length
     ? await supabase
         .from('driver_route_assignments')
-        .select('id, driver_id, vehicle_id, route_id, status, seats_available, days_active, weekly_price, single_route_price, admin_notes, approved_by, approved_at, created_at')
+        .select('id, driver_id, vehicle_id, route_id, status, seats_available, days_active, weekly_price, single_route_price, created_at')
         .eq('route_id', route.id)
         .in('driver_id', driverIds)
         .order('created_at', { ascending: false })
@@ -131,8 +130,7 @@ export default async function DriverRouteDetailPage({
     ? `${routeChatPeer.first_name || ''} ${routeChatPeer.surname || ''}`.trim() || 'Member'
     : 'Member';
   const verifiedDriver = Boolean(
-    driverProfile?.id_document_url &&
-      driverProfile?.id_status === 'approved' &&
+    driverProfile?.id_status === 'approved' &&
       driverProfile?.vehicle_status === 'approved'
   );
 
