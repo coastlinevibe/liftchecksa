@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect, notFound } from 'next/navigation';
-import { ArrowLeft, BadgeCheck, CalendarDays, ListOrdered, Plus, Route, Users } from 'lucide-react';
+import { ArrowLeft, BadgeCheck, Bell, CalendarDays, ListOrdered, Plus, Route, Users } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { deleteOfficialRoute, getAdminRouteReviewDetail, updateOfficialRouteStatusFromForm } from '@/lib/routes/actions';
 import { isAdminRole, isSuperAdminEmail } from '@/lib/auth/routing';
@@ -86,6 +86,12 @@ export default async function AdminRouteDetailPage({
                 <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${badgeClass(route.status)}`}>
                   {route.status}
                 </span>
+                {pendingApplications.length > 0 ? (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-900">
+                    <Bell className="h-3 w-3" />
+                    {pendingApplications.length} pending
+                  </span>
+                ) : null}
                 <span className="rounded-full bg-violet-50 px-2 py-0.5 text-xs font-semibold text-violet-700">
                   {formatVehicleCapacity(route.vehicle_capacity)}
                 </span>
@@ -192,6 +198,11 @@ export default async function AdminRouteDetailPage({
             <div className="mb-3 flex items-center gap-2">
               <Users className="h-4 w-4 text-emerald-600" />
               <h2 className="text-base font-bold text-slate-900">Driver Applications</h2>
+              {pendingApplications.length > 0 ? (
+                <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-900">
+                  {pendingApplications.length} pending
+                </span>
+              ) : null}
             </div>
             <div className="space-y-2">
               {assignments.map((assignment) => (

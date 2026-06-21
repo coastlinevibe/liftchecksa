@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { Users, Car, CheckCircle, Clock, TrendingUp, CreditCard, AlertTriangle } from 'lucide-react';
+import { Users, Car, CheckCircle, Clock, TrendingUp, CreditCard, AlertTriangle, Bell } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import LogoutButton from '@/components/LogoutButton';
 import { isAdminRole, isSuperAdminEmail } from '@/lib/auth/routing';
@@ -120,6 +120,7 @@ async function getAdminStats() {
     { count: pendingVehicleVerifications },
     { count: pendingPayments },
     { count: pendingDriverSubscriptionProofs },
+    { count: pendingRouteApplications },
     { count: activeReports },
     { data: recentMembers },
     { data: recentDrivers },
@@ -139,6 +140,7 @@ async function getAdminStats() {
     supabase.from('vehicles').select('*', { count: 'exact', head: true }).eq('verification_status', 'pending'),
     supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
     supabase.from('driver_profiles').select('*', { count: 'exact', head: true }).eq('provider_payment_status', 'pending').not('provider_payment_proof_url', 'is', null),
+    supabase.from('driver_route_assignments').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
     supabase.from('reports').select('*', { count: 'exact', head: true }).in('status', ['new', 'under_review']),
     supabase.from('profiles').select('id, user_id, first_name, surname, phone, role, membership_status, created_at').eq('role', 'member').order('created_at', { ascending: false }).limit(5),
     supabase.from('driver_profiles').select('id, user_id, id_status, vehicle_status, provider_payment_status, provider_next_payment_at, provider_expires_at, completed_trips, rating_average, created_at').order('created_at', { ascending: false }).limit(5),
@@ -235,6 +237,7 @@ async function getAdminStats() {
     pendingVehicleVerifications: pendingVehicleVerifications || 0,
     pendingPayments: (pendingPayments || 0) + (pendingDriverSubscriptionProofs || 0),
     pendingDriverSubscriptionProofs: pendingDriverSubscriptionProofs || 0,
+    pendingRouteApplications: pendingRouteApplications || 0,
     activeReports: activeReports || 0,
     recentMembers: recentMembers || [],
     recentDrivers: driversWithProfiles || [],
@@ -302,7 +305,7 @@ export default async function AdminDashboard() {
               <span className="text-xs text-slate-600">Pending Items</span>
             </div>
             <div className="text-2xl font-bold text-slate-900">
-              {stats.pendingDriverVerifications + stats.pendingVehicleVerifications + stats.pendingPayments}
+              {stats.pendingDriverVerifications + stats.pendingVehicleVerifications + stats.pendingPayments + stats.pendingRouteApplications}
             </div>
             <div className="text-xs text-amber-600 mt-1">Needs review</div>
           </div>
@@ -381,7 +384,15 @@ export default async function AdminDashboard() {
         >
           <div className="flex items-center justify-between gap-3">
             <div>
-              <div className="text-sm font-bold text-emerald-900">Official Routes</div>
+              <div className="flex items-center gap-2 text-sm font-bold text-emerald-900">
+                <span>Official Routes</span>
+                {stats.pendingRouteApplications > 0 ? (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-white px-2 py-0.5 text-[11px] font-bold text-amber-900">
+                    <Bell className="h-3 w-3" />
+                    {stats.pendingRouteApplications} pending
+                  </span>
+                ) : null}
+              </div>
               <p className="text-xs text-emerald-800">Create routes, then review driver applications against them.</p>
             </div>
             <CheckCircle className="h-5 w-5 text-emerald-600" />
