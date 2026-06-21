@@ -51,14 +51,14 @@ export default async function RouteDetailPage({
   const { data: driverProfile } = user
     ? await supabase
         .from('driver_profiles')
-        .select('id, user_id, verification_status, id_status, vehicle_status, id_document_url')
+        .select('id, user_id, verification_status, id_status, vehicle_status')
         .eq('user_id', user.id)
         .maybeSingle()
     : { data: null };
   const { data: latestPayment } = user
     ? await supabase
         .from('payments')
-        .select('status, proof_url, proof_image, activated_at, expires_at, created_at')
+        .select('status')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(1)
@@ -107,26 +107,7 @@ export default async function RouteDetailPage({
   const chatVehicleLabel = primaryAssignment?.vehicle_plate
     ? `Vehicle plate ${primaryAssignment.vehicle_plate}`
     : null;
-  const { data: assignedDriverProfile } = primaryAssignment?.driver_id
-    ? await supabase
-        .from('profiles')
-        .select('id, user_id, first_name, surname, phone, email, id_document_url')
-        .eq('id', primaryAssignment.driver_id)
-        .maybeSingle()
-    : { data: null };
-  const { data: assignedDriverVerification } = assignedDriverProfile?.user_id
-    ? await supabase
-        .from('driver_profiles')
-        .select('id_status, vehicle_status')
-        .eq('user_id', assignedDriverProfile.user_id)
-        .maybeSingle()
-    : { data: null };
-  const verifiedDriver = Boolean(
-    primaryAssignment &&
-      assignedDriverProfile?.id_document_url &&
-      assignedDriverVerification?.id_status === 'approved' &&
-      assignedDriverVerification?.vehicle_status === 'approved'
-  );
+  const verifiedDriver = Boolean(primaryAssignment?.driver_verified);
 
   return (
     <div className="min-h-screen bg-slate-50 pb-28 md:pb-0">
@@ -208,8 +189,7 @@ export default async function RouteDetailPage({
               routeId={route.id}
               routeVehicleCapacity={route.vehicle_capacity}
               driverVerified={Boolean(
-                driverProfile?.id_document_url &&
-                  driverProfile?.id_status === 'approved' &&
+                driverProfile?.id_status === 'approved' &&
                   driverProfile?.vehicle_status === 'approved'
               )}
               vehicles={(driverVehicles || []).map((vehicle) => ({
@@ -303,6 +283,8 @@ export default async function RouteDetailPage({
     </div>
   );
 }
+
+
 
 
 

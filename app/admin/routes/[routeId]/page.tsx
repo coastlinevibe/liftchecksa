@@ -3,9 +3,9 @@ import Link from 'next/link';
 import { redirect, notFound } from 'next/navigation';
 import { ArrowLeft, BadgeCheck, CalendarDays, ChevronDown, ListOrdered, Plus, Route, Users } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
-import { deleteOfficialRoute, getRouteDetail, updateOfficialRouteStatusFromForm, updateDriverRouteApplicationDecision, updateDriverRouteApplicationPhoneCallVerified } from '@/lib/routes/actions';
+import { deleteOfficialRoute, getAdminRouteReviewDetail, updateOfficialRouteStatusFromForm, updateDriverRouteApplicationDecision, updateDriverRouteApplicationPhoneCallVerified } from '@/lib/routes/actions';
 import { isAdminRole, isSuperAdminEmail } from '@/lib/auth/routing';
-import { formatPassengerSeats, formatVehicleCapacity } from '@/lib/types/pilot-routes';
+import { formatPassengerSeats, formatVehicleCapacity, type RouteReviewAssignmentSummary } from '@/lib/types/pilot-routes';
 import DeleteRouteButton from './DeleteRouteButton';
 
 function badgeClass(status: string) {
@@ -46,12 +46,13 @@ export default async function AdminRouteDetailPage({
     redirect('/admin');
   }
 
-  const detail = await getRouteDetail(routeId);
+  const detail = await getAdminRouteReviewDetail(routeId);
   if ('error' in detail) {
     notFound();
   }
 
-  const { route, stops, assignments, requests, ledger } = detail;
+  const { route, stops, assignments: rawAssignments, requests, ledger } = detail;
+  const assignments = rawAssignments as RouteReviewAssignmentSummary[];
   const pendingApplications = assignments.filter((assignment) => assignment.status === 'pending');
   const assignedDrivers = assignments.filter((assignment) => ['approved', 'active'].includes(assignment.status));
 
@@ -420,6 +421,8 @@ export default async function AdminRouteDetailPage({
     </div>
   );
 }
+
+
 
 
 

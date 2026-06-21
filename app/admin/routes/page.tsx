@@ -148,14 +148,7 @@ export default async function AdminRoutesPage() {
                                 <span className="text-slate-500">Status:</span>{' '}
                                 <span className="font-semibold text-slate-900">{assignment.status}</span>
                               </div>
-                              <div>
-                                <span className="text-slate-500">Phone:</span>{' '}
-                                <span className="font-semibold text-slate-900">{assignment.phone || 'Unavailable'}</span>
-                              </div>
-                              <div>
-                                <span className="text-slate-500">Email:</span>{' '}
-                                <span className="font-semibold text-slate-900">{assignment.email || 'Unavailable'}</span>
-                              </div>
+
                               <div>
                                 <span className="text-slate-500">Vehicle:</span>{' '}
                                 <span className="font-semibold text-slate-900">{assignment.vehicle_label || 'Not linked'}</span>
@@ -207,5 +200,6 @@ export default async function AdminRoutesPage() {
     </div>
   );
 }
+
 
 

@@ -94,13 +94,10 @@ export default function AddVehiclePage() {
         throw idUploadError;
       }
 
-      const { data: idDocumentUrlData } = supabase.storage.from('id-documents').getPublicUrl(idDocumentPath);
-      const idDocumentUrl = idDocumentUrlData.publicUrl;
-
       const { error: idUpdateError } = await supabase
         .from('driver_profiles')
         .update({
-          id_document_url: idDocumentUrl,
+          id_document_url: idDocumentPath,
           id_status: 'pending',
         })
         .eq('id', driverProfile.id);
@@ -344,3 +341,7 @@ export default function AddVehiclePage() {
     </div>
   );
 }
+
+
+
+

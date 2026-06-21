@@ -8,11 +8,15 @@ import { isSuperAdminEmail } from '@/lib/auth/routing';
 import { isDriverFullyApproved } from '@/lib/driver-status';
 import { VEHICLE_CAPACITY_OPTIONS } from '@/lib/types/pilot-routes';
 import type {
+  AdminRouteReviewDetail,
   ContactUnlock,
+  DriverRouteDetail,
   DriverRouteAssignment,
   OfficialRoute,
   OfficialRouteWithStops,
+  PublicRouteDetail,
   RouteAssignmentSummary,
+  RouteReviewAssignmentSummary,
   RidePaymentLedgerEntry,
   RouteSeatRequest,
   RouteStop,
@@ -28,7 +32,6 @@ type DriverProfileLookupRow = {
   user_id: string;
   id_status?: string | null;
   vehicle_status?: string | null;
-  id_document_url?: string | null;
   rating_average?: number | string | null;
   rating_count?: number | null;
 };
@@ -38,6 +41,10 @@ type DriverMemberProfileRow = {
   user_id: string;
   first_name: string | null;
   surname: string | null;
+  profile_photo_url?: string | null;
+};
+
+type DriverMemberReviewRow = DriverMemberProfileRow & {
   phone?: string | null;
   email?: string | null;
   id_document_url?: string | null;
@@ -208,7 +215,7 @@ export async function createOfficialRoute(input: {
   const supabase = await createClient();
   const current = await getCurrentUser(supabase);
   if ('error' in current) {
-    return { error: current.error };
+    return { error: current.error || 'Unable to load current profile' };
   }
 
   const { user } = current;
@@ -324,7 +331,7 @@ export async function deleteOfficialRoute(routeId: string) {
   const supabase = await createClient();
   const current = await getCurrentProfile(supabase);
   if ('error' in current) {
-    return { error: current.error };
+    return { error: current.error || 'Unable to load current profile' };
   }
 
   const { user } = current;
@@ -352,7 +359,7 @@ export async function updateOfficialRouteStatus(input: {
   const supabase = await createClient();
   const current = await getCurrentProfile(supabase);
   if ('error' in current) {
-    return { error: current.error };
+    return { error: current.error || 'Unable to load current profile' };
   }
 
   const { user } = current;
@@ -402,7 +409,7 @@ export async function assignDriverToRoute(input: {
   const supabase = await createClient();
   const current = await getCurrentProfile(supabase);
   if ('error' in current) {
-    return { error: current.error };
+    return { error: current.error || 'Unable to load current profile' };
   }
 
   const { user } = current;
@@ -570,7 +577,7 @@ export async function updateDriverRouteApplicationPhoneCallVerified(input: {
   const supabase = await createClient();
   const current = await getCurrentProfile(supabase);
   if ('error' in current) {
-    return { error: current.error };
+    return { error: current.error || 'Unable to load current profile' };
   }
 
   const { user } = current;
@@ -602,7 +609,7 @@ export async function updateDriverRouteApplicationDecision(input: {
   const supabase = await createClient();
   const current = await getCurrentProfile(supabase);
   if ('error' in current) {
-    return { error: current.error };
+    return { error: current.error || 'Unable to load current profile' };
   }
 
   const { user } = current;
@@ -641,7 +648,7 @@ export async function applyDriverToRoute(input: {
   const supabase = await createClient();
   const current = await getCurrentProfile(supabase);
   if ('error' in current) {
-    return { error: current.error };
+    return { error: current.error || 'Unable to load current profile' };
   }
 
   const { user, profile } = current;
@@ -799,7 +806,7 @@ export async function requestRouteSeat(input: {
   const supabase = await createClient();
   const current = await getCurrentProfile(supabase);
   if ('error' in current) {
-    return { error: current.error };
+    return { error: current.error || 'Unable to load current profile' };
   }
 
   const { profile } = current;
@@ -890,7 +897,7 @@ export async function recordContactUnlock(input: {
   const supabase = await createClient();
   const current = await getCurrentProfile(supabase);
   if ('error' in current) {
-    return { error: current.error };
+    return { error: current.error || 'Unable to load current profile' };
   }
 
   const { profile } = current;
@@ -1188,7 +1195,7 @@ export async function getOfficialRoutes(includeInactive = false) {
   const { data: driverProfiles } = driverProfileIds.length
     ? await supabase
         .from('profiles')
-        .select('id, user_id, first_name, surname, phone, email, id_document_url')
+        .select('id, user_id, first_name, surname, profile_photo_url')
         .in('id', driverProfileIds)
     : { data: [] };
 
@@ -1201,7 +1208,7 @@ export async function getOfficialRoutes(includeInactive = false) {
   const { data: driverMemberProfiles } = driverUserIds.length
     ? await supabase
         .from('driver_profiles')
-        .select('id, user_id, id_status, vehicle_status, id_document_url, rating_average, rating_count')
+        .select('id, user_id, id_status, vehicle_status, rating_average, rating_count')
         .in('user_id', driverUserIds)
     : { data: [] };
 
@@ -1235,13 +1242,14 @@ export async function getOfficialRoutes(includeInactive = false) {
       status: string;
       driver_name: string;
       driver_verified?: boolean;
-      phone?: string | null;
-      email?: string | null;
+      driver_avatar_url?: string | null;
       seats_available?: number | null;
       weekly_price?: number | string | null;
       single_route_price?: number | string | null;
       days_active?: string[] | null;
       vehicle_label?: string | null;
+      rating_average?: number | string | null;
+      rating_count?: number | null;
     }>
   >();
   for (const assignment of typedAssignments) {
@@ -1264,17 +1272,17 @@ export async function getOfficialRoutes(includeInactive = false) {
       status: assignment.status,
       driver_name: driverName || 'Assigned driver',
       driver_verified: Boolean(
-        driverMemberProfile?.id_document_url &&
-          driverProfile?.id_status === 'approved' &&
+        driverProfile?.id_status === 'approved' &&
           driverProfile?.vehicle_status === 'approved'
       ),
-      phone: includeInactive ? driverMemberProfile?.phone || null : null,
-      email: includeInactive ? driverMemberProfile?.email || null : null,
+      driver_avatar_url: driverMemberProfile?.profile_photo_url || null,
       seats_available: assignment.seats_available,
       weekly_price: assignment.weekly_price,
       single_route_price: assignment.single_route_price,
       days_active: assignment.days_active || [],
       vehicle_label: vehicleLabel,
+      rating_average: driverProfile?.rating_average ?? 0,
+      rating_count: driverProfile?.rating_count ?? 0,
     });
     assignmentsByRoute.set(assignment.route_id, list);
   }
@@ -1288,12 +1296,12 @@ export async function getOfficialRoutes(includeInactive = false) {
   return { routes: normalizedRoutes };
 }
 
-export async function getRouteDetail(routeId: string) {
+export async function getRouteDetail(routeId: string): Promise<PublicRouteDetail | { error: string }> {
   noStore();
   const supabase = await createClient();
   const supportsVehicleCapacity = await hasVehicleCapacityColumn(supabase);
 
-  const [{ data: route, error: routeError }, { data: stops }, { data: assignments }, { data: requests }, { data: ledger }] = await Promise.all([
+  const [{ data: route, error: routeError }, { data: stops }, { data: assignments }] = await Promise.all([
     supabase
       .from('official_routes')
       .select(
@@ -1308,17 +1316,7 @@ export async function getRouteDetail(routeId: string) {
       .order('stop_order', { ascending: true }),
     supabase
       .from('driver_route_assignments')
-      .select('id, driver_id, vehicle_id, route_id, status, seats_available, days_active, weekly_price, single_route_price, admin_notes, approved_by, approved_at, phone_call_verified, created_at')
-      .eq('route_id', routeId)
-      .order('created_at', { ascending: false }),
-    supabase
-      .from('route_seat_requests')
-      .select('id, passenger_id, route_id, pickup_stop_id, dropoff_stop_id, seats_requested, requested_days, request_type, preferred_morning_time, preferred_return_time, status, matched_assignment_id, admin_notes, created_at, updated_at')
-      .eq('route_id', routeId)
-      .order('created_at', { ascending: false }),
-    supabase
-      .from('ride_payment_ledger')
-      .select('id, passenger_id, driver_id, route_id, seat_request_id, amount, platform_fee, driver_amount, payment_period, payment_method, payment_provider, provider_reference, status, payout_status, proof_url, paid_at, confirmed_at, payout_due_at, payout_completed_at, created_at')
+      .select('id, driver_id, vehicle_id, route_id, status, seats_available, days_active, weekly_price, single_route_price, created_at')
       .eq('route_id', routeId)
       .order('created_at', { ascending: false }),
   ]);
@@ -1328,15 +1326,13 @@ export async function getRouteDetail(routeId: string) {
   }
 
   const typedRoute = route as unknown as OfficialRoute;
-
-  const stopById = new Map((stops || []).map((stop) => [stop.id, stop] as const));
   const driverIds = Array.from(
     new Set(((assignments || []) as DriverRouteAssignment[]).map((assignment) => assignment.driver_id).filter(Boolean))
   );
   const { data: driverMemberProfiles } = driverIds.length
     ? await supabase
         .from('profiles')
-        .select('id, user_id, first_name, surname, phone, email, id_document_url')
+        .select('id, user_id, first_name, surname, profile_photo_url')
         .in('id', driverIds)
     : { data: [] };
   const driverMemberProfilesById = new Map(
@@ -1348,7 +1344,7 @@ export async function getRouteDetail(routeId: string) {
   const { data: driverProfiles } = driverUserIds.length
     ? await supabase
         .from('driver_profiles')
-        .select('id, user_id, id_status, vehicle_status, id_document_url, rating_average, rating_count')
+        .select('id, user_id, id_status, vehicle_status, rating_average, rating_count')
         .in('user_id', driverUserIds)
     : { data: [] };
   const driverProfilesByUserId = new Map(
@@ -1366,18 +1362,6 @@ export async function getRouteDetail(routeId: string) {
   const vehiclesById = new Map(
     ((vehicles || []) as VehicleLookupRow[]).map((vehicle) => [vehicle.id, vehicle])
   );
-  const passengerIds = Array.from(
-    new Set(((requests || []) as RouteSeatRequest[]).map((request) => request.passenger_id).filter(Boolean))
-  );
-  const { data: passengerProfiles } = passengerIds.length
-    ? await supabase
-        .from('profiles')
-        .select('id, first_name, surname, phone, email')
-        .in('id', passengerIds)
-    : { data: [] };
-  const passengerProfilesById = new Map(
-    ((passengerProfiles || []) as PassengerProfileRow[]).map((profile) => [profile.id, profile])
-  );
 
   const assignmentDisplayDetails = assignments?.length
     ? await Promise.all(
@@ -1392,7 +1376,6 @@ export async function getRouteDetail(routeId: string) {
     : [];
 
   const assignmentDetailsById = new Map(assignmentDisplayDetails);
-  const requestCounts = countAssignmentsByRequest((requests || []) as RouteSeatRequest[]);
 
   return {
     route: typedRoute,
@@ -1401,46 +1384,198 @@ export async function getRouteDetail(routeId: string) {
       const memberProfile = driverMemberProfilesById.get(assignment.driver_id);
       const driverProfile = memberProfile ? driverProfilesByUserId.get(memberProfile.user_id) : null;
       const vehicle = vehiclesById.get(assignment.vehicle_id);
-      const [idDocumentUrl, vehiclePhotoUrl] = await Promise.all([
-        resolveSignedStorageUrl(supabase, 'id-documents', memberProfile?.id_document_url || null),
-        resolveSignedStorageUrl(supabase, 'vehicle-photos', vehicle?.vehicle_photo_url || null),
-      ]);
+      const vehiclePhotoUrl = await resolveSignedStorageUrl(supabase, 'vehicle-photos', vehicle?.vehicle_photo_url || null);
 
       return {
-        ...(assignment as DriverRouteAssignment),
-        passenger_request_count: requestCounts.get(assignment.id) || 0,
+        id: assignment.id,
+        driver_id: assignment.driver_id,
+        vehicle_id: assignment.vehicle_id,
+        route_id: assignment.route_id,
+        status: assignment.status,
+        seats_available: assignment.seats_available ?? 0,
+        days_active: assignment.days_active || [],
+        weekly_price: assignment.weekly_price,
+        single_route_price: assignment.single_route_price,
+        created_at: assignment.created_at,
         driver_name:
           assignmentDetailsById.get(assignment.id)?.driver_name ||
           (memberProfile
             ? `${memberProfile.first_name || ''} ${memberProfile.surname || ''}`.trim()
             : `Driver ${assignment.driver_id.slice(0, 8)}`),
         driver_verified: Boolean(
-          memberProfile?.id_document_url &&
-            driverProfile?.id_status === 'approved' &&
+          driverProfile?.id_status === 'approved' &&
             driverProfile?.vehicle_status === 'approved'
         ),
+        driver_avatar_url: memberProfile?.profile_photo_url || null,
         rating_average: driverProfile?.rating_average ?? 0,
         rating_count: driverProfile?.rating_count ?? 0,
-        vehicle_plate: assignmentDetailsById.get(assignment.id)?.vehicle_plate || null,
-        driver_phone: memberProfile?.phone || null,
-        id_document_url: idDocumentUrl || memberProfile?.id_document_url || null,
+        vehicle_plate: assignmentDetailsById.get(assignment.id)?.vehicle_plate || vehicle?.licence_plate || null,
         vehicle_photo_url: vehiclePhotoUrl || vehicle?.vehicle_photo_url || null,
       };
     }))) as RouteAssignmentSummary[],
-    requests: ((requests || []) as RouteSeatRequest[]).map((request) => {
+  };
+}
+
+export async function getDriverRouteDetail(routeId: string): Promise<DriverRouteDetail | { error: string }> {
+  const baseDetail = await getRouteDetail(routeId);
+  if ('error' in baseDetail) {
+    return baseDetail;
+  }
+
+  const supabase = await createClient();
+  const [requestsResult, ledgerResult] = await Promise.all([
+    supabase
+      .from('route_seat_requests')
+      .select('id, passenger_id, route_id, pickup_stop_id, dropoff_stop_id, seats_requested, requested_days, request_type, preferred_morning_time, preferred_return_time, status, matched_assignment_id, created_at, updated_at')
+      .eq('route_id', routeId)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('ride_payment_ledger')
+      .select('id, passenger_id, driver_id, route_id, seat_request_id, amount, platform_fee, driver_amount, payment_period, payment_method, payment_provider, provider_reference, status, payout_status, proof_url, paid_at, confirmed_at, payout_due_at, payout_completed_at, created_at')
+      .eq('route_id', routeId)
+      .order('created_at', { ascending: false }),
+  ]);
+
+  const stopById = new Map((baseDetail.stops || []).map((stop) => [stop.id, stop] as const));
+  const passengerIds = Array.from(
+    new Set(((requestsResult.data || []) as RouteSeatRequest[]).map((request) => request.passenger_id).filter(Boolean))
+  );
+  const { data: passengerProfiles } = passengerIds.length
+    ? await supabase
+        .from('profiles')
+        .select('id, first_name, surname')
+        .in('id', passengerIds)
+    : { data: [] };
+  const passengerProfilesById = new Map(
+    ((passengerProfiles || []) as PassengerProfileRow[]).map((profile) => [profile.id, profile])
+  );
+  const requestCounts = countAssignmentsByRequest((requestsResult.data || []) as RouteSeatRequest[]);
+
+  return {
+    ...baseDetail,
+    assignments: baseDetail.assignments.map((assignment) => ({
+      ...assignment,
+      passenger_request_count: requestCounts.get(assignment.id) || 0,
+    })),
+    requests: ((requestsResult.data || []) as RouteSeatRequest[]).map((request) => {
       const passengerProfile = passengerProfilesById.get(request.passenger_id);
       return {
         ...request,
         passenger_name: passengerProfile
           ? `${passengerProfile.first_name || ''} ${passengerProfile.surname || ''}`.trim() || null
           : null,
-        passenger_phone: passengerProfile?.phone || null,
-        passenger_email: passengerProfile?.email || null,
         pickup_stop_name: stopById.get(request.pickup_stop_id)?.stop_name || null,
         dropoff_stop_name: stopById.get(request.dropoff_stop_id)?.stop_name || null,
       };
     }),
-    ledger: (ledger || []) as RidePaymentLedgerEntry[],
+    ledger: (ledgerResult.data || []) as RidePaymentLedgerEntry[],
+  };
+}
+export async function getAdminRouteReviewDetail(routeId: string): Promise<AdminRouteReviewDetail | { error: string }> {
+  noStore();
+  const supabase = await createClient();
+  const current = await getCurrentProfile(supabase);
+  if ('error' in current) {
+    return { error: current.error || 'Unable to load current profile' };
+  }
+
+  const { user } = current;
+  const adminAllowed = (await isPlatformAdmin(supabase, user.id)) || isSuperAdminEmail(user.email);
+  if (!adminAllowed) {
+    return { error: 'Platform admin access required' };
+  }
+
+  const detail = await getDriverRouteDetail(routeId);
+  if ('error' in detail) {
+    return detail;
+  }
+
+  const baseAssignmentsById = new Map(detail.assignments.map((assignment) => [assignment.id, assignment] as const));
+  const assignmentIds = detail.assignments.map((assignment) => assignment.id);
+  if (assignmentIds.length === 0) {
+    return {
+      ...detail,
+      assignments: [] as RouteReviewAssignmentSummary[],
+    };
+  }
+
+  const { data: assignments } = await supabase
+    .from('driver_route_assignments')
+    .select('id, driver_id, vehicle_id, route_id, status, seats_available, days_active, weekly_price, single_route_price, admin_notes, approved_by, approved_at, phone_call_verified, created_at')
+    .in('id', assignmentIds)
+    .order('created_at', { ascending: false });
+
+  const driverIds = Array.from(new Set(((assignments || []) as DriverRouteAssignment[]).map((assignment) => assignment.driver_id).filter(Boolean)));
+  const { data: driverMemberProfiles } = driverIds.length
+    ? await supabase
+        .from('profiles')
+        .select('id, user_id, first_name, surname, phone, email, profile_photo_url')
+        .in('id', driverIds)
+    : { data: [] };
+  const driverMemberProfilesById = new Map(
+    ((driverMemberProfiles || []) as DriverMemberReviewRow[]).map((profile) => [profile.id, profile])
+  );
+  const driverUserIds = Array.from(
+    new Set(((driverMemberProfiles || []) as DriverMemberReviewRow[]).map((profile) => profile.user_id).filter(Boolean))
+  );
+  const { data: driverProfiles } = driverUserIds.length
+    ? await supabase
+        .from('driver_profiles')
+        .select('id, user_id, id_status, vehicle_status, rating_average, rating_count, id_document_url')
+        .in('user_id', driverUserIds)
+    : { data: [] };
+  const driverProfilesByUserId = new Map(
+    ((driverProfiles || []) as (DriverProfileLookupRow & { id_document_url?: string | null })[]).map((profile) => [profile.user_id, profile])
+  );
+  const vehicleIds = Array.from(new Set(((assignments || []) as DriverRouteAssignment[]).map((assignment) => assignment.vehicle_id).filter(Boolean)));
+  const { data: vehicles } = vehicleIds.length
+    ? await supabase
+        .from('vehicles')
+        .select('id, vehicle_photo_url, make, model, licence_plate')
+        .in('id', vehicleIds)
+    : { data: [] };
+  const vehiclesById = new Map(
+    ((vehicles || []) as VehicleLookupRow[]).map((vehicle) => [vehicle.id, vehicle])
+  );
+
+  return {
+    ...detail,
+    assignments: (await Promise.all((assignments || []).map(async (assignment) => {
+      const baseAssignment = baseAssignmentsById.get(assignment.id);
+      const memberProfile = driverMemberProfilesById.get(assignment.driver_id);
+      const driverProfile = memberProfile ? driverProfilesByUserId.get(memberProfile.user_id) : null;
+      const vehicle = vehiclesById.get(assignment.vehicle_id);
+      const [idDocumentUrl, vehiclePhotoUrl] = await Promise.all([
+        resolveSignedStorageUrl(supabase, 'id-documents', driverProfile?.id_document_url || null),
+        resolveSignedStorageUrl(supabase, 'vehicle-photos', vehicle?.vehicle_photo_url || null),
+      ]);
+
+      return {
+        ...(baseAssignment || {}),
+        ...(assignment as DriverRouteAssignment),
+        driver_name:
+          baseAssignment?.driver_name ||
+          (memberProfile
+            ? `${memberProfile.first_name || ''} ${memberProfile.surname || ''}`.trim()
+            : `Driver ${assignment.driver_id.slice(0, 8)}`),
+        driver_verified: Boolean(
+          driverProfile?.id_status === 'approved' &&
+            driverProfile?.vehicle_status === 'approved'
+        ),
+        driver_avatar_url: memberProfile?.profile_photo_url || baseAssignment?.driver_avatar_url || null,
+        driver_phone: memberProfile?.phone || null,
+        driver_email: memberProfile?.email || null,
+        id_document_url: idDocumentUrl || driverProfile?.id_document_url || null,
+        rating_average: driverProfile?.rating_average ?? baseAssignment?.rating_average ?? 0,
+        rating_count: driverProfile?.rating_count ?? baseAssignment?.rating_count ?? 0,
+        vehicle_photo_url: vehiclePhotoUrl || baseAssignment?.vehicle_photo_url || null,
+        vehicle_plate: baseAssignment?.vehicle_plate || vehicle?.licence_plate || null,
+        admin_notes: assignment.admin_notes,
+        approved_by: assignment.approved_by,
+        approved_at: assignment.approved_at,
+        phone_call_verified: assignment.phone_call_verified,
+      };
+    }))) as RouteReviewAssignmentSummary[],
   };
 }
 
@@ -1448,7 +1583,7 @@ export async function getDriverRouteDashboard() {
   const supabase = await createClient();
   const current = await getCurrentProfile(supabase);
   if ('error' in current) {
-    return { error: current.error };
+    return { error: current.error || 'Unable to load current profile' };
   }
 
   const { profile } = current;
@@ -1537,6 +1672,12 @@ export async function getDriverRouteDashboard() {
     pendingRequests,
   };
 }
+
+
+
+
+
+
 
 
 
