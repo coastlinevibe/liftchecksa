@@ -1,4 +1,4 @@
-﻿import { revalidatePath, unstable_noStore as noStore } from 'next/cache';
+import { revalidatePath, unstable_noStore as noStore } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { isSuperAdminEmail } from '@/lib/auth/routing';
 import { createClient } from '@/lib/supabase/server';
@@ -33,6 +33,50 @@ async function getCurrentProfile(supabase: Awaited<ReturnType<typeof createClien
   }
 
   return { user, profile: profile ?? null };
+}
+
+type DriverChatAccessProfile = {
+  id: string;
+  user_id: string;
+  id_status?: string | null;
+  vehicle_status?: string | null;
+  provider_payment_status?: string | null;
+  provider_next_payment_at?: string | null;
+  provider_expires_at?: string | null;
+  is_suspended?: boolean | null;
+};
+
+async function loadDriverAccessProfile(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string
+): Promise<DriverChatAccessProfile | null> {
+  const { data } = await supabase
+    .from('driver_profiles')
+    .select('id, user_id, id_status, vehicle_status, provider_payment_status, provider_next_payment_at, provider_expires_at, is_suspended')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  return (data as DriverChatAccessProfile | null) ?? null;
+}
+
+function hasValidDriverChatAccess(
+  profile: { role?: string | null; membership_status?: string | null; user_id: string } | null,
+  driverProfile: DriverChatAccessProfile | null
+) {
+  if (!profile || profile.role !== 'driver' || profile.membership_status !== 'active' || !driverProfile) {
+    return false;
+  }
+
+  const dueAt = driverProfile.provider_next_payment_at || driverProfile.provider_expires_at || null;
+  const paymentApproved =
+    driverProfile.provider_payment_status === 'approved' && (!dueAt || new Date(dueAt) > new Date());
+
+  return Boolean(
+    paymentApproved &&
+      driverProfile.id_status === 'approved' &&
+      driverProfile.vehicle_status === 'approved' &&
+      !driverProfile.is_suspended
+  );
 }
 
 async function loadRouteThread(supabase: Awaited<ReturnType<typeof createClient>>, routeId: string) {
@@ -243,6 +287,7 @@ export async function getOpenRouteChatView(routeId: string): Promise<OpenRouteCh
   }
 
   const isAdmin = Boolean(profile?.role === 'platform_admin' || isSuperAdminEmail(user.email));
+  const driverProfile = profile?.role === 'driver' ? await loadDriverAccessProfile(supabase, user.id) : null;
   const isActiveMember = Boolean(profile?.role === 'member' && profile?.membership_status === 'active');
 
   const { data: driverAssignment } = profile
@@ -255,7 +300,7 @@ export async function getOpenRouteChatView(routeId: string): Promise<OpenRouteCh
         .maybeSingle()
     : { data: null };
 
-  const isDriver = Boolean(driverAssignment);
+  const isDriver = Boolean(driverAssignment && hasValidDriverChatAccess(profile, driverProfile));
   const { data: thread } = await loadRouteThread(supabase, routeId);
   const threadId = thread?.id || null;
 
@@ -367,9 +412,10 @@ export async function sendOpenRouteChatMessage(routeId: string, message: string)
 
   const { user, profile } = current;
   if (!profile) {
-    redirect(`/admin/routes/${routeId}?chat_error=${encodeURIComponent('Profile not found')}`);
+    redirect(`/routes/${routeId}?chat_error=${encodeURIComponent('Profile not found')}`);
   }
   const isAdmin = Boolean(profile?.role === 'platform_admin' || isSuperAdminEmail(user.email));
+  const driverProfile = profile.role === 'driver' ? await loadDriverAccessProfile(supabase, user.id) : null;
 
   const { data: route } = await supabase
     .from('official_routes')
@@ -405,7 +451,7 @@ export async function sendOpenRouteChatMessage(routeId: string, message: string)
         .maybeSingle()
     : { data: null };
 
-  const canSend = Boolean(participantRow || driverAssignment || isAdmin);
+  const canSend = Boolean(participantRow || (driverAssignment && hasValidDriverChatAccess(profile, driverProfile)) || isAdmin);
   if (!canSend) {
     redirect(`/routes/${routeId}?chat_error=${encodeURIComponent('Join the route chat before sending messages')}`);
   }
@@ -443,10 +489,11 @@ export async function reportOpenRouteChatParticipant(routeId: string, reportedPr
     redirect(`/dashboard/driver/routes/${routeId}?chat_error=${encodeURIComponent('Report reason is required')}`);
   }
 
-  const { profile } = current;
+  const { user, profile } = current;
   if (!profile) {
     redirect(`/dashboard/driver/routes/${routeId}?chat_error=${encodeURIComponent('Profile not found')}`);
   }
+  const driverProfile = profile.role === 'driver' ? await loadDriverAccessProfile(supabase, user.id) : null;
   const { data: route } = await supabase
     .from('official_routes')
     .select('id, status')
@@ -472,7 +519,9 @@ export async function reportOpenRouteChatParticipant(routeId: string, reportedPr
         .maybeSingle()
     : { data: null };
 
-  if (!driverAssignment && profile?.role !== 'platform_admin') {
+  const isDriver = Boolean(driverAssignment && hasValidDriverChatAccess(profile, driverProfile));
+
+  if (!isDriver && profile?.role !== 'platform_admin') {
     redirect(`/dashboard/driver/routes/${routeId}?chat_error=${encodeURIComponent('Only the assigned driver can report passengers')}`);
   }
 
@@ -562,8 +611,3 @@ export async function updateOpenRouteChatReportStatusFromForm(formData: FormData
     String(formData.get('status') || '')
   );
 }
-
-
-
-
-

@@ -1,4 +1,4 @@
-﻿create table if not exists public.route_chat_threads (
+create table if not exists public.route_chat_threads (
   id uuid primary key default uuid_generate_v4(),
   route_id uuid not null unique references public.official_routes(id) on delete cascade,
   created_at timestamptz not null default now()
@@ -309,3 +309,187 @@ with check (
   )
 );
 
+
+create or replace function public.is_valid_open_route_chat_driver(p_user_id uuid, p_route_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.profiles actor
+    join public.driver_profiles driver_profile on driver_profile.user_id = actor.user_id
+    join public.driver_route_assignments assignment on assignment.driver_id = actor.id
+    join public.official_routes route on route.id = assignment.route_id
+    where actor.user_id = p_user_id
+      and actor.role = 'driver'
+      and actor.membership_status = 'active'
+      and assignment.route_id = p_route_id
+      and assignment.status in ('approved', 'active')
+      and route.status = 'active'
+      and driver_profile.provider_payment_status = 'approved'
+      and coalesce(driver_profile.id_status, '') = 'approved'
+      and coalesce(driver_profile.vehicle_status, '') = 'approved'
+      and coalesce(driver_profile.is_suspended, false) = false
+      and (
+        coalesce(driver_profile.provider_next_payment_at, driver_profile.provider_expires_at) is null
+        or coalesce(driver_profile.provider_next_payment_at, driver_profile.provider_expires_at) > now()
+      )
+  );
+$$;
+
+drop policy if exists "Route chat threads can be viewed by active members, assigned drivers, and admins" on public.route_chat_threads;
+create policy "Route chat threads can be viewed by active members, assigned drivers, and admins"
+on public.route_chat_threads
+for select
+to authenticated
+using (
+  exists (
+    select 1
+    from public.profiles actor
+    join public.official_routes route on route.id = route_chat_threads.route_id
+    where actor.user_id = auth.uid()
+      and actor.role = 'member'
+      and actor.membership_status = 'active'
+      and route.status = 'active'
+  )
+  or public.is_valid_open_route_chat_driver(auth.uid(), route_chat_threads.route_id)
+  or exists (
+    select 1
+    from public.profiles actor
+    where actor.user_id = auth.uid()
+      and actor.role = 'platform_admin'
+  )
+);
+
+drop policy if exists "Route chat participants can be viewed by participants, drivers, and admins" on public.route_chat_participants;
+create policy "Route chat participants can be viewed by participants, drivers, and admins"
+on public.route_chat_participants
+for select
+to authenticated
+using (
+  exists (
+    select 1
+    from public.profiles actor
+    where actor.user_id = auth.uid()
+      and actor.id = route_chat_participants.profile_id
+  )
+  or exists (
+    select 1
+    from public.route_chat_threads thread
+    where thread.id = route_chat_participants.thread_id
+      and public.is_valid_open_route_chat_driver(auth.uid(), thread.route_id)
+  )
+  or exists (
+    select 1
+    from public.profiles actor
+    where actor.user_id = auth.uid()
+      and actor.role = 'platform_admin'
+  )
+);
+
+drop policy if exists "Route chat messages can be viewed by thread participants, drivers, and admins" on public.route_chat_messages;
+create policy "Route chat messages can be viewed by thread participants, drivers, and admins"
+on public.route_chat_messages
+for select
+to authenticated
+using (
+  exists (
+    select 1
+    from public.route_chat_participants participant
+    join public.profiles actor on actor.user_id = auth.uid()
+    join public.route_chat_threads thread on thread.id = participant.thread_id
+    join public.official_routes route on route.id = thread.route_id
+    where participant.thread_id = route_chat_messages.thread_id
+      and participant.profile_id = actor.id
+      and route.status = 'active'
+  )
+  or exists (
+    select 1
+    from public.route_chat_threads thread
+    where thread.id = route_chat_messages.thread_id
+      and public.is_valid_open_route_chat_driver(auth.uid(), thread.route_id)
+  )
+  or exists (
+    select 1
+    from public.profiles actor
+    where actor.user_id = auth.uid()
+      and actor.role = 'platform_admin'
+  )
+);
+
+drop policy if exists "Route chat messages can be sent by joined active members or assigned drivers" on public.route_chat_messages;
+create policy "Route chat messages can be sent by joined active members or assigned drivers"
+on public.route_chat_messages
+for insert
+to authenticated
+with check (
+  exists (
+    select 1
+    from public.profiles actor
+    join public.route_chat_participants participant on participant.profile_id = actor.id
+    join public.route_chat_threads thread on thread.id = participant.thread_id
+    join public.official_routes route on route.id = thread.route_id
+    where actor.user_id = auth.uid()
+      and actor.id = route_chat_messages.sender_id
+      and actor.role = 'member'
+      and actor.membership_status = 'active'
+      and participant.thread_id = route_chat_messages.thread_id
+      and route.status = 'active'
+  )
+  or exists (
+    select 1
+    from public.route_chat_threads thread
+    where thread.id = route_chat_messages.thread_id
+      and public.is_valid_open_route_chat_driver(auth.uid(), thread.route_id)
+  )
+);
+
+drop policy if exists "Route chat reports can be viewed by reporters, drivers, and admins" on public.route_chat_reports;
+create policy "Route chat reports can be viewed by reporters, drivers, and admins"
+on public.route_chat_reports
+for select
+to authenticated
+using (
+  exists (
+    select 1
+    from public.profiles actor
+    where actor.user_id = auth.uid()
+      and actor.id = route_chat_reports.reporter_id
+  )
+  or exists (
+    select 1
+    from public.route_chat_threads thread
+    where thread.id = route_chat_reports.thread_id
+      and public.is_valid_open_route_chat_driver(auth.uid(), thread.route_id)
+  )
+  or exists (
+    select 1
+    from public.profiles actor
+    where actor.user_id = auth.uid()
+      and actor.role = 'platform_admin'
+  )
+);
+
+drop policy if exists "Drivers and admins can create route chat reports" on public.route_chat_reports;
+create policy "Drivers and admins can create route chat reports"
+on public.route_chat_reports
+for insert
+to authenticated
+with check (
+  exists (
+    select 1
+    from public.route_chat_threads thread
+    where thread.id = route_chat_reports.thread_id
+      and public.is_valid_open_route_chat_driver(auth.uid(), thread.route_id)
+  )
+  or exists (
+    select 1
+    from public.profiles actor
+    where actor.user_id = auth.uid()
+      and actor.id = route_chat_reports.reporter_id
+      and actor.role = 'platform_admin'
+  )
+);

@@ -1,5 +1,6 @@
-﻿'use client';
+'use client';
 
+import Image from 'next/image';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { OpenRouteChatMessage, OpenRouteChatParticipant } from '@/lib/types/route-chat';
@@ -139,10 +140,13 @@ export default function RouteChatThread({
                   className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700"
                 >
                   {participant.profile_photo_url ? (
-                    <img
+                    <Image
                       src={participant.profile_photo_url}
                       alt={participant.display_name}
+                      width={24}
+                      height={24}
                       className="h-6 w-6 rounded-full object-cover"
+                      sizes="24px"
                     />
                   ) : (
                     <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-[11px] font-semibold text-emerald-700">
@@ -169,10 +173,13 @@ export default function RouteChatThread({
                 >
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-200 text-[11px] font-semibold text-slate-700">
                     {chat.sender_photo_url ? (
-                      <img
+                      <Image
                         src={chat.sender_photo_url}
                         alt={chat.sender_name}
+                        width={32}
+                        height={32}
                         className="h-full w-full object-cover"
+                        sizes="32px"
                       />
                     ) : (
                       <span>{getInitials(chat.sender_name)}</span>
@@ -202,4 +209,3 @@ export default function RouteChatThread({
     </div>
   );
 }
-

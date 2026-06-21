@@ -1,4 +1,4 @@
-﻿export interface OpenRouteChatThread {
+export interface OpenRouteChatThread {
   id: string;
   route_id: string;
   created_at: string;
@@ -50,4 +50,3 @@ export interface OpenRouteChatView {
   messages: OpenRouteChatMessage[];
   reports: OpenRouteChatReport[];
 }
-
