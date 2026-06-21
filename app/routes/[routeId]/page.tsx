@@ -1,12 +1,14 @@
-import Link from 'next/link';
+﻿import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, BadgeCheck, MapPin, MessageSquare, Route as RouteIcon, Send, Shield } from 'lucide-react';
-import { getRouteDetail, sendRouteChatMessageFromForm } from '@/lib/routes/actions';
+import { ArrowLeft, MapPin, MessageSquare, Route as RouteIcon, Send, Shield } from 'lucide-react';
+import { getRouteDetail } from '@/lib/routes/actions';
 import { formatVehicleCapacity } from '@/lib/types/pilot-routes';
 import { createClient } from '@/lib/supabase/server';
-import RouteChatThread, { type RouteChatMessage } from '@/components/RouteChatThread';
+import RouteChatThread from '@/components/RouteChatThread';
 import DriverRouteApplicationForm from '@/components/DriverRouteApplicationForm';
 import RouteSeatRequestForm from './RouteSeatRequestForm';
+import { joinOpenRouteChatFromForm, getOpenRouteChatView, sendOpenRouteChatMessageFromForm } from '@/lib/routes/open-chat';
+import LogoutButton from '@/components/LogoutButton';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -36,7 +38,7 @@ export default async function RouteDetailPage({
     notFound();
   }
 
-  const { route, stops, assignments } = detail;
+  const { route, stops } = detail;
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -63,17 +65,12 @@ export default async function RouteDetailPage({
         .limit(1)
         .maybeSingle()
     : { data: null };
+
   const isLoggedIn = Boolean(user);
   const membershipActive = profile?.membership_status === 'active' || latestPayment?.status === 'approved';
   const isMemberUser = profile?.role === 'member' || latestPayment?.status === 'approved';
   const isDriverUser = Boolean(profile?.role === 'driver' || driverProfile);
   const canRequestSeat = Boolean(isLoggedIn && isMemberUser && membershipActive);
-  const primaryAssignment = assignments.find((assignment) => ['approved', 'active'].includes(assignment.status)) || null;
-  const canUseRouteChat = Boolean(
-    canRequestSeat &&
-      primaryAssignment &&
-      (Number(primaryAssignment.seats_available || 0) > 0)
-  );
   const { data: driverVehicles } = user && driverProfile
     ? await supabase
         .from('vehicles')
@@ -93,20 +90,12 @@ export default async function RouteDetailPage({
         .maybeSingle()
     : { data: null };
 
-  const { data: routeChatMessages } = primaryAssignment && profile?.id
-    ? await supabase
-        .from('route_chats')
-        .select('id, route_id, assignment_id, sender_id, receiver_id, message, created_at')
-        .eq('route_id', route.id)
-        .eq('assignment_id', primaryAssignment.id)
-        .order('created_at', { ascending: true })
-        .limit(50)
-    : { data: [] };
-  const chatDriverName = primaryAssignment?.driver_name || 'Assigned driver';
-  const chatVehicleLabel = primaryAssignment?.vehicle_plate
-    ? `Vehicle plate ${primaryAssignment.vehicle_plate}`
+  const openRouteChatViewResult = isMemberUser && membershipActive
+    ? await getOpenRouteChatView(route.id)
     : null;
-  const verifiedDriver = Boolean(primaryAssignment?.driver_verified);
+  const openRouteChatView = openRouteChatViewResult && !('error' in openRouteChatViewResult)
+    ? openRouteChatViewResult
+    : null;
 
   return (
     <div className="min-h-screen bg-slate-50 pb-28 md:pb-0">
@@ -131,7 +120,10 @@ export default async function RouteDetailPage({
                 </span>
               </div>
             </div>
-            <Shield className="h-4 w-4 text-emerald-500" />
+            <div className="flex flex-col items-end gap-2">
+              {user ? <LogoutButton /> : null}
+              <Shield className="h-4 w-4 text-emerald-500" />
+            </div>
           </div>
         </div>
       </div>
@@ -201,70 +193,78 @@ export default async function RouteDetailPage({
             />
           ) : null}
 
-          {canUseRouteChat && primaryAssignment ? (
+          {openRouteChatView ? (
             <section className="rounded-xl border border-slate-200 bg-white p-4">
               <div className="mb-3 flex items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">
                     <MessageSquare className="h-4 w-4 text-emerald-600" />
-                    <h2 className="text-base font-bold text-slate-900">Direct chat</h2>
+                    <h2 className="text-base font-bold text-slate-900">Route chat</h2>
                   </div>
                   <p className="mt-1 text-sm text-slate-600">
-                    Chat with {chatDriverName} before requesting your seat.
+                    {openRouteChatView.is_joined
+                      ? 'Chat with other joined members on this route.'
+                      : 'Join the chat to read and send route messages.'}
                   </p>
                 </div>
                 <div className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                  Seats available
+                  {openRouteChatView.participants.length} joined
                 </div>
               </div>
 
-              {verifiedDriver ? (
-                <div className="mb-3 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
-                  <BadgeCheck className="h-3.5 w-3.5" />
-                  Verified driver
-                </div>
+              {!openRouteChatView.is_joined && openRouteChatView.can_join ? (
+                <form action={joinOpenRouteChatFromForm} className="mb-3">
+                  <input type="hidden" name="routeId" value={route.id} />
+                  <button
+                    type="submit"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-500 bg-emerald-500 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-600"
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                    Join chat
+                  </button>
+                </form>
               ) : null}
 
-              <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                {chatDriverName}
-                {chatVehicleLabel ? ` - ${chatVehicleLabel}` : ''}
-              </div>
+              {openRouteChatView.is_joined ? (
+                <>
+                  <RouteChatThread
+                    threadId={openRouteChatView.thread_id || route.id}
+                    currentProfileId={profile?.id || ''}
+                    participants={openRouteChatView.participants}
+                    initialMessages={openRouteChatView.messages}
+                    emptyStateText="No messages yet. Start the conversation with other members on this route."
+                  />
 
-              <RouteChatThread
-                key={`${route.id}:${primaryAssignment.id}:${(routeChatMessages || []).length}`}
-                routeId={route.id}
-                assignmentId={primaryAssignment.id}
-                currentProfileId={profile?.id || ''}
-                peerProfileId={primaryAssignment.driver_id}
-                initialMessages={(routeChatMessages || []) as RouteChatMessage[]}
-                emptyStateText="No messages yet. Start the conversation before you request a seat."
-              />
-
-              <form action={sendRouteChatMessageFromForm} className="mt-3 space-y-2">
-                <input type="hidden" name="routeId" value={route.id} />
-                <input type="hidden" name="assignmentId" value={primaryAssignment.id} />
-                <input type="hidden" name="receiverId" value={primaryAssignment.driver_id} />
-                <label htmlFor="routeChatMessage" className="block text-sm font-semibold text-slate-900">
-                  Message to driver
-                </label>
-                <textarea
-                  id="routeChatMessage"
-                  name="message"
-                  rows={3}
-                  required
-                  placeholder={`Message ${chatDriverName}...`}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-                <button
-                  type="submit"
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-500 bg-white px-4 py-3 text-sm font-semibold text-emerald-600 hover:bg-emerald-50"
-                >
-                  <Send className="h-4 w-4" />
-                  Send message
-                </button>
-              </form>
+                  <form action={sendOpenRouteChatMessageFromForm} className="mt-3 space-y-2">
+                    <input type="hidden" name="routeId" value={route.id} />
+                    <label htmlFor="routeChatMessage" className="block text-sm font-semibold text-slate-900">
+                      Message to route chat
+                    </label>
+                    <textarea
+                      id="routeChatMessage"
+                      name="message"
+                      rows={3}
+                      required
+                      placeholder="Write a message to joined route members..."
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <button
+                      type="submit"
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-500 bg-white px-4 py-3 text-sm font-semibold text-emerald-600 hover:bg-emerald-50"
+                    >
+                      <Send className="h-4 w-4" />
+                      Send message
+                    </button>
+                  </form>
+                </>
+              ) : (
+                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+                  Only active members can join this chat.
+                </div>
+              )}
             </section>
           ) : null}
+
           {!isDriverUser ? (
             <RouteSeatRequestForm
               routeId={route.id}
@@ -279,3 +279,6 @@ export default async function RouteDetailPage({
     </div>
   );
 }
+
+
+

@@ -1,10 +1,22 @@
+﻿import Image from 'next/image';
 import Link from 'next/link';
 import { redirect, notFound } from 'next/navigation';
-import { ArrowLeft, BadgeCheck, Bell, CalendarDays, ListOrdered, Plus, Route, Users } from 'lucide-react';
+import { ArrowLeft, BadgeCheck, Bell, CalendarDays, ChevronDown, ListOrdered, MessageSquare, Plus, Route, Users } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
-import { deleteOfficialRoute, getAdminRouteReviewDetail, updateOfficialRouteStatusFromForm } from '@/lib/routes/actions';
+import {
+  deleteOfficialRoute,
+  getAdminRouteReviewDetail,
+  updateDriverRouteApplicationDecision,
+  updateDriverRouteApplicationPhoneCallVerified,
+  updateOfficialRouteStatusFromForm,
+} from '@/lib/routes/actions';
+import {
+  getOpenRouteChatView,
+  updateOpenRouteChatReportStatusFromForm,
+} from '@/lib/routes/open-chat';
 import { isAdminRole, isSuperAdminEmail } from '@/lib/auth/routing';
 import { formatPassengerSeats, formatVehicleCapacity, type RouteReviewAssignmentSummary } from '@/lib/types/pilot-routes';
+import RouteChatThread from '@/components/RouteChatThread';
 import DeleteRouteButton from './DeleteRouteButton';
 
 function badgeClass(status: string) {
@@ -17,15 +29,18 @@ function formatPreferredTime(morning?: string | null, returnTime?: string | null
   const parts: string[] = [];
   if (morning) parts.push(`AM ${morning}`);
   if (returnTime) parts.push(`PM ${returnTime}`);
-  return parts.length > 0 ? parts.join(' • ') : 'Not set';
+  return parts.length > 0 ? parts.join(' - ') : 'Not set';
 }
 
 export default async function AdminRouteDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ routeId: string }>;
+  searchParams?: Promise<{ chat_error?: string }>;
 }) {
   const { routeId } = await params;
+  const resolvedSearchParams = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -37,7 +52,7 @@ export default async function AdminRouteDetailPage({
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('id, role')
     .eq('user_id', user.id)
     .maybeSingle();
 
@@ -54,6 +69,8 @@ export default async function AdminRouteDetailPage({
   const assignments = rawAssignments as RouteReviewAssignmentSummary[];
   const pendingApplications = assignments.filter((assignment) => assignment.status === 'pending');
   const assignedDrivers = assignments.filter((assignment) => ['approved', 'active'].includes(assignment.status));
+  const routeChatViewResult = await getOpenRouteChatView(route.id);
+  const routeChatView = 'error' in routeChatViewResult ? null : routeChatViewResult;
 
   const deleteRouteAction = async () => {
     'use server';
@@ -63,6 +80,25 @@ export default async function AdminRouteDetailPage({
   const updateStatusAction = async (formData: FormData) => {
     'use server';
     await updateOfficialRouteStatusFromForm(formData);
+  };
+
+  const updatePhoneCallVerifiedAction = async (formData: FormData) => {
+    'use server';
+    await updateDriverRouteApplicationPhoneCallVerified({
+      assignmentId: String(formData.get('assignmentId') || ''),
+      routeId,
+      phoneCallVerified: formData.get('phone_call_verified') === 'on',
+    });
+  };
+
+  const updateApplicationDecisionAction = async (formData: FormData) => {
+    'use server';
+    const decision = String(formData.get('decision') || '') as 'approved' | 'rejected';
+    await updateDriverRouteApplicationDecision({
+      assignmentId: String(formData.get('assignmentId') || ''),
+      routeId,
+      decision,
+    });
   };
 
   return (
@@ -162,6 +198,12 @@ export default async function AdminRouteDetailPage({
 
       <div className="mx-auto grid max-w-6xl gap-4 px-4 py-4 lg:grid-cols-[1.4fr_1fr]">
         <div className="space-y-4">
+          {resolvedSearchParams?.chat_error ? (
+            <section className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+              {resolvedSearchParams.chat_error}
+            </section>
+          ) : null}
+
           <section className="rounded-xl border border-slate-200 bg-white p-4">
             <div className="mb-3 flex items-center gap-2">
               <Route className="h-4 w-4 text-emerald-600" />
@@ -177,8 +219,8 @@ export default async function AdminRouteDetailPage({
                       </div>
                       <div className="text-xs text-slate-600">
                         {stop.area || 'No area set'}
-                        {stop.is_start ? ' • Start' : ''}
-                        {stop.is_end ? ' • Destination' : ''}
+                        {stop.is_start ? ' - Start' : ''}
+                        {stop.is_end ? ' - Destination' : ''}
                       </div>
                     </div>
                     <div className="text-right text-xs text-slate-500">
@@ -198,50 +240,232 @@ export default async function AdminRouteDetailPage({
             <div className="mb-3 flex items-center gap-2">
               <Users className="h-4 w-4 text-emerald-600" />
               <h2 className="text-base font-bold text-slate-900">Driver Applications</h2>
-              {pendingApplications.length > 0 ? (
-                <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-900">
-                  {pendingApplications.length} pending
-                </span>
-              ) : null}
             </div>
-            <div className="space-y-2">
-              {assignments.map((assignment) => (
-                <div key={assignment.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="space-y-3">
+              {assignments.map((assignment) => {
+                const submittedAt = new Date(assignment.created_at).toLocaleDateString();
+                const statusLabel = assignment.status === 'pending' ? 'Pending review' : assignment.status;
+                const showReviewDetails = assignment.status === 'pending';
+                const applicationHeader = (
                   <div className="flex items-start justify-between gap-3">
-                    <div>
+                    <div className="min-w-0">
                       <div className="text-sm font-semibold text-slate-900">
                         {assignment.driver_name || `Driver ${assignment.driver_id.slice(0, 8)}`}
-                        {' '}
-                        •
-                        {' '}
-                        {assignment.vehicle_plate || 'Plate unavailable'}
-                                            </div>
+                      </div>
+                      <div className="mt-1 text-xs text-slate-600">
+                        Vehicle: {assignment.vehicle_plate || 'Plate unavailable'}
+                      </div>
+                      <div className="mt-1 text-xs text-slate-600">
+                        Status: {statusLabel}
+                      </div>
+                      <div className="mt-1 text-xs text-slate-600">
+                        Passenger seats: {assignment.seats_available}
+                      </div>
+                      <div className="mt-1 text-xs text-slate-600">
+                        Contact: {assignment.driver_phone || 'Unavailable'}
+                      </div>
+                      <div className="mt-1 text-xs text-slate-600">
+                        Rating: {Number(assignment.rating_average || 0).toFixed(1)} / 5 ({assignment.rating_count || 0} reviews)
+                      </div>
+                      <div className="mt-1 text-xs text-slate-600">Submitted: {submittedAt}</div>
+                    </div>
+                    <div className="text-right text-xs text-slate-500">
                       {assignment.driver_verified ? (
-                        <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">
+                        <div className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">
                           <BadgeCheck className="h-3 w-3" />
                           Verified driver
                         </div>
                       ) : null}
-                      <div className="text-xs text-slate-600">
-                        Status: {assignment.status} - Passenger seats: {assignment.seats_available}
-                      </div>
-                      <div className="text-xs text-slate-600">
-                        Weekly: {assignment.weekly_price ? `R${assignment.weekly_price}` : 'TBA'} • Single:{' '}
-                        {assignment.single_route_price ? `R${assignment.single_route_price}` : 'TBA'}
-                      </div>
-                    </div>
-                    <div className="text-right text-xs text-slate-500">
-                      Requests: {assignment.passenger_request_count || 0}
                     </div>
                   </div>
-                </div>
-              ))}
-              {assignments.length === 0 ? (
+                );
+                const reviewDetails = showReviewDetails ? (
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    <div className="rounded-lg border border-slate-200 bg-white p-3">
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Driver contact</div>
+                      <div className="mt-1 text-sm font-semibold text-slate-900">
+                        {assignment.driver_phone || 'Unavailable'}
+                      </div>
+                      <div className="mt-1 text-xs text-slate-500">
+                        Confirm this number with a phone call before approving the driver.
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-slate-200 bg-white p-3">
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Driver ID</div>
+                      {assignment.id_document_url ? (
+                        <Image
+                          src={assignment.id_document_url}
+                          alt={`${assignment.driver_name || 'Driver'} ID document`}
+                          width={1200}
+                          height={800}
+                          className="mt-2 h-48 w-full rounded-md object-cover"
+                        />
+                      ) : (
+                        <div className="mt-2 rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 py-8 text-center text-xs text-slate-500">
+                          ID document unavailable
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="rounded-lg border border-slate-200 bg-white p-3 md:col-span-2">
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Vehicle photo</div>
+                      {assignment.vehicle_photo_url ? (
+                        <Image
+                          src={assignment.vehicle_photo_url}
+                          alt={`${assignment.driver_name || 'Driver'} vehicle`}
+                          width={1200}
+                          height={800}
+                          className="mt-2 h-56 w-full rounded-md object-cover"
+                        />
+                      ) : (
+                        <div className="mt-2 rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 py-8 text-center text-xs text-slate-500">
+                          Vehicle photo unavailable
+                        </div>
+                      )}
+                    </div>
+
+                    <form action={updatePhoneCallVerifiedAction} className="md:col-span-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                      <input type="hidden" name="assignmentId" value={assignment.id} />
+                      <label className="flex items-center gap-2 text-sm font-semibold text-emerald-900">
+                        <input
+                          type="checkbox"
+                          name="phone_call_verified"
+                          defaultChecked={Boolean(assignment.phone_call_verified)}
+                          className="h-4 w-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
+                        />
+                        Phone call verified
+                      </label>
+                      <p className="mt-1 text-xs text-emerald-800">
+                        Check this after confirming the driver identity by phone.
+                      </p>
+                      <button
+                        type="submit"
+                        className="mt-3 inline-flex items-center justify-center rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-600"
+                      >
+                        Save verification
+                      </button>
+                    </form>
+
+                    <form action={updateApplicationDecisionAction} className="md:col-span-2 rounded-lg border border-slate-200 bg-white p-3">
+                      <input type="hidden" name="assignmentId" value={assignment.id} />
+                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Finish application</div>
+                      <p className="mt-1 text-xs text-slate-600">Approve the driver to activate this route assignment, or decline the application.</p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                          type="submit"
+                          name="decision"
+                          value="approved"
+                          className="inline-flex items-center justify-center rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-600"
+                        >
+                          Assign Driver
+                        </button>
+                        <button
+                          type="submit"
+                          name="decision"
+                          value="rejected"
+                          className="inline-flex items-center justify-center rounded-lg bg-rose-500 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-600"
+                        >
+                          Decline driver
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                ) : null;
+
+                return (
+                  <details key={assignment.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">{applicationHeader}</div>
+                        <div className="flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600">
+                          <ChevronDown className="h-3.5 w-3.5" />
+                          Expand
+                        </div>
+                      </div>
+                    </summary>
+                    {reviewDetails}
+                  </details>
+                );
+              })}
+              {pendingApplications.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">
                   No driver applications yet.
                 </div>
               ) : null}
             </div>
+          </section>
+
+          <section className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <MessageSquare className="h-4 w-4 text-emerald-600" />
+              <h2 className="text-base font-bold text-slate-900">Route chat</h2>
+              {routeChatView ? (
+                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                  {routeChatView.participants.length} joined - {routeChatView.reports.length} reports
+                </span>
+              ) : null}
+            </div>
+
+            {routeChatView ? (
+              <>
+                <RouteChatThread
+                  threadId={routeChatView.thread_id || route.id}
+                  currentProfileId={profile?.id || user.id}
+                  participants={routeChatView.participants}
+                  initialMessages={routeChatView.messages}
+                  emptyStateText="No route messages yet."
+                />
+
+                <div className="mt-3 space-y-3">
+                  {routeChatView.reports.length > 0 ? (
+                    routeChatView.reports.map((report) => (
+                      <div key={report.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="text-sm font-semibold text-slate-900">{report.reported_name}</div>
+                            <div className="text-xs text-slate-600">Reporter: {report.reporter_name}</div>
+                            <div className="mt-1 text-xs text-slate-600">Reason: {report.reason}</div>
+                            <div className="mt-1 text-xs text-slate-600">Status: {report.status}</div>
+                          </div>
+                          <div className="text-right text-xs text-slate-500">
+                            {new Date(report.created_at).toLocaleDateString()}
+                          </div>
+                        </div>
+                        <form action={updateOpenRouteChatReportStatusFromForm} className="mt-3 flex flex-wrap items-center gap-2">
+                          <input type="hidden" name="routeId" value={route.id} />
+                          <input type="hidden" name="reportId" value={report.id} />
+                          <select
+                            name="status"
+                            defaultValue={report.status}
+                            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                          >
+                            <option value="new">New</option>
+                            <option value="under_review">Under review</option>
+                            <option value="resolved">Resolved</option>
+                            <option value="dismissed">Dismissed</option>
+                          </select>
+                          <button
+                            type="submit"
+                            className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                          >
+                            Save report status
+                          </button>
+                        </form>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">
+                      No route chat reports yet.
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">
+                Route chat data is not available yet.
+              </div>
+            )}
           </section>
 
           <section className="rounded-xl border border-slate-200 bg-white p-4">
@@ -254,11 +478,13 @@ export default async function AdminRouteDetailPage({
                 <div key={request.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                   <div className="text-sm font-semibold text-slate-900">
                     {request.passenger_name || `Passenger ${request.passenger_id.slice(0, 8)}`}
-                  </div>                      <div className="text-xs text-slate-600">
-                    Status: {request.status} • Type: {request.request_type}
-                  </div>                      <div className="text-xs text-slate-600">Seats: {request.seats_requested ?? 1}</div>                      <div className="text-xs text-slate-600">
-                    Days: {(request.requested_days || []).join(', ')}
-                  </div>                      <div className="text-xs text-slate-600">
+                  </div>
+                  <div className="text-xs text-slate-600">
+                    Status: {request.status} - Type: {request.request_type}
+                  </div>
+                  <div className="text-xs text-slate-600">Seats: {request.seats_requested ?? 1}</div>
+                  <div className="text-xs text-slate-600">Days: {(request.requested_days || []).join(', ')}</div>
+                  <div className="text-xs text-slate-600">
                     Time: {formatPreferredTime(request.preferred_morning_time, request.preferred_return_time)}
                   </div>
                 </div>
@@ -279,8 +505,9 @@ export default async function AdminRouteDetailPage({
             <div className="space-y-2">
               {ledger.map((entry) => (
                 <div key={entry.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  <div className="text-sm font-semibold text-slate-900">R{entry.amount}</div>                      <div className="text-xs text-slate-600">
-                    {entry.payment_method} • {entry.status} • payout {entry.payout_status}
+                  <div className="text-sm font-semibold text-slate-900">R{entry.amount}</div>
+                  <div className="text-xs text-slate-600">
+                    {entry.payment_method} - {entry.status} - payout {entry.payout_status}
                   </div>
                 </div>
               ))}
@@ -296,3 +523,4 @@ export default async function AdminRouteDetailPage({
     </div>
   );
 }
+
