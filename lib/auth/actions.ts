@@ -132,7 +132,7 @@ export async function signUp(formData: {
     }
   }
 
-  await supabase.from('payments').insert({
+  const { error: paymentError } = await supabase.from('payments').insert({
     user_id: userId,
     plan_type: formData.membershipType,
     amount,
@@ -140,7 +140,15 @@ export async function signUp(formData: {
     status: 'pending',
   });
 
-  return { success: true, paymentReference };
+  if (paymentError) {
+    return { error: paymentError.message };
+  }
+
+  return {
+    success: true,
+    paymentReference,
+    redirectUrl: formData.role === 'driver' ? '/dashboard/driver' : '/dashboard/member',
+  };
 }
 
 function safeRedirectPath(value?: string) {
@@ -191,12 +199,15 @@ export async function signIn(email: string, password: string, redirectTo?: strin
     .eq('user_id', data.user.id)
     .maybeSingle();
 
+
   // Determine redirect URL based on role
   const safeTarget = safeRedirectPath(redirectTo);
   let redirectUrl = safeTarget || '/dashboard';
 
   if (!safeTarget && (profile?.role === 'driver' || driverProfile)) {
     redirectUrl = '/dashboard/driver';
+  } else if (!safeTarget && profile?.role === 'member') {
+    redirectUrl = '/dashboard/member';
   } else if (!safeTarget && (isAdminRole(profile?.role) || isSuperAdminEmail(data.user.email))) {
     redirectUrl = '/admin';
   }
@@ -247,3 +258,5 @@ export async function getCurrentUser() {
 
   return { user, profile };
 }
+
+

@@ -80,7 +80,7 @@ export default function PaymentUploadPage() {
         return;
       }
 
-      const { data } = await supabase
+      let { data } = await supabase
         .from('payments')
         .select('*')
         .eq('user_id', user.id)
@@ -89,6 +89,18 @@ export default function PaymentUploadPage() {
         .limit(1)
         .maybeSingle();
 
+      if (!data) {
+        const { data: latestPayment } = await supabase
+          .from('payments')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        data = latestPayment || null;
+      }
+
       if (data) {
         setPaymentData({
           ...(data as PaymentRecord),
@@ -96,7 +108,7 @@ export default function PaymentUploadPage() {
         });
         setNextPath('/dashboard/member');
       } else {
-        setError('No pending payment found');
+        setError('No payment record found yet. Return to your dashboard to check your account status.');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load payment details');
@@ -290,7 +302,7 @@ export default function PaymentUploadPage() {
           {error ? (
             <>
               <p className="text-sm font-semibold text-red-600 mb-2">{error}</p>
-              <Link href="/dashboard/driver" className="text-sm font-semibold text-emerald-600">
+              <Link href={nextPath} className="text-sm font-semibold text-emerald-600">
                 Back to dashboard
               </Link>
             </>

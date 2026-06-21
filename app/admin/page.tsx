@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { Users, Car, CheckCircle, Clock, TrendingUp, CreditCard, AlertTriangle } from 'lucide-react';
+import { Users, Car, CheckCircle, Clock, TrendingUp, CreditCard, AlertTriangle, Bell } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import LogoutButton from '@/components/LogoutButton';
 import { isAdminRole, isSuperAdminEmail } from '@/lib/auth/routing';
@@ -120,6 +120,7 @@ async function getAdminStats() {
     { count: pendingVehicleVerifications },
     { count: pendingPayments },
     { count: pendingDriverSubscriptionProofs },
+    { count: pendingRouteApplications },
     { count: activeReports },
     { data: recentMembers },
     { data: recentDrivers },
@@ -139,6 +140,7 @@ async function getAdminStats() {
     supabase.from('vehicles').select('*', { count: 'exact', head: true }).eq('verification_status', 'pending'),
     supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
     supabase.from('driver_profiles').select('*', { count: 'exact', head: true }).eq('provider_payment_status', 'pending').not('provider_payment_proof_url', 'is', null),
+    supabase.from('driver_route_assignments').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
     supabase.from('reports').select('*', { count: 'exact', head: true }).in('status', ['new', 'under_review']),
     supabase.from('profiles').select('id, user_id, first_name, surname, phone, role, membership_status, created_at').eq('role', 'member').order('created_at', { ascending: false }).limit(5),
     supabase.from('driver_profiles').select('id, user_id, id_status, vehicle_status, provider_payment_status, provider_next_payment_at, provider_expires_at, completed_trips, rating_average, created_at').order('created_at', { ascending: false }).limit(5),
@@ -235,6 +237,7 @@ async function getAdminStats() {
     pendingVehicleVerifications: pendingVehicleVerifications || 0,
     pendingPayments: (pendingPayments || 0) + (pendingDriverSubscriptionProofs || 0),
     pendingDriverSubscriptionProofs: pendingDriverSubscriptionProofs || 0,
+    pendingRouteApplications: pendingRouteApplications || 0,
     activeReports: activeReports || 0,
     recentMembers: recentMembers || [],
     recentDrivers: driversWithProfiles || [],
@@ -381,10 +384,28 @@ export default async function AdminDashboard() {
         >
           <div className="flex items-center justify-between gap-3">
             <div>
-              <div className="text-sm font-bold text-emerald-900">Official Routes</div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-emerald-900">Official Routes</span>
+              </div>
               <p className="text-xs text-emerald-800">Create routes, then review driver applications against them.</p>
             </div>
-            <CheckCircle className="h-5 w-5 text-emerald-600" />
+            <div className="flex items-center gap-3">
+              {stats.pendingRouteApplications > 0 ? (
+                <div className="inline-flex items-center gap-2 rounded-xl border border-amber-300 bg-white px-3 py-1.5 shadow-sm">
+                  <div className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 text-amber-800">
+                    <Bell className="h-4 w-4" />
+                    <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                      {stats.pendingRouteApplications}
+                    </span>
+                  </div>
+                  <div className="text-right leading-tight">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Pending</div>
+                    <div className="text-xs font-bold text-slate-900">Route applications</div>
+                  </div>
+                </div>
+              ) : null}
+              <CheckCircle className="h-5 w-5 text-emerald-600" />
+            </div>
           </div>
         </Link>
 
@@ -516,3 +537,12 @@ export default async function AdminDashboard() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+

@@ -1,8 +1,9 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, unstable_noStore as noStore } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { resolveSignedStorageUrl } from '@/lib/supabase/storage';
 import { isSuperAdminEmail } from '@/lib/auth/routing';
 import { isDriverFullyApproved } from '@/lib/driver-status';
 import { VEHICLE_CAPACITY_OPTIONS } from '@/lib/types/pilot-routes';
@@ -28,14 +29,18 @@ type DriverProfileLookupRow = {
   id_status?: string | null;
   vehicle_status?: string | null;
   id_document_url?: string | null;
+  rating_average?: number | string | null;
+  rating_count?: number | null;
 };
 
 type DriverMemberProfileRow = {
+  id: string;
   user_id: string;
   first_name: string | null;
   surname: string | null;
   phone?: string | null;
   email?: string | null;
+  id_document_url?: string | null;
 };
 
 type PassengerProfileRow = {
@@ -554,6 +559,78 @@ export async function assignDriverToRouteFromForm(formData: FormData) {
     daysActive: parsedDays.length ? parsedDays : DEFAULT_WEEKDAYS,
     adminNotes: String(formData.get('admin_notes') || ''),
   });
+}
+
+export async function updateDriverRouteApplicationPhoneCallVerified(input: {
+  assignmentId: string;
+  routeId: string;
+  phoneCallVerified: boolean;
+}) {
+  const supabase = await createClient();
+  const current = await getCurrentProfile(supabase);
+  if ('error' in current) {
+    return { error: current.error };
+  }
+
+  const { user } = current;
+  const adminAllowed = (await isPlatformAdmin(supabase, user.id)) || isSuperAdminEmail(user.email);
+  if (!adminAllowed) {
+    return { error: 'Platform admin access required' };
+  }
+
+  const { error } = await supabase
+    .from('driver_route_assignments')
+    .update({ phone_call_verified: input.phoneCallVerified })
+    .eq('id', input.assignmentId);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath(`/admin/routes/${input.routeId}`);
+  revalidatePath('/admin/routes');
+
+  return { success: true };
+}
+
+export async function updateDriverRouteApplicationDecision(input: {
+  assignmentId: string;
+  routeId: string;
+  decision: 'approved' | 'rejected';
+}) {
+  const supabase = await createClient();
+  const current = await getCurrentProfile(supabase);
+  if ('error' in current) {
+    return { error: current.error };
+  }
+
+  const { user } = current;
+  const adminAllowed = (await isPlatformAdmin(supabase, user.id)) || isSuperAdminEmail(user.email);
+  if (!adminAllowed) {
+    return { error: 'Platform admin access required' };
+  }
+
+  const updates =
+    input.decision === 'approved'
+      ? { status: 'approved', approved_by: (await getCurrentProfile(supabase)).profile?.id ?? null, approved_at: new Date().toISOString() }
+      : { status: 'rejected', approved_by: null, approved_at: null };
+
+  const { error } = await supabase
+    .from('driver_route_assignments')
+    .update(updates)
+    .eq('id', input.assignmentId);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath(`/admin/routes/${input.routeId}`);
+  revalidatePath('/admin/routes');
+  revalidatePath('/routes');
+  revalidatePath(`/routes/${input.routeId}`);
+  revalidatePath('/dashboard/driver/routes');
+
+  return { success: true };
 }
 
 export async function applyDriverToRoute(input: {
@@ -1098,9 +1175,7 @@ export async function getOfficialRoutes(includeInactive = false) {
     .order('created_at', { ascending: false });
 
   const { data: assignments } = routeIds.length
-    ? await (includeInactive
-        ? assignmentsQuery
-        : assignmentsQuery.in('status', ['approved', 'active']))
+    ? await assignmentsQuery.in('status', ['approved', 'active'])
     : { data: [] };
 
   const typedAssignments = (assignments || []) as DriverAssignmentListRow[];
@@ -1111,12 +1186,12 @@ export async function getOfficialRoutes(includeInactive = false) {
 
   const { data: driverProfiles } = driverProfileIds.length
     ? await supabase
-        .from('driver_profiles')
-        .select('id, user_id, id_status, vehicle_status, id_document_url')
+        .from('profiles')
+        .select('id, user_id, first_name, surname, phone, email, id_document_url')
         .in('id', driverProfileIds)
     : { data: [] };
 
-  const typedDriverProfiles = (driverProfiles || []) as DriverProfileLookupRow[];
+  const typedDriverProfiles = (driverProfiles || []) as DriverMemberProfileRow[];
 
   const driverUserIds = Array.from(
     new Set(typedDriverProfiles.map((profile) => profile.user_id).filter(Boolean))
@@ -1124,13 +1199,13 @@ export async function getOfficialRoutes(includeInactive = false) {
 
   const { data: driverMemberProfiles } = driverUserIds.length
     ? await supabase
-        .from('profiles')
-        .select('user_id, first_name, surname, phone, email')
+        .from('driver_profiles')
+        .select('id, user_id, id_status, vehicle_status, id_document_url, rating_average, rating_count')
         .in('user_id', driverUserIds)
     : { data: [] };
 
   const driverProfilesByUserId = new Map(
-    ((driverMemberProfiles || []) as DriverMemberProfileRow[]).map((profile) => [profile.user_id, profile])
+    ((driverMemberProfiles || []) as DriverProfileLookupRow[]).map((profile) => [profile.user_id, profile])
   );
   const driverProfilesByDriverProfileId = new Map(
     typedDriverProfiles.map((profile) => [profile.id, profile])
@@ -1189,8 +1264,8 @@ export async function getOfficialRoutes(includeInactive = false) {
       driver_name: driverName || 'Assigned driver',
       driver_verified: Boolean(
         driverProfileRow?.id_document_url &&
-          driverProfileRow?.id_status === 'approved' &&
-          driverProfileRow?.vehicle_status === 'approved'
+          driverProfile?.id_status === 'approved' &&
+          driverProfile?.vehicle_status === 'approved'
       ),
       phone: includeInactive ? driverProfile?.phone || null : null,
       email: includeInactive ? driverProfile?.email || null : null,
@@ -1213,6 +1288,7 @@ export async function getOfficialRoutes(includeInactive = false) {
 }
 
 export async function getRouteDetail(routeId: string) {
+  noStore();
   const supabase = await createClient();
   const supportsVehicleCapacity = await hasVehicleCapacityColumn(supabase);
 
@@ -1231,7 +1307,7 @@ export async function getRouteDetail(routeId: string) {
       .order('stop_order', { ascending: true }),
     supabase
       .from('driver_route_assignments')
-      .select('id, driver_id, vehicle_id, route_id, status, seats_available, days_active, weekly_price, single_route_price, admin_notes, approved_by, approved_at, created_at')
+      .select('id, driver_id, vehicle_id, route_id, status, seats_available, days_active, weekly_price, single_route_price, admin_notes, approved_by, approved_at, phone_call_verified, created_at')
       .eq('route_id', routeId)
       .order('created_at', { ascending: false }),
     supabase
@@ -1256,26 +1332,38 @@ export async function getRouteDetail(routeId: string) {
   const driverIds = Array.from(
     new Set(((assignments || []) as DriverRouteAssignment[]).map((assignment) => assignment.driver_id).filter(Boolean))
   );
-  const { data: driverProfiles } = driverIds.length
-    ? await supabase
-        .from('driver_profiles')
-        .select('id, user_id, id_status, vehicle_status, id_document_url')
-        .in('id', driverIds)
-    : { data: [] };
-  const driverProfilesById = new Map(
-    ((driverProfiles || []) as DriverProfileLookupRow[]).map((profile) => [profile.id, profile])
-  );
-  const driverUserIds = Array.from(
-    new Set(((driverProfiles || []) as DriverProfileLookupRow[]).map((profile) => profile.user_id).filter(Boolean))
-  );
-  const { data: driverMemberProfiles } = driverUserIds.length
+  const { data: driverMemberProfiles } = driverIds.length
     ? await supabase
         .from('profiles')
-        .select('user_id, first_name, surname, phone, email')
+        .select('id, user_id, first_name, surname, phone, email, id_document_url')
+        .in('id', driverIds)
+    : { data: [] };
+  const driverMemberProfilesById = new Map(
+    ((driverMemberProfiles || []) as DriverMemberProfileRow[]).map((profile) => [profile.id, profile])
+  );
+  const driverUserIds = Array.from(
+    new Set(((driverMemberProfiles || []) as DriverMemberProfileRow[]).map((profile) => profile.user_id).filter(Boolean))
+  );
+  const { data: driverProfiles } = driverUserIds.length
+    ? await supabase
+        .from('driver_profiles')
+        .select('id, user_id, id_status, vehicle_status, id_document_url, rating_average, rating_count')
         .in('user_id', driverUserIds)
     : { data: [] };
-  const driverMemberProfilesByUserId = new Map(
-    ((driverMemberProfiles || []) as DriverMemberProfileRow[]).map((profile) => [profile.user_id, profile])
+  const driverProfilesByUserId = new Map(
+    ((driverProfiles || []) as DriverProfileLookupRow[]).map((profile) => [profile.user_id, profile])
+  );
+  const vehicleIds = Array.from(
+    new Set(((assignments || []) as DriverRouteAssignment[]).map((assignment) => assignment.vehicle_id).filter(Boolean))
+  );
+  const { data: vehicles } = vehicleIds.length
+    ? await supabase
+        .from('vehicles')
+        .select('id, vehicle_photo_url, make, model, licence_plate')
+        .in('id', vehicleIds)
+    : { data: [] };
+  const vehiclesById = new Map(
+    ((vehicles || []) as VehicleLookupRow[]).map((vehicle) => [vehicle.id, vehicle])
   );
   const passengerIds = Array.from(
     new Set(((requests || []) as RouteSeatRequest[]).map((request) => request.passenger_id).filter(Boolean))
@@ -1308,27 +1396,36 @@ export async function getRouteDetail(routeId: string) {
   return {
     route: typedRoute,
     stops: (stops || []) as RouteStop[],
-    assignments: (assignments || []).map((assignment) => ({
-      ...(assignment as DriverRouteAssignment),
-      passenger_request_count: requestCounts.get(assignment.id) || 0,
-      driver_name:
-        assignmentDetailsById.get(assignment.id)?.driver_name ||
-        (() => {
-          const driverProfile = driverProfilesById.get(assignment.driver_id);
-          const memberProfile = driverProfile ? driverMemberProfilesByUserId.get(driverProfile.user_id) : null;
-          return (
-            memberProfile
-              ? `${memberProfile.first_name || ''} ${memberProfile.surname || ''}`.trim()
-              : `Driver ${assignment.driver_id.slice(0, 8)}`
-          );
-        })(),
-      driver_verified: Boolean(
-        driverProfilesById.get(assignment.driver_id)?.id_document_url &&
-          driverProfilesById.get(assignment.driver_id)?.id_status === 'approved' &&
-          driverProfilesById.get(assignment.driver_id)?.vehicle_status === 'approved'
-      ),
-      vehicle_plate: assignmentDetailsById.get(assignment.id)?.vehicle_plate || null,
-    })) as RouteAssignmentSummary[],
+    assignments: (await Promise.all((assignments || []).map(async (assignment) => {
+      const memberProfile = driverMemberProfilesById.get(assignment.driver_id);
+      const driverProfile = memberProfile ? driverProfilesByUserId.get(memberProfile.user_id) : null;
+      const vehicle = vehiclesById.get(assignment.vehicle_id);
+      const [idDocumentUrl, vehiclePhotoUrl] = await Promise.all([
+        resolveSignedStorageUrl(supabase, 'id-documents', memberProfile?.id_document_url || null),
+        resolveSignedStorageUrl(supabase, 'vehicle-photos', vehicle?.vehicle_photo_url || null),
+      ]);
+
+      return {
+        ...(assignment as DriverRouteAssignment),
+        passenger_request_count: requestCounts.get(assignment.id) || 0,
+        driver_name:
+          assignmentDetailsById.get(assignment.id)?.driver_name ||
+          (memberProfile
+            ? `${memberProfile.first_name || ''} ${memberProfile.surname || ''}`.trim()
+            : `Driver ${assignment.driver_id.slice(0, 8)}`),
+        driver_verified: Boolean(
+          memberProfile?.id_document_url &&
+            driverProfile?.id_status === 'approved' &&
+            driverProfile?.vehicle_status === 'approved'
+        ),
+        rating_average: driverProfile?.rating_average ?? 0,
+        rating_count: driverProfile?.rating_count ?? 0,
+        vehicle_plate: assignmentDetailsById.get(assignment.id)?.vehicle_plate || null,
+        driver_phone: memberProfile?.phone || null,
+        id_document_url: idDocumentUrl || memberProfile?.id_document_url || null,
+        vehicle_photo_url: vehiclePhotoUrl || vehicle?.vehicle_photo_url || null,
+      };
+    }))) as RouteAssignmentSummary[],
     requests: ((requests || []) as RouteSeatRequest[]).map((request) => {
       const passengerProfile = passengerProfilesById.get(request.passenger_id);
       return {
@@ -1439,3 +1536,12 @@ export async function getDriverRouteDashboard() {
     pendingRequests,
   };
 }
+
+
+
+
+
+
+
+
+

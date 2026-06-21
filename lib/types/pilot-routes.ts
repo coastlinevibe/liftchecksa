@@ -105,6 +105,7 @@ export interface DriverRouteAssignment {
   admin_notes?: string | null;
   approved_by?: string | null;
   approved_at?: string | null;
+  phone_call_verified?: boolean | null;
   created_at: string;
 }
 
@@ -200,5 +201,11 @@ export interface RouteAssignmentSummary extends DriverRouteAssignment {
   passenger_request_count?: number;
   driver_name?: string;
   driver_verified?: boolean;
+  driver_phone?: string | null;
+  id_document_url?: string | null;
+  vehicle_photo_url?: string | null;
   vehicle_plate?: string | null;
+  rating_average?: number | string | null;
+  rating_count?: number | null;
 }
+

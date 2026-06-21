@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/server';
 import RouteChatThread, { type RouteChatMessage } from '@/components/RouteChatThread';
 import DriverRouteApplicationForm from '@/components/DriverRouteApplicationForm';
 import RouteSeatRequestForm from './RouteSeatRequestForm';
+import LogoutButton from '@/components/LogoutButton';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -108,16 +109,23 @@ export default async function RouteDetailPage({
     : null;
   const { data: assignedDriverProfile } = primaryAssignment?.driver_id
     ? await supabase
-        .from('driver_profiles')
-        .select('id, id_status, vehicle_status, id_document_url')
+        .from('profiles')
+        .select('id, user_id, first_name, surname, phone, email, id_document_url')
         .eq('id', primaryAssignment.driver_id)
+        .maybeSingle()
+    : { data: null };
+  const { data: assignedDriverVerification } = assignedDriverProfile?.user_id
+    ? await supabase
+        .from('driver_profiles')
+        .select('id_status, vehicle_status')
+        .eq('user_id', assignedDriverProfile.user_id)
         .maybeSingle()
     : { data: null };
   const verifiedDriver = Boolean(
     primaryAssignment &&
       assignedDriverProfile?.id_document_url &&
-      assignedDriverProfile?.id_status === 'approved' &&
-      assignedDriverProfile?.vehicle_status === 'approved'
+      assignedDriverVerification?.id_status === 'approved' &&
+      assignedDriverVerification?.vehicle_status === 'approved'
   );
 
   return (
@@ -143,7 +151,10 @@ export default async function RouteDetailPage({
                 </span>
               </div>
             </div>
-            <Shield className="h-4 w-4 text-emerald-500" />
+            <div className="flex flex-col items-end gap-2">
+              {user ? <LogoutButton /> : null}
+              <Shield className="h-4 w-4 text-emerald-500" />
+            </div>
           </div>
         </div>
       </div>
@@ -169,7 +180,7 @@ export default async function RouteDetailPage({
                       <div className="text-xs text-slate-600">{stop.area || 'Area to be confirmed'}</div>
                       <div className="mt-1 text-[11px] font-semibold text-slate-500">
                         {formatRouteStopTime(stop.estimated_morning_time) || 'AM time pending'}
-                        {' · '}
+                        {' Â· '}
                         {formatRouteStopTime(stop.estimated_return_time) || 'PM time pending'}
                       </div>
                     </div>
@@ -292,3 +303,7 @@ export default async function RouteDetailPage({
     </div>
   );
 }
+
+
+
+
