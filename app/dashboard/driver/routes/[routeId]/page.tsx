@@ -1,11 +1,16 @@
-import Link from 'next/link';
+﻿import Link from 'next/link';
 import { redirect, notFound } from 'next/navigation';
-import { ArrowLeft, BadgeCheck, Bell, CalendarDays, MapPin, MessageSquare, Route as RouteIcon, Users } from 'lucide-react';
+import { ArrowLeft, BadgeCheck, Bell, CalendarDays, MapPin, MessageSquare, Route as RouteIcon, Send, Users } from 'lucide-react';
 import { getDisplayName } from '@/lib/display-name';
 import { createClient } from '@/lib/supabase/server';
-import { getDriverRouteDetail, sendRouteChatMessageFromForm } from '@/lib/routes/actions';
-import RouteChatThread, { type RouteChatMessage } from '@/components/RouteChatThread';
+import { getDriverRouteDetail } from '@/lib/routes/actions';
+import RouteChatThread from '@/components/RouteChatThread';
 import { isAdminRole, isSuperAdminEmail } from '@/lib/auth/routing';
+import {
+  getOpenRouteChatView,
+  reportOpenRouteChatParticipantFromForm,
+  sendOpenRouteChatMessageFromForm,
+} from '@/lib/routes/open-chat';
 
 function badgeClass(status: string) {
   if (status === 'active' || status === 'approved') return 'bg-emerald-100 text-emerald-700';
@@ -31,10 +36,13 @@ function formatPreferredTime(morning?: string | null, returnTime?: string | null
 
 export default async function DriverRouteDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ routeId: string }>;
+  searchParams?: Promise<{ chat_error?: string }>;
 }) {
   const { routeId } = await params;
+  const resolvedSearchParams = await searchParams;
   const supabase = await createClient();
 
   const {
@@ -91,44 +99,17 @@ export default async function DriverRouteDetailPage({
     assignments[0] ||
     null;
   const routeIsLive = Boolean(assignment && ['approved', 'active'].includes(assignment.status));
-
-  const { data: routeChatMessages } = assignment && routeIsLive
-    ? await supabase
-        .from('route_chats')
-        .select('id, route_id, assignment_id, sender_id, receiver_id, message, created_at')
-        .eq('route_id', route.id)
-        .eq('assignment_id', assignment.id)
-        .order('created_at', { ascending: true })
-    : { data: [] };
+  const routeChatViewResult = routeIsLive ? await getOpenRouteChatView(route.id) : null;
+  const routeChatView = routeChatViewResult && !('error' in routeChatViewResult) ? routeChatViewResult : null;
 
   const routeRequests = requests.filter((request) => request.route_id === route.id);
   const routeLedger = ledger.filter((entry) => entry.route_id === route.id);
-  const assignmentRequest = assignment
-    ? routeRequests.find((request) => request.matched_assignment_id === assignment.id && request.passenger_id) ||
-      routeRequests.find((request) => request.passenger_id) ||
-      null
-    : null;
-  const inferredRouteChatPeerId =
-    assignmentRequest?.passenger_id ||
-    routeChatMessages?.find((message) => message.sender_id !== profile?.id)?.sender_id ||
-    routeChatMessages?.find((message) => message.receiver_id !== profile?.id)?.receiver_id ||
-    null;
-  const { data: routeChatPeer } = inferredRouteChatPeerId
-    ? await supabase
-        .from('profiles')
-        .select('id, user_id, first_name, surname, role')
-        .or(`id.eq.${inferredRouteChatPeerId},user_id.eq.${inferredRouteChatPeerId}`)
-        .maybeSingle()
-    : { data: null };
   const driverName = getDisplayName({
     firstName: profile?.first_name,
     surname: profile?.surname,
     email: user.email ?? null,
     fallback: 'Driver',
   });
-  const memberName = routeChatPeer
-    ? `${routeChatPeer.first_name || ''} ${routeChatPeer.surname || ''}`.trim() || 'Member'
-    : 'Member';
   const verifiedDriver = Boolean(
     driverProfile?.id_status === 'approved' &&
       driverProfile?.vehicle_status === 'approved'
@@ -178,6 +159,12 @@ export default async function DriverRouteDetailPage({
 
       <div className="mx-auto grid max-w-5xl gap-4 px-4 py-4 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-4">
+          {resolvedSearchParams?.chat_error ? (
+            <section className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+              {resolvedSearchParams.chat_error}
+            </section>
+          ) : null}
+
           <section className="rounded-xl border border-slate-200 bg-white p-4">
             <h2 className="mb-3 text-base font-bold text-slate-900">Ordered stops</h2>
             <div className="space-y-2">
@@ -205,7 +192,7 @@ export default async function DriverRouteDetailPage({
 
           <section className="rounded-xl border border-slate-200 bg-white p-4">
             <h2 className="mb-3 text-base font-bold text-slate-900">Assignment summary</h2>
-              <div className="grid gap-2 text-sm text-slate-600">
+            <div className="grid gap-2 text-sm text-slate-600">
               <div>Driver: {driverName}</div>
               <div>Vehicle plate: {assignment?.vehicle_plate || 'TBA'}</div>
               <div>Weekly price: {assignment?.weekly_price ? `R${assignment.weekly_price}` : 'TBA'}</div>
@@ -221,78 +208,96 @@ export default async function DriverRouteDetailPage({
               <div>
                 <div className="flex items-center gap-2">
                   <MessageSquare className="h-4 w-4 text-emerald-600" />
-                  <h2 className="text-base font-bold text-slate-900">Direct chat</h2>
+                  <h2 className="text-base font-bold text-slate-900">Route chat</h2>
                 </div>
                 <p className="mt-1 text-sm text-slate-600">
-                  Member conversations for this route appear here.
+                  Members joined to this route can read and post messages here.
                 </p>
               </div>
               <div className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                Live chat
+                {routeChatView?.participants.length || 0} joined
               </div>
             </div>
 
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <div className="mb-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span>Chat with {memberName} on this route</span>
-                  {verifiedDriver ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
-                      <BadgeCheck className="h-3 w-3" />
-                      Verified driver
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-              {assignment && routeIsLive ? (
+            {routeChatView ? (
+              <>
                 <RouteChatThread
-                  key={`${route.id}:${assignment.id}:${(routeChatMessages || []).length}`}
-                  routeId={route.id}
-                  assignmentId={assignment.id}
+                  threadId={routeChatView.thread_id || route.id}
                   currentProfileId={profile?.id || user.id}
-                  initialMessages={(routeChatMessages || []) as RouteChatMessage[]}
-                  emptyStateText="No direct chat yet. Members can start the conversation from the route page."
+                  participants={routeChatView.participants}
+                  initialMessages={routeChatView.messages}
+                  emptyStateText="No route messages yet. Joined members will appear here once they start chatting."
                 />
-              ) : (
-                <div className="rounded-lg border border-dashed border-slate-300 bg-white px-3 py-3 text-sm text-slate-600">
-                  Route details are available, but no assignment is being resolved for this driver session yet.
-                </div>
-              )}
 
-              {assignment && inferredRouteChatPeerId && profile?.id ? (
-                <form action={sendRouteChatMessageFromForm} className="mt-3 space-y-2">
-                  <input type="hidden" name="routeId" value={route.id} />
-                  <input type="hidden" name="assignmentId" value={assignment.id} />
-                  <input type="hidden" name="receiverId" value={routeChatPeer?.id || inferredRouteChatPeerId} />
-                  <label htmlFor="driverRouteChatMessage" className="block text-sm font-semibold text-slate-900">
-                    Reply to {memberName}
-                  </label>
-                  <textarea
-                    id="driverRouteChatMessage"
-                    name="message"
-                    rows={3}
-                    required
-                    placeholder={`Reply to ${memberName}...`}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  />
-                  <button
-                    type="submit"
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-500 bg-white px-4 py-3 text-sm font-semibold text-emerald-600 hover:bg-emerald-50"
-                  >
-                    <MessageSquare className="h-4 w-4" />
-                    Send reply
-                  </button>
-                </form>
-              ) : assignment ? (
-                <div className="mt-3 rounded-lg border border-dashed border-slate-300 bg-white px-3 py-3 text-sm text-slate-600">
-                  This route application is not live yet. Chat will unlock after admin approves the assignment.
-                </div>
-              ) : !profile?.id ? (
-                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800">
-                  Driver profile lookup is still resolving. The route is open, but chat controls need the profile row to load.
-                </div>
-              ) : null}
-            </div>
+                {routeChatView.can_post ? (
+                  <form action={sendOpenRouteChatMessageFromForm} className="mt-3 space-y-2">
+                    <input type="hidden" name="routeId" value={route.id} />
+                    <label htmlFor="driverRouteChatMessage" className="block text-sm font-semibold text-slate-900">
+                      Message the route chat
+                    </label>
+                    <textarea
+                      id="driverRouteChatMessage"
+                      name="message"
+                      rows={3}
+                      required
+                      placeholder="Write a message to joined route members..."
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <button
+                      type="submit"
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-500 bg-white px-4 py-3 text-sm font-semibold text-emerald-600 hover:bg-emerald-50"
+                    >
+                      <Send className="h-4 w-4" />
+                      Send message
+                    </button>
+                  </form>
+                ) : null}
+
+                {routeChatView.can_report ? (
+                  <form action={reportOpenRouteChatParticipantFromForm} className="mt-3 space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <input type="hidden" name="routeId" value={route.id} />
+                    <div className="text-sm font-semibold text-slate-900">Report a passenger</div>
+                    <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="reportedProfileId">
+                      Passenger
+                    </label>
+                    <select
+                      id="reportedProfileId"
+                      name="reportedProfileId"
+                      required
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900"
+                    >
+                      <option value="">Select a joined passenger</option>
+                      {routeChatView.participants.map((participant) => (
+                        <option key={participant.id} value={participant.profile_id}>
+                          {participant.display_name}
+                        </option>
+                      ))}
+                    </select>
+                    <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="reportReason">
+                      Reason
+                    </label>
+                    <textarea
+                      id="reportReason"
+                      name="reason"
+                      rows={3}
+                      required
+                      placeholder="Explain what happened..."
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <button
+                      type="submit"
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-rose-500 bg-white px-4 py-3 text-sm font-semibold text-rose-600 hover:bg-rose-50"
+                    >
+                      Report passenger
+                    </button>
+                  </form>
+                ) : null}
+              </>
+            ) : (
+              <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+                Route chat unlocks after the route is approved and assigned.
+              </div>
+            )}
           </section>
 
           <section className="rounded-xl border border-slate-200 bg-white p-4">
@@ -352,3 +357,4 @@ export default async function DriverRouteDetailPage({
     </div>
   );
 }
+
