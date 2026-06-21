@@ -53,7 +53,8 @@ type PassengerProfileRow = {
 
 type VehicleLookupRow = {
   id: string;
-  seat_capacity: number | null;
+  seat_capacity?: number | null;
+  vehicle_photo_url?: string | null;
   make: string | null;
   model: string | null;
   licence_plate: string | null;
@@ -1245,13 +1246,13 @@ export async function getOfficialRoutes(includeInactive = false) {
   >();
   for (const assignment of typedAssignments) {
     const list = assignmentsByRoute.get(assignment.route_id) || [];
-    const driverProfileRow = driverProfilesByDriverProfileId.get(assignment.driver_id);
-    const driverProfile = driverProfileRow
-      ? driverProfilesByUserId.get(driverProfileRow.user_id)
+    const driverMemberProfile = driverProfilesByDriverProfileId.get(assignment.driver_id);
+    const driverProfile = driverMemberProfile
+      ? driverProfilesByUserId.get(driverMemberProfile.user_id)
       : null;
     const vehicle = vehiclesById.get(assignment.vehicle_id);
-    const driverName = driverProfile
-      ? `${driverProfile.first_name || ''} ${driverProfile.surname || ''}`.trim()
+    const driverName = driverMemberProfile
+      ? `${driverMemberProfile.first_name || ''} ${driverMemberProfile.surname || ''}`.trim()
       : 'Assigned driver';
     const vehicleLabel = vehicle
       ? `${vehicle.make || ''} ${vehicle.model || ''}`.trim() + (vehicle.licence_plate ? ` - ${vehicle.licence_plate}` : '')
@@ -1263,12 +1264,12 @@ export async function getOfficialRoutes(includeInactive = false) {
       status: assignment.status,
       driver_name: driverName || 'Assigned driver',
       driver_verified: Boolean(
-        driverProfileRow?.id_document_url &&
+        driverMemberProfile?.id_document_url &&
           driverProfile?.id_status === 'approved' &&
           driverProfile?.vehicle_status === 'approved'
       ),
-      phone: includeInactive ? driverProfile?.phone || null : null,
-      email: includeInactive ? driverProfile?.email || null : null,
+      phone: includeInactive ? driverMemberProfile?.phone || null : null,
+      email: includeInactive ? driverMemberProfile?.email || null : null,
       seats_available: assignment.seats_available,
       weekly_price: assignment.weekly_price,
       single_route_price: assignment.single_route_price,
@@ -1536,6 +1537,7 @@ export async function getDriverRouteDashboard() {
     pendingRequests,
   };
 }
+
 
 
 
