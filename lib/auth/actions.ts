@@ -32,7 +32,7 @@ export async function signUp(formData: {
   }
 
   const userId = authData.user.id;
-  let idDocUrl = '';
+  let idDocumentPath = '';
   let selfieUrl = '';
 
   // Upload ID document if provided
@@ -46,8 +46,7 @@ export async function signUp(formData: {
       .upload(idPath, idBuffer, { contentType: formData.idDocument.type });
     
     if (!idUploadError) {
-      const { data: { publicUrl } } = supabase.storage.from('id-documents').getPublicUrl(idPath);
-      idDocUrl = publicUrl;
+      idDocumentPath = idPath;
     }
   }
 
@@ -78,7 +77,7 @@ export async function signUp(formData: {
     membership_type: formData.membershipType,
     membership_status: 'pending',
     home_province: formData.homeProvince,
-    id_document_url: idDocUrl || null,
+    id_document_url: idDocumentPath || null,
     profile_photo_url: selfieUrl || null,
   });
 
@@ -124,7 +123,7 @@ export async function signUp(formData: {
       provider_payment_proof_url: null,
       provider_last_paid_at: null,
       provider_next_payment_at: null,
-      id_document_url: idDocUrl || null,
+      id_document_url: idDocumentPath || null,
     });
 
     if (driverError) {
@@ -211,23 +210,6 @@ export async function signIn(email: string, password: string, redirectTo?: strin
 
 export async function signOut() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (profile?.id) {
-      await supabase
-        .from('route_chats')
-        .delete()
-        .or(`sender_id.eq.${profile.id},receiver_id.eq.${profile.id}`);
-    }
-  }
-
   await supabase.auth.signOut();
   return { success: true, redirectUrl: '/' };
 }
