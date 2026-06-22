@@ -1,4 +1,4 @@
-import Link from 'next/link';
+﻿import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, BadgeCheck, MapPin, MessageSquare, Route as RouteIcon, Send, Shield } from 'lucide-react';
 import { getRouteDetail, sendRouteChatMessageFromForm } from '@/lib/routes/actions';
@@ -161,7 +161,7 @@ export default async function RouteDetailPage({
                       <div className="text-xs text-slate-600">{stop.area || 'Area to be confirmed'}</div>
                       <div className="mt-1 text-[11px] font-semibold text-slate-500">
                         {formatRouteStopTime(stop.estimated_morning_time) || 'AM time pending'}
-                        {' Â· '}
+                        {' Ã‚Â· '}
                         {formatRouteStopTime(stop.estimated_return_time) || 'PM time pending'}
                       </div>
                     </div>
@@ -248,9 +248,17 @@ export default async function RouteDetailPage({
                 <input type="hidden" name="routeId" value={route.id} />
                 <input type="hidden" name="assignmentId" value={primaryAssignment.id} />
                 <input type="hidden" name="receiverId" value={primaryAssignment.driver_id} />
-                <label htmlFor="routeChatMessage" className="block text-sm font-semibold text-slate-900">
-                  Message to driver
-                </label>
+                                <div className="mb-1 flex items-center justify-between gap-3">
+                  <label htmlFor="routeChatMessage" className="block text-sm font-semibold text-slate-900">
+                    Message to driver
+                  </label>
+                  <a
+                    href="#private-offer"
+                    className="inline-flex items-center justify-center rounded-lg border border-violet-500 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-50"
+                  >
+                    Make an offer
+                  </a>
+                </div>
                 <textarea
                   id="routeChatMessage"
                   name="message"
@@ -283,9 +291,3 @@ export default async function RouteDetailPage({
     </div>
   );
 }
-
-
-
-
-
-
