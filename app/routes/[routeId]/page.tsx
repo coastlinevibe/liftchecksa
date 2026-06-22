@@ -8,6 +8,11 @@ import RouteChatThread from '@/components/RouteChatThread';
 import DriverRouteApplicationForm from '@/components/DriverRouteApplicationForm';
 import RouteSeatRequestForm from './RouteSeatRequestForm';
 import { joinOpenRouteChatFromForm, getOpenRouteChatView, sendOpenRouteChatMessageFromForm } from '@/lib/routes/open-chat';
+import {
+  createPrivateOfferFromForm,
+  getRoutePrivateOfferContext,
+  withdrawPrivateOfferFromForm,
+} from '@/lib/routes/private-offers';
 import LogoutButton from '@/components/LogoutButton';
 
 export const dynamic = 'force-dynamic';
@@ -27,7 +32,7 @@ export default async function RouteDetailPage({
   searchParams,
 }: {
   params: Promise<{ routeId: string }>;
-  searchParams?: Promise<{ chat_error?: string }>;
+  searchParams?: Promise<{ chat_error?: string; offer_error?: string; offer_success?: string }>;
 }) {
   const { routeId } = await params;
   const resolvedSearchParams = await searchParams;
@@ -97,6 +102,8 @@ export default async function RouteDetailPage({
     ? openRouteChatViewResult
     : null;
 
+  const privateOfferContext = await getRoutePrivateOfferContext(route.id);
+
   return (
     <div className="min-h-screen bg-slate-50 pb-28 md:pb-0">
       <div className="border-b border-slate-200 bg-white">
@@ -135,6 +142,17 @@ export default async function RouteDetailPage({
               {resolvedSearchParams.chat_error}
             </section>
           ) : null}
+          {resolvedSearchParams?.offer_error ? (
+            <section className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+              {resolvedSearchParams.offer_error}
+            </section>
+          ) : null}
+          {resolvedSearchParams?.offer_success ? (
+            <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+              Private offer sent to the assigned driver.
+            </section>
+          ) : null}
+
 
           <section className="rounded-xl border border-slate-200 bg-white p-4">
             <h2 className="mb-3 text-base font-bold text-slate-900">Ordered stops</h2>
@@ -172,6 +190,101 @@ export default async function RouteDetailPage({
         </div>
 
         <div className="space-y-4">
+          {privateOfferContext ? (
+            <section className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-violet-600">Private offer</div>
+                  <h2 className="text-base font-bold text-slate-900">Make an offer to the assigned driver</h2>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Only you, the assigned driver, and platform admins can see this offer.
+                  </p>
+                </div>
+                {privateOfferContext.assigned_driver_name ? (
+                  <div className="rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700">
+                    {privateOfferContext.assigned_driver_name}
+                  </div>
+                ) : null}
+              </div>
+
+              {privateOfferContext.current_offer ? (
+                <div className="rounded-lg border border-violet-200 bg-violet-50 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold text-violet-900">
+                        Current offer: R{privateOfferContext.current_offer.amount}
+                      </div>
+                      <div className="mt-1 text-xs text-violet-800">
+                        Status: {privateOfferContext.current_offer.status}
+                      </div>
+                      <div className="mt-2 text-xs text-violet-800">{privateOfferContext.current_offer.message}</div>
+                    </div>
+                    <div className="text-right text-[11px] text-violet-700">
+                      {new Date(privateOfferContext.current_offer.created_at).toLocaleDateString()}
+                    </div>
+                  </div>
+                  {privateOfferContext.can_withdraw_offer ? (
+                    <form action={withdrawPrivateOfferFromForm} className="mt-3">
+                      <input type="hidden" name="routeId" value={route.id} />
+                      <input type="hidden" name="offerId" value={privateOfferContext.current_offer.id} />
+                      <button
+                        type="submit"
+                        className="inline-flex items-center justify-center rounded-lg border border-violet-300 bg-white px-3 py-2 text-xs font-semibold text-violet-700 hover:bg-violet-100"
+                      >
+                        Withdraw offer
+                      </button>
+                    </form>
+                  ) : null}
+                </div>
+              ) : privateOfferContext.can_make_offer ? (
+                <form action={createPrivateOfferFromForm} className="space-y-3">
+                  <input type="hidden" name="routeId" value={route.id} />
+                  <div>
+                    <label htmlFor="offerAmount" className="mb-1 block text-sm font-semibold text-slate-900">
+                      Offer amount
+                    </label>
+                    <input
+                      id="offerAmount"
+                      name="amount"
+                      type="number"
+                      min={1}
+                      step="0.01"
+                      placeholder="R250.00"
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                    />
+                  </div>
+                                    <div>
+                    <div className="mb-1 flex items-center justify-between gap-3">
+                      <label htmlFor="offerMessage" className="block text-sm font-semibold text-slate-900">
+                        Message to driver
+                      </label>
+                      <button
+                        type="submit"
+                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-xs font-semibold text-white hover:bg-violet-700"
+                      >
+                        Make an offer
+                      </button>
+                    </div>
+                    <textarea
+                      id="offerMessage"
+                      name="message"
+                      rows={4}
+                      placeholder="Send a private note to the driver..."
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                    />
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    The amount and message stay private and are visible only to you, the driver, and admin.
+                  </p>
+                </form>
+              ) : (
+                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+                  Private offers unlock once you have an active membership and an assigned driver is available.
+                </div>
+              )}
+            </section>
+          ) : null}
+
           {isDriverUser ? (
             <DriverRouteApplicationForm
               routeId={route.id}
@@ -279,6 +392,3 @@ export default async function RouteDetailPage({
     </div>
   );
 }
-
-
-
