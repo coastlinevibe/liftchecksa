@@ -56,6 +56,7 @@ type PassengerProfileRow = {
   surname: string | null;
   phone?: string | null;
   email?: string | null;
+  membership_status?: string | null;
 };
 
 type VehicleLookupRow = {
@@ -119,7 +120,7 @@ async function getCurrentProfile(supabase: Awaited<ReturnType<typeof createClien
 
   const { data: profile, error } = await supabase
     .from('profiles')
-    .select('id, user_id, role, membership_status, first_name, surname')
+    .select('id, user_id, role, membership_status, first_name, surname, profile_photo_url')
     .eq('user_id', user.id)
     .maybeSingle();
 
@@ -230,7 +231,7 @@ export async function createOfficialRoute(input: {
     : await (async () => {
         const { data: currentProfile } = await supabase
           .from('profiles')
-          .select('id, user_id, role, membership_status, first_name, surname')
+          .select('id, user_id, role, membership_status, first_name, surname, profile_photo_url')
           .eq('user_id', user.id)
           .maybeSingle();
 
@@ -813,45 +814,70 @@ export async function requestRouteSeat(input: {
   if (!profile) {
     return { error: 'Profile not found' };
   }
-  const passengerProfileId = profile.id;
 
-  const { data: existing } = await supabase
+  if (profile.role !== 'member') {
+    return { error: 'Active member access required' };
+  }
+
+  if (profile.membership_status !== 'active') {
+    return { error: 'Active member access required' };
+  }
+
+  const { data: existingActiveRequest, error: existingError } = await supabase
     .from('route_seat_requests')
     .select('id, status')
     .eq('route_id', input.routeId)
-    .eq('passenger_id', passengerProfileId)
+    .eq('passenger_id', profile.id)
+    .in('status', ['pending', 'approved', 'assigned', 'cancellation_requested', 'suspended'])
     .maybeSingle();
 
-  const seatsRequested = Number.isFinite(input.seatsRequested)
-    ? Math.max(1, Math.floor(Number(input.seatsRequested)))
-    : 1;
+  if (existingError) {
+    return { error: existingError.message };
+  }
 
+  if (existingActiveRequest) {
+    return { error: 'You already have an active seat request on this route' };
+  }
+
+  const { data: assignment, error: assignmentError } = await supabase
+    .from('driver_route_assignments')
+    .select('id, status, seats_available')
+    .eq('route_id', input.routeId)
+    .in('status', ['approved', 'active'])
+    .gt('seats_available', 0)
+    .order('created_at', { ascending: false })
+    .maybeSingle();
+
+  if (assignmentError) {
+    return { error: assignmentError.message };
+  }
+
+  if (!assignment) {
+    return { error: 'No available driver assignment found for this route' };
+  }
+
+  const now = new Date().toISOString();
   const payload = {
-    passenger_id: passengerProfileId,
+    passenger_id: profile.id,
     route_id: input.routeId,
     pickup_stop_id: input.pickupStopId,
     dropoff_stop_id: input.dropoffStopId,
-    seats_requested: seatsRequested,
+    seats_requested: 1,
     requested_days: input.requestedDays?.length ? input.requestedDays : DEFAULT_WEEKDAYS,
     request_type: input.requestType || 'weekly',
     preferred_morning_time: input.preferredMorningTime || null,
     preferred_return_time: input.preferredReturnTime || null,
+    matched_assignment_id: assignment.id,
+    passenger_avatar_url: profile.profile_photo_url || null,
     status: 'pending',
-    updated_at: new Date().toISOString(),
+    updated_at: now,
   };
 
-  const { data: request, error } = existing?.id
-    ? await supabase
-        .from('route_seat_requests')
-        .update(payload)
-        .eq('id', existing.id)
-        .select('*')
-        .single()
-    : await supabase
-        .from('route_seat_requests')
-        .insert(payload)
-        .select('*')
-        .single();
+  const { data: request, error } = await supabase
+    .from('route_seat_requests')
+    .insert(payload)
+    .select('*')
+    .single();
 
   if (error) {
     return { error: error.message };
@@ -863,7 +889,6 @@ export async function requestRouteSeat(input: {
 
   return { success: true, request: request as RouteSeatRequest };
 }
-
 export async function requestRouteSeatFromForm(formData: FormData) {
   const daysRaw = String(formData.get('requested_days') || '[]');
   let parsedDays: Weekday[] = [];
@@ -889,6 +914,579 @@ export async function requestRouteSeatFromForm(formData: FormData) {
   });
 }
 
+function parseSeatRequestIds(input: FormData | { requestId: string; routeId: string }) {
+  if (input instanceof FormData) {
+    const requestId = String(input.get('requestId') || '').trim();
+    const routeId = String(input.get('routeId') || '').trim();
+
+    if (!requestId || !routeId) {
+      return { error: 'Missing seat request details' as const };
+    }
+
+    return { requestId, routeId } as const;
+  }
+
+  return input;
+}
+
+function parseSeatNumberInput(input: FormData | { requestId: string; routeId: string; seatNumber: number }) {
+  if (input instanceof FormData) {
+    const requestInput = parseSeatRequestIds(input);
+    if ('error' in requestInput) {
+      return requestInput;
+    }
+
+    const parsedSeatNumber = Number(input.get('seatNumber'));
+    const seatNumber = Number.isFinite(parsedSeatNumber) ? Math.floor(parsedSeatNumber) : 0;
+    if (seatNumber < 1) {
+      return { error: 'Choose a valid seat number' as const };
+    }
+
+    return { ...requestInput, seatNumber } as const;
+  }
+
+  return input;
+}
+
+function parseSeatDecisionInput(input: FormData | { requestId: string; routeId: string; decision: 'approved' | 'rejected' }) {
+  if (input instanceof FormData) {
+    const requestInput = parseSeatRequestIds(input);
+    if ('error' in requestInput) {
+      return requestInput;
+    }
+
+    const decision = String(input.get('decision') || '').trim();
+    if (decision !== 'approved' && decision !== 'rejected') {
+      return { error: 'Choose a valid cancellation decision' as const };
+    }
+
+    return { ...requestInput, decision } as const;
+  }
+
+  return input;
+}
+
+function parseSeatRemovalInput(input: FormData | { requestId: string; routeId: string; reason: string }) {
+  if (input instanceof FormData) {
+    const requestInput = parseSeatRequestIds(input);
+    if ('error' in requestInput) {
+      return requestInput;
+    }
+
+    const reason = String(input.get('reason') || '').trim();
+    if (!reason) {
+      return { error: 'Provide a reason for the removal' as const };
+    }
+
+    return { ...requestInput, reason } as const;
+  }
+
+  return input;
+}
+
+async function getDriverSeatActionProfile(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
+  const { data: driverProfile, error } = await supabase
+    .from('driver_profiles')
+    .select('id, user_id, id_status, vehicle_status')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  if (!driverProfile || !isDriverFullyApproved(driverProfile)) {
+    return { valid: false as const };
+  }
+
+  return { valid: true as const, driverProfile };
+}
+
+async function getSeatWorkflowContext(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  requestId: string,
+  routeId: string
+) {
+  const { data: request, error } = await supabase
+    .from('route_seat_requests')
+    .select('*')
+    .eq('id', requestId)
+    .eq('route_id', routeId)
+    .maybeSingle();
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  if (!request) {
+    return { error: 'Seat request not found' };
+  }
+
+  const { data: assignment, error: assignmentError } = request.matched_assignment_id
+    ? await supabase
+        .from('driver_route_assignments')
+        .select('id, driver_id, route_id, status, seats_available')
+        .eq('id', request.matched_assignment_id)
+        .eq('route_id', routeId)
+        .maybeSingle()
+    : { data: null, error: null };
+
+  if (assignmentError) {
+    return { error: assignmentError.message };
+  }
+
+  return { request: request as RouteSeatRequest, assignment: assignment || null };
+}
+
+function revalidateSeatRequestPaths(routeId: string) {
+  revalidatePath(`/routes/${routeId}`);
+  revalidatePath('/routes');
+  revalidatePath('/dashboard/member');
+  revalidatePath(`/dashboard/driver/routes/${routeId}`);
+  revalidatePath('/dashboard/driver/routes');
+  revalidatePath(`/admin/routes/${routeId}`);
+  revalidatePath('/admin/routes');
+}
+
+export async function approveRouteSeatRequest(input: FormData | { requestId: string; routeId: string; seatNumber: number }) {
+  const supabase = await createClient();
+  const requestInput = parseSeatNumberInput(input);
+  if ('error' in requestInput) {
+    return { error: requestInput.error };
+  }
+  const { seatNumber } = requestInput as { seatNumber: number };
+
+  const current = await getCurrentProfile(supabase);
+  if ('error' in current) {
+    return { error: current.error || 'Unable to load current profile' };
+  }
+
+  const { profile } = current;
+  if (!profile) {
+    return { error: 'Profile not found' };
+  }
+
+  const isAdmin = profile.role === 'platform_admin';
+  if (!isAdmin) {
+    if (profile.role !== 'driver' || profile.membership_status !== 'active') {
+      return { error: 'Valid driver approval is required' };
+    }
+
+    const driverCheck = await getDriverSeatActionProfile(supabase, profile.user_id);
+    if ('error' in driverCheck) {
+      return { error: driverCheck.error };
+    }
+
+    if (!driverCheck.valid) {
+      return { error: 'Valid driver approval is required' };
+    }
+  }
+
+  const context = await getSeatWorkflowContext(supabase, requestInput.requestId, requestInput.routeId);
+  if ('error' in context) {
+    return { error: context.error };
+  }
+
+  const { request, assignment } = context;
+  if (!assignment) {
+    return { error: 'Route assignment not found for this request' };
+  }
+  if (!isAdmin && assignment.driver_id !== profile.id) {
+    return { error: 'Not authorized to review this request' };
+  }
+  if (request.status !== 'pending') {
+    return { error: 'Only pending requests can be approved' };
+  }
+
+  const { data: route, error: routeError } = await supabase
+    .from('official_routes')
+    .select('vehicle_capacity')
+    .eq('id', request.route_id)
+    .maybeSingle();
+
+  if (routeError) {
+    return { error: routeError.message };
+  }
+
+  const seatCapacity = Math.max(0, Number(route?.vehicle_capacity || 0) - 1);
+  if (seatNumber < 1 || seatNumber > seatCapacity) {
+    return { error: 'Choose a valid seat number for this route' };
+  }
+
+  const { data: existingSeat, error: existingSeatError } = await supabase
+    .from('route_seat_requests')
+    .select('id, status')
+    .eq('route_id', request.route_id)
+    .eq('seat_number', seatNumber)
+    .in('status', ['approved', 'assigned', 'cancellation_requested', 'suspended'])
+    .maybeSingle();
+
+  if (existingSeatError) {
+    return { error: existingSeatError.message };
+  }
+  if (existingSeat && existingSeat.id !== request.id) {
+    return { error: 'That seat is already reserved' };
+  }
+
+  const now = new Date().toISOString();
+  const { data: updatedSeatCount, error: seatError } = await supabase
+    .from('driver_route_assignments')
+    .update({ seats_available: Number(assignment.seats_available || 0) - 1 })
+    .eq('id', assignment.id)
+    .eq('seats_available', assignment.seats_available || 0)
+    .select('id')
+    .maybeSingle();
+
+  if (seatError) {
+    return { error: seatError.message };
+  }
+  if (!updatedSeatCount) {
+    return { error: 'Unable to reserve a seat right now' };
+  }
+
+  const { data: updatedRequest, error } = await supabase
+    .from('route_seat_requests')
+    .update({
+      status: 'approved',
+      approved_by: profile.id,
+      approved_at: now,
+      seat_number: seatNumber,
+      seat_assigned_by: profile.id,
+      seat_assigned_at: now,
+      cancellation_requested_by: null,
+      cancellation_requested_at: null,
+      cancellation_reviewed_by: null,
+      cancellation_reviewed_at: null,
+      removed_by: null,
+      removed_at: null,
+      removed_reason: null,
+      updated_at: now,
+    })
+    .eq('id', request.id)
+    .select('*')
+    .single();
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidateSeatRequestPaths(request.route_id);
+
+  return { success: true, request: updatedRequest as RouteSeatRequest };
+}
+export async function rejectRouteSeatRequest(input: FormData | { requestId: string; routeId: string }) {
+  const supabase = await createClient();
+  const requestInput = parseSeatRequestIds(input);
+  if ('error' in requestInput) {
+    return { error: requestInput.error };
+  }
+
+  const current = await getCurrentProfile(supabase);
+  if ('error' in current) {
+    return { error: current.error || 'Unable to load current profile' };
+  }
+
+  const { profile } = current;
+  if (!profile) {
+    return { error: 'Profile not found' };
+  }
+
+  const isAdmin = profile.role === 'platform_admin';
+  if (!isAdmin) {
+    if (profile.role !== 'driver' || profile.membership_status !== 'active') {
+      return { error: 'Valid driver approval is required' };
+    }
+
+    const driverCheck = await getDriverSeatActionProfile(supabase, profile.user_id);
+    if ('error' in driverCheck) {
+      return { error: driverCheck.error };
+    }
+
+    if (!driverCheck.valid) {
+      return { error: 'Valid driver approval is required' };
+    }
+  }
+
+  const context = await getSeatWorkflowContext(supabase, requestInput.requestId, requestInput.routeId);
+  if ('error' in context) {
+    return { error: context.error };
+  }
+
+  const { request, assignment } = context;
+  if (!assignment) {
+    return { error: 'Route assignment not found for this request' };
+  }
+  if (!isAdmin && assignment.driver_id !== profile.id) {
+    return { error: 'Not authorized to review this request' };
+  }
+  if (request.status !== 'pending') {
+    return { error: 'Only pending requests can be rejected' };
+  }
+
+  const now = new Date().toISOString();
+  const { data: updatedRequest, error } = await supabase
+    .from('route_seat_requests')
+    .update({
+      status: 'rejected',
+      approved_by: profile.id,
+      approved_at: now,
+      cancellation_requested_by: null,
+      cancellation_requested_at: null,
+      cancellation_reviewed_by: null,
+      cancellation_reviewed_at: null,
+      removed_by: null,
+      removed_at: null,
+      removed_reason: null,
+      updated_at: now,
+    })
+    .eq('id', request.id)
+    .select('*')
+    .single();
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidateSeatRequestPaths(request.route_id);
+
+  return { success: true, request: updatedRequest as RouteSeatRequest };
+}
+
+export async function assignRouteSeatNumber() {
+  return { error: 'Seat number must be chosen during approval' };
+}
+export async function requestRouteSeatCancellation(input: FormData | { requestId: string; routeId: string }) {
+  const supabase = await createClient();
+  const requestInput = parseSeatRequestIds(input);
+  if ('error' in requestInput) {
+    return { error: requestInput.error };
+  }
+
+  const current = await getCurrentProfile(supabase);
+  if ('error' in current) {
+    return { error: current.error || 'Unable to load current profile' };
+  }
+
+  const { profile } = current;
+  if (!profile) {
+    return { error: 'Profile not found' };
+  }
+
+  const { request } = await getSeatWorkflowContext(supabase, requestInput.requestId, requestInput.routeId);
+  if (!request) {
+    return { error: 'Seat request not found' };
+  }
+
+  if (request.passenger_id !== profile.id) {
+    return { error: 'Not authorized to request cancellation' };
+  }
+
+  if (!['approved', 'assigned'].includes(request.status)) {
+    return { error: 'Only approved seat requests can be cancelled' };
+  }
+
+  const now = new Date().toISOString();
+  const { data: updatedRequest, error } = await supabase
+    .from('route_seat_requests')
+    .update({
+      status: 'cancellation_requested',
+      cancellation_requested_by: profile.id,
+      cancellation_requested_at: now,
+      updated_at: now,
+    })
+    .eq('id', request.id)
+    .select('*')
+    .single();
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidateSeatRequestPaths(request.route_id);
+
+  return { success: true, request: updatedRequest as RouteSeatRequest };
+}
+
+export async function reviewRouteSeatCancellation(input: FormData | { requestId: string; routeId: string; decision: 'approved' | 'rejected' }) {
+  const supabase = await createClient();
+  const requestInput = parseSeatDecisionInput(input);
+  if ('error' in requestInput) {
+    return { error: requestInput.error };
+  }
+  const { decision } = requestInput as { decision: 'approved' | 'rejected' };
+
+  const current = await getCurrentProfile(supabase);
+  if ('error' in current) {
+    return { error: current.error || 'Unable to load current profile' };
+  }
+
+  const { profile } = current;
+  if (!profile) {
+    return { error: 'Profile not found' };
+  }
+
+  const isAdmin = profile.role === 'platform_admin';
+  if (!isAdmin) {
+    if (profile.role !== 'driver' || profile.membership_status !== 'active') {
+      return { error: 'Valid driver approval is required' };
+    }
+
+    const driverCheck = await getDriverSeatActionProfile(supabase, profile.user_id);
+    if ('error' in driverCheck) {
+      return { error: driverCheck.error };
+    }
+
+    if (!driverCheck.valid) {
+      return { error: 'Valid driver approval is required' };
+    }
+  }
+
+  const context = await getSeatWorkflowContext(supabase, requestInput.requestId, requestInput.routeId);
+  if ('error' in context) {
+    return { error: context.error };
+  }
+
+  const { request, assignment } = context;
+  if (!assignment) {
+    return { error: 'Route assignment not found for this request' };
+  }
+  if (!isAdmin && assignment.driver_id !== profile.id) {
+    return { error: 'Not authorized to review this cancellation' };
+  }
+  if (!request.cancellation_requested_at) {
+    return { error: 'No cancellation request is pending' };
+  }
+
+  const now = new Date().toISOString();
+  if (decision === 'approved') {
+    const { data: updatedSeatCount, error: seatError } = await supabase
+      .from('driver_route_assignments')
+      .update({ seats_available: Number(assignment.seats_available || 0) + 1 })
+      .eq('id', assignment.id)
+      .eq('seats_available', assignment.seats_available || 0)
+      .select('id')
+      .maybeSingle();
+
+    if (seatError) {
+      return { error: seatError.message };
+    }
+    if (!updatedSeatCount) {
+      return { error: 'Unable to release the seat right now' };
+    }
+  }
+
+  const { data: updatedRequest, error } = await supabase
+    .from('route_seat_requests')
+    .update({
+      status: decision === 'approved' ? 'cancelled' : 'approved',
+      cancellation_reviewed_by: profile.id,
+      cancellation_reviewed_at: now,
+      cancellation_requested_by: null,
+      cancellation_requested_at: null,
+      updated_at: now,
+    })
+    .eq('id', request.id)
+    .select('*')
+    .single();
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidateSeatRequestPaths(request.route_id);
+
+  return { success: true, request: updatedRequest as RouteSeatRequest };
+}
+
+export async function removeRouteSeatPassenger(input: FormData | { requestId: string; routeId: string; reason: string }) {
+  const supabase = await createClient();
+  const requestInput = parseSeatRemovalInput(input);
+  if ('error' in requestInput) {
+    return { error: requestInput.error };
+  }
+  const { reason } = requestInput as { reason: string };
+
+  const current = await getCurrentProfile(supabase);
+  if ('error' in current) {
+    return { error: current.error || 'Unable to load current profile' };
+  }
+
+  const { profile } = current;
+  if (!profile) {
+    return { error: 'Profile not found' };
+  }
+
+  const isAdmin = profile.role === 'platform_admin';
+  if (!isAdmin) {
+    if (profile.role !== 'driver' || profile.membership_status !== 'active') {
+      return { error: 'Valid driver approval is required' };
+    }
+
+    const driverCheck = await getDriverSeatActionProfile(supabase, profile.user_id);
+    if ('error' in driverCheck) {
+      return { error: driverCheck.error };
+    }
+
+    if (!driverCheck.valid) {
+      return { error: 'Valid driver approval is required' };
+    }
+  }
+
+  const context = await getSeatWorkflowContext(supabase, requestInput.requestId, requestInput.routeId);
+  if ('error' in context) {
+    return { error: context.error };
+  }
+
+  const { request, assignment } = context;
+  if (!assignment) {
+    return { error: 'Route assignment not found for this request' };
+  }
+  if (!isAdmin && assignment.driver_id !== profile.id) {
+    return { error: 'Not authorized to remove this passenger' };
+  }
+  if (!['approved', 'assigned', 'cancellation_requested'].includes(request.status)) {
+    return { error: 'Only active reservations can be removed' };
+  }
+
+  const { data: updatedSeatCount, error: seatError } = await supabase
+    .from('driver_route_assignments')
+    .update({ seats_available: Number(assignment.seats_available || 0) + 1 })
+    .eq('id', assignment.id)
+    .eq('seats_available', assignment.seats_available || 0)
+    .select('id')
+    .maybeSingle();
+
+  if (seatError) {
+    return { error: seatError.message };
+  }
+  if (!updatedSeatCount) {
+    return { error: 'Unable to release the seat right now' };
+  }
+
+  const now = new Date().toISOString();
+  const { data: updatedRequest, error } = await supabase
+    .from('route_seat_requests')
+    .update({
+      status: 'removed',
+      removed_by: profile.id,
+      removed_at: now,
+      removed_reason: reason,
+      cancellation_reviewed_by: profile.id,
+      cancellation_reviewed_at: now,
+      updated_at: now,
+    })
+    .eq('id', request.id)
+    .select('*')
+    .single();
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidateSeatRequestPaths(request.route_id);
+
+  return { success: true, request: updatedRequest as RouteSeatRequest };
+}
 export async function recordContactUnlock(input: {
   seatRequestId: string;
   passengerAccepted?: boolean;
@@ -1426,7 +2024,7 @@ export async function getDriverRouteDetail(routeId: string): Promise<DriverRoute
   const [requestsResult, ledgerResult] = await Promise.all([
     supabase
       .from('route_seat_requests')
-      .select('id, passenger_id, route_id, pickup_stop_id, dropoff_stop_id, seats_requested, requested_days, request_type, preferred_morning_time, preferred_return_time, status, matched_assignment_id, created_at, updated_at')
+      .select('id, passenger_id, route_id, pickup_stop_id, dropoff_stop_id, seats_requested, requested_days, request_type, preferred_morning_time, preferred_return_time, status, seat_number, passenger_avatar_url, matched_assignment_id, created_at, updated_at')
       .eq('route_id', routeId)
       .order('created_at', { ascending: false }),
     supabase
@@ -1443,7 +2041,7 @@ export async function getDriverRouteDetail(routeId: string): Promise<DriverRoute
   const { data: passengerProfiles } = passengerIds.length
     ? await supabase
         .from('profiles')
-        .select('id, first_name, surname')
+        .select('id, first_name, surname, membership_status, profile_photo_url')
         .in('id', passengerIds)
     : { data: [] };
   const passengerProfilesById = new Map(
@@ -1464,6 +2062,7 @@ export async function getDriverRouteDetail(routeId: string): Promise<DriverRoute
         passenger_name: passengerProfile
           ? `${passengerProfile.first_name || ''} ${passengerProfile.surname || ''}`.trim() || null
           : null,
+        passenger_membership_status: passengerProfile?.membership_status || null,
         pickup_stop_name: stopById.get(request.pickup_stop_id)?.stop_name || null,
         dropoff_stop_name: stopById.get(request.dropoff_stop_id)?.stop_name || null,
       };

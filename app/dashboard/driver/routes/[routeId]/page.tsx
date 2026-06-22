@@ -1,9 +1,10 @@
-﻿import Link from 'next/link';
+import Image from 'next/image';
+import Link from 'next/link';
 import { redirect, notFound } from 'next/navigation';
-import { ArrowLeft, BadgeCheck, Bell, CalendarDays, MapPin, MessageSquare, Route as RouteIcon, Send, Users } from 'lucide-react';
+import { ArrowLeft, BadgeCheck, Bell, CalendarDays, ChevronDown, MapPin, MessageSquare, Route as RouteIcon, Send, Users } from 'lucide-react';
 import { getDisplayName } from '@/lib/display-name';
 import { createClient } from '@/lib/supabase/server';
-import { getDriverRouteDetail } from '@/lib/routes/actions';
+import { approveRouteSeatRequest, getDriverRouteDetail, rejectRouteSeatRequest, removeRouteSeatPassenger, reviewRouteSeatCancellation } from '@/lib/routes/actions';
 import RouteChatThread from '@/components/RouteChatThread';
 import { isAdminRole, isSuperAdminEmail } from '@/lib/auth/routing';
 import {
@@ -31,9 +32,62 @@ function formatPreferredTime(morning?: string | null, returnTime?: string | null
   const parts: string[] = [];
   if (morning) parts.push(`AM ${morning}`);
   if (returnTime) parts.push(`PM ${returnTime}`);
-  return parts.length > 0 ? parts.join(' • ') : 'Not set';
+  return parts.length > 0 ? parts.join(' - ') : 'Not set';
 }
 
+function formatSeatRequestStatusLabel(status: string) {
+  switch (status) {
+    case 'pending':
+      return 'Pending review';
+    case 'approved':
+      return 'Seat reserved';
+    case 'assigned':
+      return 'Seat assigned';
+    case 'cancellation_requested':
+      return 'Cancellation pending';
+    case 'suspended':
+      return 'Passenger inactive';
+    case 'cancelled':
+      return 'Cancelled';
+    case 'removed':
+      return 'Removed';
+    case 'rejected':
+      return 'Rejected';
+    default:
+      return status;
+  }
+}
+function SeatAvatar({ avatarUrl, label }: { avatarUrl?: string | null; label: string }) {
+  return (
+    <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200">
+      {avatarUrl ? (
+        <Image src={avatarUrl} alt="Passenger avatar" width={40} height={40} className="h-full w-full object-cover" />
+      ) : (
+        <span className="text-[11px] font-semibold text-slate-500">{label}</span>
+      )}
+    </div>
+  );
+}
+
+async function approveSeatRequestAction(formData: FormData) {
+  'use server';
+  await approveRouteSeatRequest(formData);
+}
+
+async function rejectSeatRequestAction(formData: FormData) {
+  'use server';
+  await rejectRouteSeatRequest(formData);
+}
+
+async function reviewCancellationAction(formData: FormData) {
+  'use server';
+  await reviewRouteSeatCancellation(formData);
+}
+
+async function removePassengerAction(formData: FormData) {
+  'use server';
+  await removeRouteSeatPassenger(formData);
+}
 export default async function DriverRouteDetailPage({
   params,
   searchParams,
@@ -178,7 +232,7 @@ export default async function DriverRouteDetailPage({
                       <div className="text-xs text-slate-600">{stop.area || 'Area to be confirmed'}</div>
                       <div className="mt-1 text-[11px] font-semibold text-slate-500">
                         {formatStopTime(stop.estimated_morning_time) || 'AM time pending'}
-                        {' · '}
+                        {' Ã‚Â· '}
                         {formatStopTime(stop.estimated_return_time) || 'PM time pending'}
                       </div>
                     </div>
@@ -306,21 +360,146 @@ export default async function DriverRouteDetailPage({
               <h2 className="text-base font-bold text-slate-900">Route requests</h2>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-3">
               {routeRequests.length > 0 ? (
-                routeRequests.map((request) => (
-                  <div key={request.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                    <div className="text-sm font-semibold text-slate-900">
-                      {request.passenger_name || `Passenger ${request.passenger_id.slice(0, 8)}`}
-                    </div>
-                    <div className="text-xs text-slate-600">Status: {request.status}</div>
-                    <div className="text-xs text-slate-600">Seats: {request.seats_requested ?? 1}</div>
-                    <div className="text-xs text-slate-600">Days: {(request.requested_days || []).join(', ')}</div>
-                    <div className="text-xs text-slate-600">
-                      Time: {formatPreferredTime(request.preferred_morning_time, request.preferred_return_time)}
-                    </div>
-                  </div>
-                ))
+                routeRequests.map((request) => {
+                  const isPending = request.status === 'pending';
+                  const hasCancellationRequest = request.status === 'cancellation_requested';
+                  const passengerInactive = request.status === 'suspended' || request.passenger_membership_status !== 'active';
+                  const showRemovalAction = ['approved', 'assigned', 'cancellation_requested', 'suspended'].includes(request.status);
+                  return (
+                    <details key={request.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                      <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex min-w-0 items-start gap-3">
+                            <SeatAvatar avatarUrl={request.passenger_avatar_url} label={request.passenger_name?.slice(0, 2).toUpperCase() || 'P'} />
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold text-slate-900">
+                                {request.passenger_name || `Passenger ${request.passenger_id.slice(0, 8)}`}
+                              </div>
+                              <div className="mt-1 text-xs text-slate-600">Status: {formatSeatRequestStatusLabel(request.status)}</div>
+                              {passengerInactive ? (
+                                <div className="mt-1 inline-flex rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700">
+                                  Passenger inactive
+                                </div>
+                              ) : null}
+                              <div className="mt-1 text-xs text-slate-600">Seats: {request.seats_requested ?? 1}</div>
+                              <div className="mt-1 text-xs text-slate-600">Days: {(request.requested_days || []).join(', ') || 'Not set'}</div>
+                              <div className="mt-1 text-xs text-slate-600">
+                                Time: {formatPreferredTime(request.preferred_morning_time, request.preferred_return_time)}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600">
+                            <ChevronDown className="h-3.5 w-3.5" />
+                            Expand
+                          </div>
+                        </div>
+                      </summary>
+
+                      <div className="mt-3 space-y-3 rounded-lg border border-slate-200 bg-white p-3">
+                        <div className="grid gap-2 text-xs text-slate-600 md:grid-cols-2">
+                          <div>Pickup stop: {request.pickup_stop_name || 'Unavailable'}</div>
+                          <div>Drop-off stop: {request.dropoff_stop_name || 'Unavailable'}</div>
+                          <div>Seat number: {request.seat_number || 'Selected during approval'}</div>
+                          <div>Submitted: {new Date(request.created_at).toLocaleDateString()}</div>
+                        </div>
+
+                        {isPending ? (
+                          <form action={approveSeatRequestAction} className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                            <input type="hidden" name="routeId" value={route.id} />
+                            <input type="hidden" name="requestId" value={request.id} />
+                            <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Review request</div>
+                            <p className="mt-1 text-sm text-emerald-900">Choose a seat number, then approve or reject the request.</p>
+                            <label className="mt-3 block text-xs font-semibold uppercase tracking-wide text-emerald-700" htmlFor={`seat-number-${request.id}`}>
+                              Seat number
+                            </label>
+                            <input
+                              id={`seat-number-${request.id}`}
+                              name="seatNumber"
+                              type="number"
+                              min={1}
+                              defaultValue={request.seat_number || ''}
+                              className="mt-2 w-28 rounded-lg border border-emerald-300 px-3 py-2 text-sm"
+                              placeholder="Seat"
+                              required
+                            />
+                            <button
+                              type="submit"
+                              className="mt-3 inline-flex items-center justify-center rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-600"
+                            >
+                              Approve and assign seat
+                            </button>
+                          </form>
+                        ) : null}
+
+                        {isPending ? (
+                          <form action={rejectSeatRequestAction} className="rounded-lg border border-rose-200 bg-rose-50 p-3">
+                            <input type="hidden" name="routeId" value={route.id} />
+                            <input type="hidden" name="requestId" value={request.id} />
+                            <button
+                              type="submit"
+                              className="inline-flex items-center justify-center rounded-lg bg-rose-500 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-600"
+                            >
+                              Reject request
+                            </button>
+                          </form>
+                        ) : null}
+
+                        {hasCancellationRequest ? (
+                          <form action={reviewCancellationAction} className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                            <input type="hidden" name="routeId" value={route.id} />
+                            <input type="hidden" name="requestId" value={request.id} />
+                            <div className="text-xs font-semibold uppercase tracking-wide text-amber-700">Cancellation review</div>
+                            <p className="mt-1 text-sm text-amber-900">Approve to release the reserved seat or reject to keep the seat reserved.</p>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <button
+                                type="submit"
+                                name="decision"
+                                value="approved"
+                                className="inline-flex items-center justify-center rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-600"
+                              >
+                                Approve cancellation
+                              </button>
+                              <button
+                                type="submit"
+                                name="decision"
+                                value="rejected"
+                                className="inline-flex items-center justify-center rounded-lg bg-white px-3 py-2 text-xs font-semibold text-amber-700 ring-1 ring-inset ring-amber-300 hover:bg-amber-100"
+                              >
+                                Reject cancellation
+                              </button>
+                            </div>
+                          </form>
+                        ) : null}
+
+                        {showRemovalAction ? (
+                          <form action={removePassengerAction} className="rounded-lg border border-slate-200 bg-white p-3">
+                            <input type="hidden" name="routeId" value={route.id} />
+                            <input type="hidden" name="requestId" value={request.id} />
+                            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor={`remove-reason-${request.id}`}>
+                              Removal reason
+                            </label>
+                            <textarea
+                              id={`remove-reason-${request.id}`}
+                              name="reason"
+                              rows={2}
+                              required
+                              placeholder="Explain why this passenger is being removed"
+                              className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                            />
+                            <button
+                              type="submit"
+                              className="mt-3 inline-flex items-center justify-center rounded-lg bg-rose-500 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-600"
+                            >
+                              Remove passenger
+                            </button>
+                          </form>
+                        ) : null}
+                      </div>
+                    </details>
+                  );
+                })
               ) : (
                 <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">
                   No route requests yet.
@@ -357,4 +536,3 @@ export default async function DriverRouteDetailPage({
     </div>
   );
 }
-
