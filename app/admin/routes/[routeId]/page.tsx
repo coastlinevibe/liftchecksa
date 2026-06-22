@@ -18,6 +18,7 @@ import {
   getOpenRouteChatView,
   updateOpenRouteChatReportStatusFromForm,
 } from '@/lib/routes/open-chat';
+import { getVisibleRoutePrivateOffers } from '@/lib/routes/private-offers';
 import { isAdminRole, isSuperAdminEmail } from '@/lib/auth/routing';
 import { formatPassengerSeats, formatVehicleCapacity, type RouteReviewAssignmentSummary } from '@/lib/types/pilot-routes';
 import RouteChatThread from '@/components/RouteChatThread';
@@ -93,7 +94,7 @@ export default async function AdminRouteDetailPage({
   searchParams,
 }: {
   params: Promise<{ routeId: string }>;
-  searchParams?: Promise<{ chat_error?: string }>;
+  searchParams?: Promise<{ chat_error?: string; offer_error?: string; offer_success?: string }>;
 }) {
   const { routeId } = await params;
   const resolvedSearchParams = await searchParams;
@@ -127,6 +128,7 @@ export default async function AdminRouteDetailPage({
   const assignedDrivers = assignments.filter((assignment) => ['approved', 'active'].includes(assignment.status));
   const routeChatViewResult = await getOpenRouteChatView(route.id);
   const routeChatView = 'error' in routeChatViewResult ? null : routeChatViewResult;
+  const privateOffers = await getVisibleRoutePrivateOffers(route.id);
 
   const deleteRouteAction = async () => {
     'use server';
@@ -452,7 +454,38 @@ export default async function AdminRouteDetailPage({
             </div>
           </section>
 
-          <section className="rounded-xl border border-slate-200 bg-white p-4">
+                    <section className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <MessageSquare className="h-4 w-4 text-violet-600" />
+              <h2 className="text-base font-bold text-slate-900">Private offers</h2>
+              <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-semibold text-violet-700">
+                {privateOffers.length} visible
+              </span>
+            </div>
+            <div className="space-y-3">
+              {privateOffers.length > 0 ? (
+                privateOffers.map((offer) => (
+                  <div key={offer.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold text-slate-900">{offer.passenger_name || 'Passenger'}</div>
+                        <div className="mt-1 text-xs text-slate-600">Offer: R{offer.amount}</div>
+                        <div className="mt-1 text-xs text-slate-600">Status: {offer.status}</div>
+                        <div className="mt-2 text-sm text-slate-700">{offer.message}</div>
+                      </div>
+                      <div className="text-right text-xs text-slate-500">{new Date(offer.created_at).toLocaleDateString()}</div>
+                    </div>
+                    <div className="mt-2 text-xs text-slate-500">Driver: {offer.driver_name || 'Driver'}</div>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">
+                  No private offers yet.
+                </div>
+              )}
+            </div>
+          </section>
+<section className="rounded-xl border border-slate-200 bg-white p-4">
             <div className="mb-3 flex items-center gap-2">
               <MessageSquare className="h-4 w-4 text-emerald-600" />
               <h2 className="text-base font-bold text-slate-900">Route chat</h2>
@@ -700,4 +733,3 @@ export default async function AdminRouteDetailPage({
     </div>
   );
 }
-

@@ -8,6 +8,11 @@ import { createClient } from '@/lib/supabase/server';
 import RouteChatThread from '@/components/RouteChatThread';
 import RouteSeatRequestForm from './RouteSeatRequestForm';
 import { joinOpenRouteChatFromForm, getOpenRouteChatView, sendOpenRouteChatMessageFromForm } from '@/lib/routes/open-chat';
+import {
+  createPrivateOfferFromForm,
+  getRoutePrivateOfferContext,
+  withdrawPrivateOfferFromForm,
+} from '@/lib/routes/private-offers';
 import LogoutButton from '@/components/LogoutButton';
 
 export const dynamic = 'force-dynamic';
@@ -163,6 +168,9 @@ export default async function RouteDetailPage({
     : null;
   const openRouteChatView = openRouteChatViewResult && !('error' in openRouteChatViewResult)
     ? openRouteChatViewResult
+    : null;
+  const privateOfferContext = isMemberUser && membershipActive
+    ? await getRoutePrivateOfferContext(route.id)
     : null;
 
   return (
@@ -423,18 +431,12 @@ export default async function RouteDetailPage({
                     emptyStateText="No messages yet. Start the conversation with other members on this route."
                   />
 
-                  <form id="private-offer" action={sendOpenRouteChatMessageFromForm} className="mt-3 space-y-2">
+                                    <form action={sendOpenRouteChatMessageFromForm} className="mt-3 space-y-2">
                     <input type="hidden" name="routeId" value={route.id} />
                     <div className="mb-1 flex items-center justify-between gap-3">
                       <label htmlFor="routeChatMessage" className="block text-sm font-semibold text-slate-900">
                         Message to route chat
                       </label>
-                      <a
-                        href="#private-offer"
-                        className="inline-flex items-center justify-center rounded-lg border border-violet-500 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-50"
-                      >
-                        Make an offer
-                      </a>
                     </div>
                     <textarea
                       id="routeChatMessage"
@@ -452,6 +454,99 @@ export default async function RouteDetailPage({
                       Send message
                     </button>
                   </form>
+
+                  {privateOfferContext ? (
+                    <section id="private-offer" className="mt-4 rounded-xl border border-violet-200 bg-violet-50 p-4">
+                      <div className="mb-3 flex items-start justify-between gap-3">
+                        <div>
+                          <h3 className="text-base font-bold text-slate-900">Private offer</h3>
+                          <p className="mt-1 text-sm text-slate-600">
+                            Make an offer to the assigned driver. Only you, the driver, and platform admins can see it.
+                          </p>
+                        </div>
+                        {privateOfferContext.current_offer ? (
+                          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-violet-700">
+                            Current offer: R{privateOfferContext.current_offer.amount}
+                          </span>
+                        ) : null}
+                      </div>
+
+                      {privateOfferContext.current_offer ? (
+                        <div className="mb-3 rounded-lg border border-violet-200 bg-white p-3 text-sm text-slate-600">
+                          <div className="font-semibold text-slate-900">Your current offer is active.</div>
+                          <div className="mt-1">
+                            {privateOfferContext.current_offer.message || 'No message added.'}
+                          </div>
+                          {privateOfferContext.can_withdraw_offer ? (
+                            <form action={withdrawPrivateOfferFromForm} className="mt-3">
+                              <input type="hidden" name="routeId" value={route.id} />
+                              <input type="hidden" name="offerId" value={privateOfferContext.current_offer.id} />
+                              <button
+                                type="submit"
+                                className="inline-flex items-center justify-center rounded-lg border border-violet-500 px-4 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-50"
+                              >
+                                Withdraw offer
+                              </button>
+                            </form>
+                          ) : null}
+                        </div>
+                      ) : null}
+
+                      {privateOfferContext.can_make_offer ? (
+                        <form action={createPrivateOfferFromForm} className="space-y-3">
+                          <input type="hidden" name="routeId" value={route.id} />
+                          <div className="mb-1 flex items-center justify-between gap-3">
+                            <label htmlFor="privateOfferMessage" className="block text-sm font-semibold text-slate-900">
+                              Message to driver
+                            </label>
+                            <button
+                              type="submit"
+                              className="inline-flex items-center justify-center rounded-lg border border-violet-500 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-50"
+                            >
+                              Make an offer
+                            </button>
+                          </div>
+                          <div className="grid gap-3 md:grid-cols-2">
+                            <div>
+                              <label htmlFor="privateOfferAmount" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Amount
+                              </label>
+                              <input
+                                id="privateOfferAmount"
+                                name="amount"
+                                type="number"
+                                min="0"
+                                step="1"
+                                required
+                                placeholder="R0"
+                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                              />
+                            </div>
+                            <div>
+                              <label htmlFor="privateOfferNote" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Driver note
+                              </label>
+                              <textarea
+                                id="privateOfferNote"
+                                name="message"
+                                rows={3}
+                                required
+                                placeholder="Add a private note for the driver"
+                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                              />
+                            </div>
+                          </div>
+                          <p className="text-xs text-slate-500">
+                            The amount and message stay private and are visible only to you, the driver, and admin.
+                          </p>
+                        </form>
+                      ) : (
+                        <div className="rounded-lg border border-dashed border-violet-200 bg-white p-3 text-sm text-slate-600">
+                          Private offers unlock once you have an active membership and an assigned driver is available.
+                        </div>
+                      )}
+                    </section>
+                  ) : null}
                 </>
               ) : (
                 <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">

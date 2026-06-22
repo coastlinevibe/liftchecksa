@@ -6,6 +6,7 @@ import { getDisplayName } from '@/lib/display-name';
 import { createClient } from '@/lib/supabase/server';
 import { approveRouteSeatRequest, getDriverRouteDetail, rejectRouteSeatRequest, removeRouteSeatPassenger, reviewRouteSeatCancellation } from '@/lib/routes/actions';
 import RouteChatThread from '@/components/RouteChatThread';
+import { getVisibleRoutePrivateOffers, respondToPrivateOfferFromForm } from '@/lib/routes/private-offers';
 import { isAdminRole, isSuperAdminEmail } from '@/lib/auth/routing';
 import {
   getOpenRouteChatView,
@@ -93,7 +94,7 @@ export default async function DriverRouteDetailPage({
   searchParams,
 }: {
   params: Promise<{ routeId: string }>;
-  searchParams?: Promise<{ chat_error?: string }>;
+  searchParams?: Promise<{ chat_error?: string; offer_error?: string; offer_success?: string }>;
 }) {
   const { routeId } = await params;
   const resolvedSearchParams = await searchParams;
@@ -158,6 +159,7 @@ export default async function DriverRouteDetailPage({
 
   const routeRequests = requests.filter((request) => request.route_id === route.id);
   const routeLedger = ledger.filter((entry) => entry.route_id === route.id);
+  const privateOffers = routeIsLive ? await getVisibleRoutePrivateOffers(route.id) : [];
   const driverName = getDisplayName({
     firstName: profile?.first_name,
     surname: profile?.surname,
@@ -257,7 +259,60 @@ export default async function DriverRouteDetailPage({
         </div>
 
         <div className="space-y-4">
-          <section className="rounded-xl border border-slate-200 bg-white p-4">
+                    <section className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4 text-violet-600" />
+                  <h2 className="text-base font-bold text-slate-900">Private offers</h2>
+                </div>
+                <p className="mt-1 text-sm text-slate-600">
+                  Only the passenger, the assigned driver, and platform admins can see these offers.
+                </p>
+              </div>
+              <div className="rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700">
+                {privateOffers.length} offers
+              </div>
+            </div>
+            <div className="space-y-3">
+              {privateOffers.map((offer) => (
+                <div key={offer.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold text-slate-900">{offer.passenger_name || 'Passenger'}</div>
+                      <div className="mt-1 text-xs text-slate-600">Offer: R{offer.amount}</div>
+                      <div className="mt-1 text-xs text-slate-600">Status: {offer.status}</div>
+                      <div className="mt-2 text-sm text-slate-700">{offer.message}</div>
+                    </div>
+                    <div className="text-right text-xs text-slate-500">{new Date(offer.created_at).toLocaleDateString()}</div>
+                  </div>
+                  {offer.status === 'pending' ? (
+                    <form action={respondToPrivateOfferFromForm} className="mt-3 flex flex-wrap gap-2">
+                      <input type="hidden" name="routeId" value={route.id} />
+                      <input type="hidden" name="offerId" value={offer.id} />
+                      <button
+                        type="submit"
+                        name="decision"
+                        value="accepted"
+                        className="inline-flex items-center justify-center rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-600"
+                      >
+                        Accept offer
+                      </button>
+                      <button
+                        type="submit"
+                        name="decision"
+                        value="declined"
+                        className="inline-flex items-center justify-center rounded-lg bg-rose-500 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-600"
+                      >
+                        Decline offer
+                      </button>
+                    </form>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          </section>
+<section className="rounded-xl border border-slate-200 bg-white p-4">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2">
