@@ -2,9 +2,46 @@
 
 ## Status
 
-This document reflects the official driver signup flow currently implemented in the app.
+This document reflects the official member and driver signup flow currently implemented in the app.
 
 ---
+
+## Official Member Flow
+
+### 1. Open Member Signup
+- User starts on `/register`
+- The register page loads the member form when `type=driver` is not present
+
+### 2. Enter Basic Account Details
+- First name
+- Surname
+- Phone number
+- Email address
+- Password
+- Member plan
+  - Basic
+  - Plus
+
+### 3. Submit Signup
+- `signUp(...)` creates the Supabase auth user
+- A `profiles` row is created with `role = 'member'` and `membership_status = 'pending'`
+- A `payments` row is created with `status = 'pending'`
+- The page shows the payment reference and amount
+- The user is auto-signed in and sent to `/dashboard/member`
+
+### 4. Upload Proof of Payment
+- The member uses the dashboard payment banner
+- The payment proof is uploaded on `/payment/upload`
+- The proof is stored in the `payment-proofs` bucket
+- The dashboard shows `Verification In Progress` while admin reviews the proof
+
+### 5. Payment Approved
+- Once admin approves payment, the member dashboard shows the verified state
+- The dashboard no longer shows the payment banner
+- The member can now browse routes and use trusted-driver features
+
+---
+
 
 ## Official Driver Flow
 
@@ -156,3 +193,4 @@ This document reflects the official driver signup flow currently implemented in 
 ## Note
 - The old flow that uploaded ID and selfie during `/register` is no longer the source of truth
 - The driver onboarding path is: signup, payment proof, vehicle + ID, admin approval, verified dashboard
+

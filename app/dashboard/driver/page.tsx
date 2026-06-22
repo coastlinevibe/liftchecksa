@@ -80,7 +80,7 @@ async function getDriverData() {
 
   const { data: driverProfile, error: driverProfileError } = await supabase
     .from('driver_profiles')
-    .select('id, rating_average, verification_status, id_status, vehicle_status, id_document_url, provider_plan, provider_payment_reference, provider_payment_amount, provider_payment_status, provider_payment_proof_url, provider_last_paid_at, provider_next_payment_at, provider_expires_at')
+    .select('id, rating_average, verification_status, id_status, vehicle_status, provider_plan, provider_payment_reference, provider_payment_amount, provider_payment_status, provider_payment_proof_url, provider_last_paid_at, provider_next_payment_at, provider_expires_at')
     .eq('user_id', user.id)
     .maybeSingle();
 
@@ -206,7 +206,6 @@ export default async function DriverDashboard() {
               <LogoutButton />
             </div>
           </div>
-
           <div className="grid grid-cols-3 gap-2">
             <div className="bg-emerald-50 rounded-lg p-2.5 text-center">
               <div className="text-lg font-bold text-emerald-600">{routeAssignments.length}</div>
@@ -420,5 +419,6 @@ export default async function DriverDashboard() {
     </div>
   );
 }
+
 
 

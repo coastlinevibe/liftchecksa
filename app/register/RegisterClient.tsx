@@ -50,7 +50,7 @@ function MemberForm({ onBack }: { onBack: () => void }) {
 
   useEffect(() => {
     if (!success) return;
-    const timer = setTimeout(async () => {
+    const timer = window.setTimeout(async () => {
       const supabase = createClient();
       await supabase.auth.signInWithPassword({
         email: formData.email,
@@ -58,8 +58,12 @@ function MemberForm({ onBack }: { onBack: () => void }) {
       });
       router.push('/dashboard/member');
     }, 2000);
-    return () => clearTimeout(timer);
+
+    return () => window.clearTimeout(timer);
   }, [success, formData.email, formData.password, router]);
+
+
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,8 +94,7 @@ function MemberForm({ onBack }: { onBack: () => void }) {
               <CheckCircle className="w-8 h-8 text-emerald-600" />
             </div>
             <h1 className="text-2xl font-bold text-slate-900 mb-2">Account Created!</h1>
-            <p className="text-sm text-slate-600 mb-2">Complete payment to activate</p>
-            <p className="text-xs text-emerald-600 font-semibold animate-pulse">Redirecting to dashboard...</p>
+            <p className="text-sm text-slate-600 mb-2">Next step: your dashboard will open with the payment proof card</p>
           </div>
           <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-4">
             <div className="text-center mb-3">
@@ -100,6 +103,9 @@ function MemberForm({ onBack }: { onBack: () => void }) {
             </div>
             <div className="text-xs text-emerald-800">
               <strong>Amount:</strong> R{plan === 'plus' ? '96' : '36'}.00
+            </div>
+            <div className="mt-2 text-xs text-emerald-800">
+              We&apos;ll sign you in and open your dashboard so you can upload payment proof just like the driver flow.
             </div>
           </div>
         </div>
@@ -117,7 +123,7 @@ function MemberForm({ onBack }: { onBack: () => void }) {
         <h1 className="text-2xl font-bold text-slate-900 mb-2">Member Sign Up</h1>
 
         <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900">
-          Choose your 12-month member plan.
+          Choose a member plan. After signup, upload payment proof from your payment page.
         </div>
 
         <div className="mb-4">
@@ -223,7 +229,7 @@ function DriverForm({
               <CheckCircle className="w-8 h-8 text-emerald-600" />
             </div>
             <h1 className="text-2xl font-bold text-slate-900 mb-2">Driver Account Created!</h1>
-            <p className="text-sm text-slate-600 mb-2">Next step: upload payment proof</p>
+            <p className="text-sm text-slate-600 mb-2">Next step: your dashboard will open with the payment proof card</p>
           </div>
           <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-4">
             <div className="text-center mb-3">

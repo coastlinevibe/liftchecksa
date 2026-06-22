@@ -8,6 +8,7 @@ export async function updateProfileSettings(formData: {
   surname: string;
   phone: string;
   homeProvince?: string;
+  profilePhoto?: File | null;
 }) {
   const supabase = await createClient();
 
@@ -19,6 +20,28 @@ export async function updateProfileSettings(formData: {
     return { error: 'Not authenticated' };
   }
 
+  let profilePhotoUrl: string | null = null;
+
+  if (formData.profilePhoto) {
+    const ext = formData.profilePhoto.name.split('.').pop() || 'jpg';
+    const filePath = `${user.id}/avatar.${ext.toLowerCase()}`;
+    const buffer = await formData.profilePhoto.arrayBuffer();
+
+    const { error: uploadError } = await supabase.storage
+      .from('profile-photos')
+      .upload(filePath, buffer, {
+        contentType: formData.profilePhoto.type || 'application/octet-stream',
+        upsert: true,
+      });
+
+    if (uploadError) {
+      return { error: uploadError.message };
+    }
+
+    const { data } = supabase.storage.from('profile-photos').getPublicUrl(filePath);
+    profilePhotoUrl = data.publicUrl;
+  }
+
   const { error } = await supabase
     .from('profiles')
     .update({
@@ -26,6 +49,7 @@ export async function updateProfileSettings(formData: {
       surname: formData.surname,
       phone: formData.phone,
       home_province: formData.homeProvince || null,
+      ...(profilePhotoUrl ? { profile_photo_url: profilePhotoUrl } : {}),
     })
     .eq('user_id', user.id);
 
@@ -40,3 +64,5 @@ export async function updateProfileSettings(formData: {
 
   return { success: true };
 }
+
+

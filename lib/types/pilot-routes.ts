@@ -105,6 +105,7 @@ export interface DriverRouteAssignment {
   admin_notes?: string | null;
   approved_by?: string | null;
   approved_at?: string | null;
+  phone_call_verified?: boolean | null;
   created_at: string;
 }
 

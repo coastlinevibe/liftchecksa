@@ -1,4 +1,4 @@
-﻿import Link from 'next/link';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, MapPin, MessageSquare, Route as RouteIcon, Send, Shield } from 'lucide-react';
 import { getRouteDetail } from '@/lib/routes/actions';
@@ -235,11 +235,19 @@ export default async function RouteDetailPage({
                     emptyStateText="No messages yet. Start the conversation with other members on this route."
                   />
 
-                  <form action={sendOpenRouteChatMessageFromForm} className="mt-3 space-y-2">
+                  <form id="private-offer" action={sendOpenRouteChatMessageFromForm} className="mt-3 space-y-2">
                     <input type="hidden" name="routeId" value={route.id} />
-                    <label htmlFor="routeChatMessage" className="block text-sm font-semibold text-slate-900">
-                      Message to route chat
-                    </label>
+                    <div className="mb-1 flex items-center justify-between gap-3">
+                      <label htmlFor="routeChatMessage" className="block text-sm font-semibold text-slate-900">
+                        Message to route chat
+                      </label>
+                      <a
+                        href="#private-offer"
+                        className="inline-flex items-center justify-center rounded-lg border border-violet-500 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-50"
+                      >
+                        Make an offer
+                      </a>
+                    </div>
                     <textarea
                       id="routeChatMessage"
                       name="message"

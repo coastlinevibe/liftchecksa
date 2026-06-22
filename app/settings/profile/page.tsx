@@ -89,8 +89,11 @@ export default async function ProfilePage() {
           homeProvince={profile?.home_province ?? ''}
           roleLabel={roleLabel}
           email={user.email ?? ''}
+          profilePhotoUrl={profile?.profile_photo_url ?? null}
         />
       </div>
     </div>
   );
 }
+
+

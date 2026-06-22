@@ -34,7 +34,7 @@ export default function HelpPage() {
           a: 'Match Check is a safety feature that helps you confirm the driver\'s face, vehicle, and licence plate match their profile before getting in. Always complete Match Check at pickup.',
         },
         {
-          q: 'What is Zii Verify?',
+          q: 'What is driver verification?',
           a: 'Zii Verify is our offline Bluetooth verification system. It allows you to verify drivers even when you don\'t have data or signal, perfect for rural areas or when airtime is low.',
         },
         {
@@ -205,3 +205,4 @@ export default function HelpPage() {
     </div>
   );
 }
+
