@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Search, MapPin, Star, Shield, Bell, Settings, AlertCircle, Clock } from 'lucide-react';
 import LogoutButton from '@/components/LogoutButton';
+import ProfileAvatar from '@/components/ProfileAvatar';
 import { getDisplayName } from '@/lib/display-name';
 import { createClient } from '@/lib/supabase/server';
 import { formatMembershipExpiry, getMembershipExpiry, getPlanLabel } from '@/lib/membership';
@@ -61,7 +62,7 @@ async function getMemberData() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, first_name, surname, role, membership_type, membership_status, membership_expires_at')
+    .select('id, first_name, surname, profile_photo_url, role, membership_type, membership_status, membership_expires_at')
     .eq('user_id', user.id)
     .single();
 
@@ -137,6 +138,12 @@ export default async function MemberDashboard() {
                 Welcome back, {memberDisplayName}
               </p>
             </div>
+            <ProfileAvatar
+              name={memberDisplayName}
+              photoUrl={data.profile?.profile_photo_url || null}
+              size={48}
+              className="shrink-0 border border-slate-200 shadow-sm"
+            />
             <div className="flex items-center gap-2">
               <Link href="/notifications" className="p-2 hover:bg-slate-100 rounded-lg relative">
                 <Bell className="w-5 h-5 text-slate-600" />
@@ -385,5 +392,3 @@ export default async function MemberDashboard() {
     </div>
   );
 }
-
-
