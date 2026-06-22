@@ -61,7 +61,7 @@ async function getMemberData() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, first_name, surname, role, membership_type, membership_status, membership_expires_at, zii_status')
+    .select('id, first_name, surname, role, membership_type, membership_status, membership_expires_at')
     .eq('user_id', user.id)
     .single();
 
@@ -164,14 +164,13 @@ export default async function MemberDashboard() {
                 </p>
               </div>
               <div className="text-right">
-                <div className="text-xs opacity-75">Bluetooth Verify</div>
+                <div className="text-xs opacity-75">Account</div>
                 <div className="text-sm font-bold">
-                  {data.profile?.zii_status === 'active' ? 'Active' : 'Inactive'}
+                  {data.profile?.membership_status === 'active' ? 'Active' : 'Pending'}
                 </div>
               </div>
             </div>
           </div>
-
           <div className="mt-3 grid grid-cols-3 gap-2">
             <div className="bg-emerald-50 rounded-lg p-2.5 text-center">
               <div className="text-lg font-bold text-emerald-600">{savedRoutes.length}</div>
@@ -386,3 +385,5 @@ export default async function MemberDashboard() {
     </div>
   );
 }
+
+

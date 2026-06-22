@@ -509,7 +509,7 @@ export default async function AdminDashboard() {
                 <span className="text-sm font-bold text-emerald-600">{stats.reportResolutionRate}%</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-xs text-slate-600">Active Bluetooth Verifications</span>
+                <span className="text-xs text-slate-600">Active Driver Verifications</span>
                 <span className="text-sm font-bold text-slate-900">{stats.activeBluetoothVerifications.toLocaleString()}</span>
               </div>
             </div>
@@ -537,6 +537,7 @@ export default async function AdminDashboard() {
     </div>
   );
 }
+
 
 
 

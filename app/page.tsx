@@ -91,9 +91,9 @@ export default function Home() {
 
           <div className="bg-slate-800/50 rounded-lg p-2.5 border border-slate-700/50">
             <Users className="w-6 h-6 text-emerald-400 mb-1.5" />
-            <h3 className="text-xs font-semibold text-white mb-0.5">Bluetooth Verify</h3>
+            <h3 className="text-xs font-semibold text-white mb-0.5">Driver Checks</h3>
             <p className="text-[10px] text-slate-400 leading-tight">
-              Offline verification, no data
+              Approved profiles, no private exposure
             </p>
           </div>
         </div>
@@ -150,7 +150,7 @@ export default function Home() {
                 <div className="text-base font-bold text-emerald-400">R36/yr</div>
               </div>
               <p className="text-[10px] text-slate-400 mb-2 leading-tight">
-                Verified profile, Bluetooth Verify, driver checks, chat, and ratings
+                Verified profile, Driver Checks, driver checks, chat, and ratings
               </p>
               <Link 
                 href="/register?type=member&plan=basic"
@@ -227,7 +227,7 @@ export default function Home() {
             {/* FAQ Item 2 */}
             <details className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden group">
               <summary className="px-3 py-2.5 cursor-pointer list-none flex items-center justify-between text-xs font-semibold text-white hover:bg-slate-800/70">
-                <span>How does Bluetooth Verification work?</span>
+                <span>How does driver verification work?</span>
                 <span className="text-emerald-400 group-open:rotate-180 transition-transform">▼</span>
               </summary>
               <div className="px-3 pb-3 pt-1 text-[10px] text-slate-300 leading-relaxed">
@@ -313,3 +313,4 @@ export default function Home() {
     </div>
   );
 }
+

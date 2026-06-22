@@ -20,7 +20,7 @@ export default async function SettingsPage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('first_name, surname, phone, role, profile_photo_url, membership_type, membership_status, membership_expires_at, zii_status, home_province')
+    .select('first_name, surname, phone, role, profile_photo_url, membership_type, membership_status, membership_expires_at, home_province')
     .eq('user_id', user.id)
     .maybeSingle();
 
@@ -49,9 +49,7 @@ export default async function SettingsPage() {
   const statusLabel =
     role === 'driver'
       ? `${getPlanLabel(driverProfile?.provider_plan)} • ${isDriverFullyApproved(driverProfile) ? 'Active' : 'Pending'}`
-      : role === 'group_admin'
-        ? 'Group Admin • Active'
-        : `${getPlanLabel(profile?.membership_type)} • ${profile?.membership_status === 'active' ? 'Active' : 'Pending'}`;
+      : `${getPlanLabel(profile?.membership_type)} • ${profile?.membership_status === 'active' ? 'Active' : 'Pending'}`;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -183,19 +181,7 @@ export default async function SettingsPage() {
               <ChevronRight className="w-4 h-4 text-slate-400" />
             </Link>
 
-            <Link
-              href="/settings/zii"
-              className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-lg transition-all"
-            >
-              <div className="flex items-center gap-3">
-                <Shield className="w-4 h-4 text-slate-600" />
-                <div>
-                  <div className="text-sm text-slate-900">Zii Verify</div>
-                  <div className="text-xs text-emerald-600">{profile?.zii_status || 'inactive'}</div>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-slate-400" />
-            </Link>
+
           </div>
         </div>
 
@@ -251,4 +237,7 @@ export default async function SettingsPage() {
     </div>
   );
 }
+
+
+
 
