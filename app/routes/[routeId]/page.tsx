@@ -191,7 +191,7 @@ export default async function RouteDetailPage({
 
         <div className="space-y-4">
           {privateOfferContext ? (
-            <section className="rounded-xl border border-slate-200 bg-white p-4">
+            <section id="private-offer" className="rounded-xl border border-slate-200 bg-white p-4">
               <div className="mb-3 flex items-start justify-between gap-3">
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-wide text-violet-600">Private offer</div>
@@ -350,9 +350,17 @@ export default async function RouteDetailPage({
 
                   <form action={sendOpenRouteChatMessageFromForm} className="mt-3 space-y-2">
                     <input type="hidden" name="routeId" value={route.id} />
-                    <label htmlFor="routeChatMessage" className="block text-sm font-semibold text-slate-900">
-                      Message to route chat
-                    </label>
+                                        <div className="mb-1 flex items-center justify-between gap-3">
+                      <label htmlFor="routeChatMessage" className="block text-sm font-semibold text-slate-900">
+                        Message to driver
+                      </label>
+                      <a
+                        href="#private-offer"
+                        className="inline-flex items-center justify-center rounded-lg border border-violet-500 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-50"
+                      >
+                        Make an offer
+                      </a>
+                    </div>
                     <textarea
                       id="routeChatMessage"
                       name="message"
