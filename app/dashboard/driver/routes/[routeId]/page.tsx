@@ -4,7 +4,7 @@ import { redirect, notFound } from 'next/navigation';
 import { ArrowLeft, BadgeCheck, Bell, CalendarDays, ChevronDown, MapPin, MessageSquare, Route as RouteIcon, Send, Users } from 'lucide-react';
 import { getDisplayName } from '@/lib/display-name';
 import { createClient } from '@/lib/supabase/server';
-import { approveRouteSeatRequest, assignRouteSeatNumber, getDriverRouteDetail, rejectRouteSeatRequest, removeRouteSeatPassenger, reviewRouteSeatCancellation } from '@/lib/routes/actions';
+import { approveRouteSeatRequest, getDriverRouteDetail, rejectRouteSeatRequest, removeRouteSeatPassenger, reviewRouteSeatCancellation } from '@/lib/routes/actions';
 import RouteChatThread from '@/components/RouteChatThread';
 import { isAdminRole, isSuperAdminEmail } from '@/lib/auth/routing';
 import {
@@ -45,6 +45,8 @@ function formatSeatRequestStatusLabel(status: string) {
       return 'Seat assigned';
     case 'cancellation_requested':
       return 'Cancellation pending';
+    case 'suspended':
+      return 'Passenger inactive';
     case 'cancelled':
       return 'Cancelled';
     case 'removed':
@@ -75,11 +77,6 @@ async function approveSeatRequestAction(formData: FormData) {
 async function rejectSeatRequestAction(formData: FormData) {
   'use server';
   await rejectRouteSeatRequest(formData);
-}
-
-async function assignSeatNumberAction(formData: FormData) {
-  'use server';
-  await assignRouteSeatNumber(formData);
 }
 
 async function reviewCancellationAction(formData: FormData) {
@@ -235,7 +232,7 @@ export default async function DriverRouteDetailPage({
                       <div className="text-xs text-slate-600">{stop.area || 'Area to be confirmed'}</div>
                       <div className="mt-1 text-[11px] font-semibold text-slate-500">
                         {formatStopTime(stop.estimated_morning_time) || 'AM time pending'}
-                        {' · '}
+                        {' Ã‚Â· '}
                         {formatStopTime(stop.estimated_return_time) || 'PM time pending'}
                       </div>
                     </div>
@@ -368,8 +365,8 @@ export default async function DriverRouteDetailPage({
                 routeRequests.map((request) => {
                   const isPending = request.status === 'pending';
                   const hasCancellationRequest = request.status === 'cancellation_requested';
-                  const canAssignSeat = ['approved', 'assigned'].includes(request.status);
-                  const showRemovalAction = ['approved', 'assigned', 'cancellation_requested'].includes(request.status);
+                  const passengerInactive = request.status === 'suspended' || request.passenger_membership_status !== 'active';
+                  const showRemovalAction = ['approved', 'assigned', 'cancellation_requested', 'suspended'].includes(request.status);
                   return (
                     <details key={request.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                       <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
@@ -381,6 +378,11 @@ export default async function DriverRouteDetailPage({
                                 {request.passenger_name || `Passenger ${request.passenger_id.slice(0, 8)}`}
                               </div>
                               <div className="mt-1 text-xs text-slate-600">Status: {formatSeatRequestStatusLabel(request.status)}</div>
+                              {passengerInactive ? (
+                                <div className="mt-1 inline-flex rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700">
+                                  Passenger inactive
+                                </div>
+                              ) : null}
                               <div className="mt-1 text-xs text-slate-600">Seats: {request.seats_requested ?? 1}</div>
                               <div className="mt-1 text-xs text-slate-600">Days: {(request.requested_days || []).join(', ') || 'Not set'}</div>
                               <div className="mt-1 text-xs text-slate-600">
@@ -399,7 +401,7 @@ export default async function DriverRouteDetailPage({
                         <div className="grid gap-2 text-xs text-slate-600 md:grid-cols-2">
                           <div>Pickup stop: {request.pickup_stop_name || 'Unavailable'}</div>
                           <div>Drop-off stop: {request.dropoff_stop_name || 'Unavailable'}</div>
-                          <div>Seat number: {request.seat_number || 'Pending assignment'}</div>
+                          <div>Seat number: {request.seat_number || 'Selected during approval'}</div>
                           <div>Submitted: {new Date(request.created_at).toLocaleDateString()}</div>
                         </div>
 
@@ -408,12 +410,25 @@ export default async function DriverRouteDetailPage({
                             <input type="hidden" name="routeId" value={route.id} />
                             <input type="hidden" name="requestId" value={request.id} />
                             <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Review request</div>
-                            <p className="mt-1 text-sm text-emerald-900">Approve to reserve one seat immediately or reject the request.</p>
+                            <p className="mt-1 text-sm text-emerald-900">Choose a seat number, then approve or reject the request.</p>
+                            <label className="mt-3 block text-xs font-semibold uppercase tracking-wide text-emerald-700" htmlFor={`seat-number-${request.id}`}>
+                              Seat number
+                            </label>
+                            <input
+                              id={`seat-number-${request.id}`}
+                              name="seatNumber"
+                              type="number"
+                              min={1}
+                              defaultValue={request.seat_number || ''}
+                              className="mt-2 w-28 rounded-lg border border-emerald-300 px-3 py-2 text-sm"
+                              placeholder="Seat"
+                              required
+                            />
                             <button
                               type="submit"
                               className="mt-3 inline-flex items-center justify-center rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-600"
                             >
-                              Approve request
+                              Approve and assign seat
                             </button>
                           </form>
                         ) : null}
@@ -428,33 +443,6 @@ export default async function DriverRouteDetailPage({
                             >
                               Reject request
                             </button>
-                          </form>
-                        ) : null}
-
-                        {canAssignSeat ? (
-                          <form action={assignSeatNumberAction} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                            <input type="hidden" name="routeId" value={route.id} />
-                            <input type="hidden" name="requestId" value={request.id} />
-                            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor={`seat-number-${request.id}`}>
-                              Seat number
-                            </label>
-                            <div className="mt-2 flex flex-wrap items-center gap-2">
-                              <input
-                                id={`seat-number-${request.id}`}
-                                name="seatNumber"
-                                type="number"
-                                min={1}
-                                defaultValue={request.seat_number || ''}
-                                className="w-28 rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                                placeholder="Seat"
-                              />
-                              <button
-                                type="submit"
-                                className="inline-flex items-center justify-center rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800"
-                              >
-                                Assign seat
-                              </button>
-                            </div>
                           </form>
                         ) : null}
 
@@ -548,4 +536,3 @@ export default async function DriverRouteDetailPage({
     </div>
   );
 }
-

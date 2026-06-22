@@ -56,6 +56,7 @@ type PassengerProfileRow = {
   surname: string | null;
   phone?: string | null;
   email?: string | null;
+  membership_status?: string | null;
 };
 
 type VehicleLookupRow = {
@@ -827,7 +828,7 @@ export async function requestRouteSeat(input: {
     .select('id, status')
     .eq('route_id', input.routeId)
     .eq('passenger_id', profile.id)
-    .in('status', ['pending', 'approved', 'assigned', 'cancellation_requested'])
+    .in('status', ['pending', 'approved', 'assigned', 'cancellation_requested', 'suspended'])
     .maybeSingle();
 
   if (existingError) {
@@ -1047,12 +1048,13 @@ function revalidateSeatRequestPaths(routeId: string) {
   revalidatePath('/admin/routes');
 }
 
-export async function approveRouteSeatRequest(input: FormData | { requestId: string; routeId: string }) {
+export async function approveRouteSeatRequest(input: FormData | { requestId: string; routeId: string; seatNumber: number }) {
   const supabase = await createClient();
-  const requestInput = parseSeatRequestIds(input);
+  const requestInput = parseSeatNumberInput(input);
   if ('error' in requestInput) {
     return { error: requestInput.error };
   }
+  const { seatNumber } = requestInput as { seatNumber: number };
 
   const current = await getCurrentProfile(supabase);
   if ('error' in current) {
@@ -1096,6 +1098,36 @@ export async function approveRouteSeatRequest(input: FormData | { requestId: str
     return { error: 'Only pending requests can be approved' };
   }
 
+  const { data: route, error: routeError } = await supabase
+    .from('official_routes')
+    .select('vehicle_capacity')
+    .eq('id', request.route_id)
+    .maybeSingle();
+
+  if (routeError) {
+    return { error: routeError.message };
+  }
+
+  const seatCapacity = Math.max(0, Number(route?.vehicle_capacity || 0) - 1);
+  if (seatNumber < 1 || seatNumber > seatCapacity) {
+    return { error: 'Choose a valid seat number for this route' };
+  }
+
+  const { data: existingSeat, error: existingSeatError } = await supabase
+    .from('route_seat_requests')
+    .select('id, status')
+    .eq('route_id', request.route_id)
+    .eq('seat_number', seatNumber)
+    .in('status', ['approved', 'assigned', 'cancellation_requested', 'suspended'])
+    .maybeSingle();
+
+  if (existingSeatError) {
+    return { error: existingSeatError.message };
+  }
+  if (existingSeat && existingSeat.id !== request.id) {
+    return { error: 'That seat is already reserved' };
+  }
+
   const now = new Date().toISOString();
   const { data: updatedSeatCount, error: seatError } = await supabase
     .from('driver_route_assignments')
@@ -1118,6 +1150,9 @@ export async function approveRouteSeatRequest(input: FormData | { requestId: str
       status: 'approved',
       approved_by: profile.id,
       approved_at: now,
+      seat_number: seatNumber,
+      seat_assigned_by: profile.id,
+      seat_assigned_at: now,
       cancellation_requested_by: null,
       cancellation_requested_at: null,
       cancellation_reviewed_by: null,
@@ -1139,7 +1174,6 @@ export async function approveRouteSeatRequest(input: FormData | { requestId: str
 
   return { success: true, request: updatedRequest as RouteSeatRequest };
 }
-
 export async function rejectRouteSeatRequest(input: FormData | { requestId: string; routeId: string }) {
   const supabase = await createClient();
   const requestInput = parseSeatRequestIds(input);
@@ -1218,82 +1252,9 @@ export async function rejectRouteSeatRequest(input: FormData | { requestId: stri
   return { success: true, request: updatedRequest as RouteSeatRequest };
 }
 
-export async function assignRouteSeatNumber(input: FormData | { requestId: string; routeId: string; seatNumber: number }) {
-  const supabase = await createClient();
-  const requestInput = parseSeatNumberInput(input);
-  if ('error' in requestInput) {
-    return { error: requestInput.error };
-  }
-
-  const current = await getCurrentProfile(supabase);
-  if ('error' in current) {
-    return { error: current.error || 'Unable to load current profile' };
-  }
-
-  const { profile } = current;
-  if (!profile) {
-    return { error: 'Profile not found' };
-  }
-
-  const isAdmin = profile.role === 'platform_admin';
-  if (!isAdmin) {
-    if (profile.role !== 'driver' || profile.membership_status !== 'active') {
-      return { error: 'Valid driver approval is required' };
-    }
-
-    const driverCheck = await getDriverSeatActionProfile(supabase, profile.user_id);
-    if ('error' in driverCheck) {
-      return { error: driverCheck.error };
-    }
-
-    if (!driverCheck.valid) {
-      return { error: 'Valid driver approval is required' };
-    }
-  }
-
-  const context = await getSeatWorkflowContext(supabase, requestInput.requestId, requestInput.routeId);
-  if ('error' in context) {
-    return { error: context.error };
-  }
-
-  const { request, assignment } = context;
-  if (!assignment) {
-    return { error: 'Route assignment not found for this request' };
-  }
-  if (!isAdmin && assignment.driver_id !== profile.id) {
-    return { error: 'Not authorized to assign a seat' };
-  }
-  if (!['approved', 'assigned'].includes(request.status)) {
-    return { error: 'Only approved requests can receive a seat number' };
-  }
-  const { seatNumber } = requestInput as { seatNumber: number };
-  if (request.seat_number && request.seat_number === seatNumber) {
-    return { success: true, request: request as RouteSeatRequest };
-  }
-
-  const now = new Date().toISOString();
-  const { data: updatedRequest, error } = await supabase
-    .from('route_seat_requests')
-    .update({
-      status: 'assigned',
-      seat_number: seatNumber,
-      seat_assigned_by: profile.id,
-      seat_assigned_at: now,
-      updated_at: now,
-    })
-    .eq('id', request.id)
-    .select('*')
-    .single();
-
-  if (error) {
-    return { error: error.message };
-  }
-
-  revalidateSeatRequestPaths(request.route_id);
-
-  return { success: true, request: updatedRequest as RouteSeatRequest };
+export async function assignRouteSeatNumber() {
+  return { error: 'Seat number must be chosen during approval' };
 }
-
 export async function requestRouteSeatCancellation(input: FormData | { requestId: string; routeId: string }) {
   const supabase = await createClient();
   const requestInput = parseSeatRequestIds(input);
@@ -1417,7 +1378,7 @@ export async function reviewRouteSeatCancellation(input: FormData | { requestId:
   const { data: updatedRequest, error } = await supabase
     .from('route_seat_requests')
     .update({
-      status: decision === 'approved' ? 'cancelled' : request.seat_number ? 'assigned' : 'approved',
+      status: decision === 'approved' ? 'cancelled' : 'approved',
       cancellation_reviewed_by: profile.id,
       cancellation_reviewed_at: now,
       cancellation_requested_by: null,
@@ -2063,7 +2024,7 @@ export async function getDriverRouteDetail(routeId: string): Promise<DriverRoute
   const [requestsResult, ledgerResult] = await Promise.all([
     supabase
       .from('route_seat_requests')
-      .select('id, passenger_id, route_id, pickup_stop_id, dropoff_stop_id, seats_requested, requested_days, request_type, preferred_morning_time, preferred_return_time, status, matched_assignment_id, created_at, updated_at')
+      .select('id, passenger_id, route_id, pickup_stop_id, dropoff_stop_id, seats_requested, requested_days, request_type, preferred_morning_time, preferred_return_time, status, seat_number, passenger_avatar_url, matched_assignment_id, created_at, updated_at')
       .eq('route_id', routeId)
       .order('created_at', { ascending: false }),
     supabase
@@ -2080,7 +2041,7 @@ export async function getDriverRouteDetail(routeId: string): Promise<DriverRoute
   const { data: passengerProfiles } = passengerIds.length
     ? await supabase
         .from('profiles')
-        .select('id, first_name, surname')
+        .select('id, first_name, surname, membership_status, profile_photo_url')
         .in('id', passengerIds)
     : { data: [] };
   const passengerProfilesById = new Map(
@@ -2101,6 +2062,7 @@ export async function getDriverRouteDetail(routeId: string): Promise<DriverRoute
         passenger_name: passengerProfile
           ? `${passengerProfile.first_name || ''} ${passengerProfile.surname || ''}`.trim() || null
           : null,
+        passenger_membership_status: passengerProfile?.membership_status || null,
         pickup_stop_name: stopById.get(request.pickup_stop_id)?.stop_name || null,
         dropoff_stop_name: stopById.get(request.dropoff_stop_id)?.stop_name || null,
       };

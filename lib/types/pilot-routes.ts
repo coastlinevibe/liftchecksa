@@ -5,6 +5,7 @@ export type PilotRequestStatus =
   | 'approved'
   | 'assigned'
   | 'cancellation_requested'
+  | 'suspended'
   | 'rejected'
   | 'cancelled'
   | 'removed'
@@ -146,6 +147,7 @@ export interface RouteSeatRequest {
   passenger_name?: string | null;
   passenger_phone?: string | null;
   passenger_email?: string | null;
+  passenger_membership_status?: string | null;
   passenger_avatar_url?: string | null;
   pickup_stop_name?: string | null;
   dropoff_stop_name?: string | null;

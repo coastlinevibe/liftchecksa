@@ -5,7 +5,6 @@ import { ArrowLeft, BadgeCheck, Bell, CalendarDays, ChevronDown, ListOrdered, Me
 import { createClient } from '@/lib/supabase/server';
 import {
   approveRouteSeatRequest,
-  assignRouteSeatNumber,
   deleteOfficialRoute,
   getAdminRouteReviewDetail,
   rejectRouteSeatRequest,
@@ -78,11 +77,6 @@ async function approveSeatRequestAction(formData: FormData) {
 async function rejectSeatRequestAction(formData: FormData) {
   'use server';
   await rejectRouteSeatRequest(formData);
-}
-
-async function assignSeatNumberAction(formData: FormData) {
-  'use server';
-  await assignRouteSeatNumber(formData);
 }
 
 async function reviewCancellationAction(formData: FormData) {
@@ -539,8 +533,8 @@ export default async function AdminRouteDetailPage({
               {requests.map((request) => {
                 const isPending = request.status === 'pending';
                 const hasCancellationRequest = request.status === 'cancellation_requested';
-                const canAssignSeat = ['approved', 'assigned'].includes(request.status);
-                const showRemovalAction = ['approved', 'assigned', 'cancellation_requested'].includes(request.status);
+                const passengerInactive = request.status === 'suspended' || request.passenger_membership_status !== 'active';
+                const showRemovalAction = ['approved', 'assigned', 'cancellation_requested', 'suspended'].includes(request.status);
                 return (
                   <details key={request.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                     <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
@@ -552,6 +546,9 @@ export default async function AdminRouteDetailPage({
                               {request.passenger_name || `Passenger ${request.passenger_id.slice(0, 8)}`}
                             </div>
                             <div className="mt-1 text-xs text-slate-600">Status: {formatSeatRequestStatusLabel(request.status)} - Type: {request.request_type}</div>
+                            {passengerInactive ? (
+                              <div className="mt-1 inline-flex rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700">Passenger inactive</div>
+                            ) : null}
                             <div className="mt-1 text-xs text-slate-600">Seats: {request.seats_requested ?? 1}</div>
                             <div className="mt-1 text-xs text-slate-600">Days: {(request.requested_days || []).join(', ') || 'Not set'}</div>
                             <div className="mt-1 text-xs text-slate-600">
@@ -570,7 +567,7 @@ export default async function AdminRouteDetailPage({
                       <div className="grid gap-2 text-xs text-slate-600 md:grid-cols-2">
                         <div>Pickup stop: {request.pickup_stop_name || 'Unavailable'}</div>
                         <div>Drop-off stop: {request.dropoff_stop_name || 'Unavailable'}</div>
-                        <div>Seat number: {request.seat_number || 'Pending assignment'}</div>
+                        <div>Seat number: {request.seat_number || 'Selected during approval'}</div>
                         <div>Submitted: {new Date(request.created_at).toLocaleDateString()}</div>
                       </div>
 
@@ -579,12 +576,25 @@ export default async function AdminRouteDetailPage({
                           <input type="hidden" name="routeId" value={route.id} />
                           <input type="hidden" name="requestId" value={request.id} />
                           <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Review request</div>
-                          <p className="mt-1 text-sm text-emerald-900">Approve to reserve one seat immediately or reject the request.</p>
+                          <p className="mt-1 text-sm text-emerald-900">Choose a seat number, then approve or reject the request.</p>
+                          <label className="mt-3 block text-xs font-semibold uppercase tracking-wide text-emerald-700" htmlFor={`seat-number-${request.id}`}>
+                            Seat number
+                          </label>
+                          <input
+                            id={`seat-number-${request.id}`}
+                            name="seatNumber"
+                            type="number"
+                            min={1}
+                            defaultValue={request.seat_number || ''}
+                            className="mt-2 w-28 rounded-lg border border-emerald-300 px-3 py-2 text-sm"
+                            placeholder="Seat"
+                            required
+                          />
                           <button
                             type="submit"
                             className="mt-3 inline-flex items-center justify-center rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-600"
                           >
-                            Approve request
+                            Approve and assign seat
                           </button>
                         </form>
                       ) : null}
@@ -599,33 +609,6 @@ export default async function AdminRouteDetailPage({
                           >
                             Reject request
                           </button>
-                        </form>
-                      ) : null}
-
-                      {canAssignSeat ? (
-                        <form action={assignSeatNumberAction} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                          <input type="hidden" name="routeId" value={route.id} />
-                          <input type="hidden" name="requestId" value={request.id} />
-                          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor={`seat-number-${request.id}`}>
-                            Seat number
-                          </label>
-                          <div className="mt-2 flex flex-wrap items-center gap-2">
-                            <input
-                              id={`seat-number-${request.id}`}
-                              name="seatNumber"
-                              type="number"
-                              min={1}
-                              defaultValue={request.seat_number || ''}
-                              className="w-28 rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                              placeholder="Seat"
-                            />
-                            <button
-                              type="submit"
-                              className="inline-flex items-center justify-center rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800"
-                            >
-                              Assign seat
-                            </button>
-                          </div>
                         </form>
                       ) : null}
 

@@ -59,14 +59,22 @@ export default function RouteSeatRequestForm({
   if (!canRequestSeat) {
     const promptTitle = !isLoggedIn
       ? 'Login required'
-      : membershipStatus === 'active'
-        ? 'Member access required'
-        : 'Membership approval required';
+      : membershipStatus === 'suspended'
+        ? 'Membership suspended'
+        : membershipStatus === 'expired'
+          ? 'Membership expired'
+          : membershipStatus === 'active'
+            ? 'Member access required'
+            : 'Membership approval required';
     const promptBody = !isLoggedIn
       ? 'Log in or register as an active member to request a seat.'
-      : membershipStatus === 'active'
-        ? 'Something is off with your member access. Please refresh or contact support.'
-        : 'Your membership is not active yet. Complete payment verification to request a seat.';
+      : membershipStatus === 'suspended'
+        ? 'Your membership is suspended. Seat requests are disabled until support reactivates your account.'
+        : membershipStatus === 'expired'
+          ? 'Your membership has expired. Renew before requesting a seat.'
+          : membershipStatus === 'active'
+            ? 'Something is off with your member access. Please refresh or contact support.'
+            : 'Your membership is not active yet. Complete payment verification to request a seat.';
     return (
       <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="text-base font-bold text-slate-900">{promptTitle}</h2>
@@ -114,7 +122,7 @@ export default function RouteSeatRequestForm({
 
       {state?.success ? (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-          Seat request submitted. A seat will be reserved when the driver approves it.
+          Seat request submitted. The driver will approve and assign a seat in one step.
         </div>
       ) : null}
 
@@ -194,7 +202,7 @@ export default function RouteSeatRequestForm({
       </button>
 
       <div className="text-xs text-slate-500">
-        One approved request reserves one seat immediately. Seat assignment and cancellation are reviewed separately.
+        One approved request reserves one seat immediately. Seat assignment happens during approval. Cancellation is reviewed separately.
       </div>
     </form>
   );

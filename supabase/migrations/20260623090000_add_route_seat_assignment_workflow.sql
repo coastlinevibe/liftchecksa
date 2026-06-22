@@ -20,7 +20,7 @@ alter table public.route_seat_requests
 
 alter table public.route_seat_requests
   add constraint route_seat_requests_status_check
-  check (status in ('pending', 'approved', 'assigned', 'cancellation_requested', 'rejected', 'cancelled', 'removed', 'matched', 'confirmed'));
+  check (status in ('pending', 'approved', 'assigned', 'cancellation_requested', 'suspended', 'rejected', 'cancelled', 'removed', 'matched', 'confirmed'));
 
 alter table public.route_seat_requests
   drop constraint if exists route_seat_requests_seat_number_check;
@@ -29,12 +29,19 @@ alter table public.route_seat_requests
   add constraint route_seat_requests_seat_number_check
   check (seat_number is null or seat_number > 0);
 
+alter table public.route_seat_requests
+  drop constraint if exists route_seat_requests_approved_requires_seat_number_check;
+
+alter table public.route_seat_requests
+  add constraint route_seat_requests_approved_requires_seat_number_check
+  check (status <> 'approved' or seat_number is not null);
+
 create index if not exists idx_route_seat_requests_route_seat_number on public.route_seat_requests(route_id, seat_number);
 create index if not exists idx_route_seat_requests_route_status on public.route_seat_requests(route_id, status);
 
 create unique index if not exists idx_route_seat_requests_active_seat_number
   on public.route_seat_requests(route_id, seat_number)
-  where seat_number is not null and status in ('approved', 'assigned', 'cancellation_requested');
+  where seat_number is not null and status in ('approved', 'assigned', 'cancellation_requested', 'suspended');
 
 create or replace function public.can_request_route_seat(p_user_id uuid, p_route_id uuid)
 returns boolean
@@ -160,3 +167,31 @@ using (
 );
 
 grant execute on function public.can_request_route_seat(uuid, uuid) to authenticated;
+
+create or replace function public.suspend_inactive_route_seat_requests()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $
+begin
+  if new.role = 'member' and new.membership_status = 'active' then
+    return new;
+  end if;
+
+  update public.route_seat_requests
+  set status = 'suspended',
+      updated_at = now()
+  where passenger_id = new.id
+    and status in ('pending', 'approved', 'assigned', 'cancellation_requested');
+
+  return new;
+end;
+$;
+
+drop trigger if exists trg_suspend_inactive_route_seat_requests on public.profiles;
+
+create trigger trg_suspend_inactive_route_seat_requests
+after insert or update of role, membership_status on public.profiles
+for each row
+execute function public.suspend_inactive_route_seat_requests();

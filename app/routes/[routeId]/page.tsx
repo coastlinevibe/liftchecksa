@@ -27,6 +27,7 @@ type SeatRequestSummary = {
   status: string;
   seat_number?: number | null;
   passenger_avatar_url?: string | null;
+  passenger_membership_status?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -119,24 +120,23 @@ export default async function RouteDetailPage({
     : { data: null };
 
   const isLoggedIn = Boolean(user);
-  const membershipActive = profile?.membership_status === 'active' || latestPayment?.status === 'approved';
-  const isMemberUser = profile?.role === 'member' || latestPayment?.status === 'approved';
+  const membershipActive = profile?.membership_status === 'active';
+  const isMemberUser = profile?.role === 'member';
   const canRequestSeat = Boolean(isLoggedIn && isMemberUser && membershipActive);
   const passengerSeatCapacity = getPassengerSeatCapacity(route.vehicle_capacity) || 0;
-  const seatRequestStatuses = ['pending', 'approved', 'assigned', 'cancellation_requested'] as const;
+  const seatRequestStatuses = ['pending', 'approved', 'assigned', 'cancellation_requested', 'suspended'] as const;
 
   const activeSeatRequestsResult = isMemberUser && membershipActive
     ? await supabase
         .from('route_seat_requests')
         .select('id, passenger_id, route_id, status, seat_number, passenger_avatar_url, pickup_stop_id, dropoff_stop_id, seats_requested, requested_days, request_type, preferred_morning_time, preferred_return_time, created_at, updated_at')
         .eq('route_id', route.id)
-        .in('status', ['approved', 'assigned', 'cancellation_requested'])
+        .in('status', ['approved', 'assigned', 'cancellation_requested', 'suspended'])
         .order('seat_number', { ascending: true })
         .order('created_at', { ascending: true })
     : { data: [] };
   const activeSeatRequests = ((activeSeatRequestsResult.data || []) as SeatRequestSummary[]).filter(Boolean);
   const seatRequestsByNumber = new Map<number, SeatRequestSummary>();
-  const reservedSeatRequests = activeSeatRequests.filter((request) => !request.seat_number);
 
   for (const request of activeSeatRequests) {
     if (request.seat_number) {
@@ -246,7 +246,7 @@ export default async function RouteDetailPage({
                 <div>
                   <h2 className="text-base font-bold text-slate-900">Seat occupancy</h2>
                   <p className="mt-1 text-sm text-slate-600">
-                    Approved requests reserve seats immediately. Seat numbers are assigned separately by the driver.
+                    Approved requests reserve seats immediately with a seat number.
                   </p>
                 </div>
                 <div className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
@@ -259,6 +259,7 @@ export default async function RouteDetailPage({
                   <div className="grid gap-2 sm:grid-cols-2">
                     {Array.from({ length: passengerSeatCapacity }, (_, index) => index + 1).map((seatNumber) => {
                       const request = seatRequestsByNumber.get(seatNumber);
+                      const passengerInactive = request?.status === 'suspended' || request?.passenger_membership_status !== 'active';
                       return (
                         <div key={seatNumber} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                           <div className="flex items-start justify-between gap-2">
@@ -267,8 +268,8 @@ export default async function RouteDetailPage({
                               <div className="text-[11px] text-slate-500">Avatar only while occupied</div>
                             </div>
                             {request ? (
-                              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
-                                {formatSeatRequestStatusLabel(request.status)}
+                              <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${passengerInactive ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                                {passengerInactive ? 'Blocked' : formatSeatRequestStatusLabel(request.status)}
                               </span>
                             ) : (
                               <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
@@ -288,14 +289,14 @@ export default async function RouteDetailPage({
                               </div>
                             )}
                             <div className="text-xs text-slate-500">
-                              {request ? 'Seat occupied' : 'Seat available'}
+                              {request ? (passengerInactive ? 'Seat blocked for inactive passenger' : 'Seat occupied') : 'Seat available'}
                               {request?.seat_number ? (
                                 <div className="mt-1 text-[11px] font-semibold text-slate-400">
                                   Assigned seat #{request.seat_number}
                                 </div>
                               ) : request ? (
                                 <div className="mt-1 text-[11px] font-semibold text-slate-400">
-                                  Seat reserved, awaiting number assignment
+                                  Seat reserved during approval
                                 </div>
                               ) : null}
                             </div>
@@ -305,21 +306,6 @@ export default async function RouteDetailPage({
                     })}
                   </div>
 
-                  {reservedSeatRequests.length > 0 ? (
-                    <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                        Reserved seats awaiting numbers
-                      </div>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {reservedSeatRequests.map((request, index) => (
-                          <div key={request.id} className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2">
-                            <SeatAvatar avatarUrl={request.passenger_avatar_url} label={`R${index + 1}`} />
-                            <span className="text-xs font-semibold text-slate-600">Reserved</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
                 </>
               ) : (
                 <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">
@@ -341,7 +327,9 @@ export default async function RouteDetailPage({
                         ? 'Your seat has been reserved.'
                         : currentSeatRequest.status === 'cancellation_requested'
                           ? 'Your cancellation request is waiting for driver review.'
-                          : 'This request is no longer active.'}
+                          : currentSeatRequest.status === 'suspended'
+                            ? 'Your seat is blocked while your account is inactive.'
+                            : 'This request is no longer active.'}
                   </p>
                 </div>
                 <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
@@ -359,7 +347,7 @@ export default async function RouteDetailPage({
                 <div>Requested days: {(currentSeatRequest.requested_days || []).join(', ') || 'Not set'}</div>
                 <div>Request type: {currentSeatRequest.request_type}</div>
                 <div>Seats requested: {currentSeatRequest.seats_requested ?? 1}</div>
-                {currentSeatRequest.seat_number ? <div>Seat number: {currentSeatRequest.seat_number}</div> : <div>Seat reserved when approved.</div>}
+                {currentSeatRequest.seat_number ? <div>Seat number: {currentSeatRequest.seat_number}</div> : <div>Seat will be assigned during approval.</div>}
               </div>
 
               {currentSeatRequest.status === 'approved' || currentSeatRequest.status === 'assigned' ? (
