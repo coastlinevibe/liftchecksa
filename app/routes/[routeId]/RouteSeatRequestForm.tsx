@@ -28,7 +28,6 @@ export default function RouteSeatRequestForm({
 }) {
   const [pickupStopId, setPickupStopId] = useState(stops[0]?.id || '');
   const [dropoffStopId, setDropoffStopId] = useState(stops[stops.length - 1]?.id || '');
-  const [seatsRequested, setSeatsRequested] = useState(1);
   const [requestedDays, setRequestedDays] = useState<string[]>(['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);
   const [state, formAction, pending] = useActionState(
     async (_prev: State, formData: FormData) => {
@@ -64,7 +63,7 @@ export default function RouteSeatRequestForm({
         ? 'Member access required'
         : 'Membership approval required';
     const promptBody = !isLoggedIn
-      ? 'Log in or register as an active member to request a weekly seat.'
+      ? 'Log in or register as an active member to request a seat.'
       : membershipStatus === 'active'
         ? 'Something is off with your member access. Please refresh or contact support.'
         : 'Your membership is not active yet. Complete payment verification to request a seat.';
@@ -79,7 +78,7 @@ export default function RouteSeatRequestForm({
               className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-600"
             >
               <Send className="h-4 w-4" />
-              Request weekly seat
+              Request seat
             </Link>
             <Link
               href="/login"
@@ -105,6 +104,7 @@ export default function RouteSeatRequestForm({
     <form action={formAction} className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
       <input type="hidden" name="route_id" value={routeId} />
       <input type="hidden" name="requested_days" value={JSON.stringify(requestedDays)} />
+      <input type="hidden" name="seats_requested" value="1" />
 
       {state?.error ? (
         <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
@@ -114,27 +114,11 @@ export default function RouteSeatRequestForm({
 
       {state?.success ? (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-          Seat request submitted.
+          Seat request submitted. A seat will be reserved when the driver approves it.
         </div>
       ) : null}
 
       <div className="grid gap-3 md:grid-cols-2">
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold text-slate-700">Seats needed</label>
-          <input
-            name="seats_requested"
-            type="number"
-            min={1}
-            max={8}
-            value={seatsRequested}
-            onChange={(event) => {
-              const nextValue = Number(event.target.value || 1);
-              setSeatsRequested(Number.isFinite(nextValue) ? Math.max(1, Math.floor(nextValue)) : 1);
-            }}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-          />
-        </div>
-
         <div>
           <label className="mb-1.5 block text-xs font-semibold text-slate-700">Pickup stop</label>
           <select
@@ -206,12 +190,11 @@ export default function RouteSeatRequestForm({
         className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:bg-slate-300"
       >
         <Send className="h-4 w-4" />
-        Request weekly seat
+        Request seat
       </button>
 
       <div className="text-xs text-slate-500">
-        Seat requests stay private until admin, driver, and passenger complete the acceptance flow.
-        You&apos;ll follow the driver&apos;s fixed route times.
+        One approved request reserves one seat immediately. Seat assignment and cancellation are reviewed separately.
       </div>
     </form>
   );

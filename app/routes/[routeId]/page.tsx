@@ -1,17 +1,35 @@
-﻿import Link from 'next/link';
+import Image from 'next/image';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, MapPin, MessageSquare, Route as RouteIcon, Send, Shield } from 'lucide-react';
-import { getRouteDetail } from '@/lib/routes/actions';
-import { formatVehicleCapacity } from '@/lib/types/pilot-routes';
+import { getRouteDetail, requestRouteSeatCancellation } from '@/lib/routes/actions';
+import { formatVehicleCapacity, getPassengerSeatCapacity } from '@/lib/types/pilot-routes';
 import { createClient } from '@/lib/supabase/server';
 import RouteChatThread from '@/components/RouteChatThread';
-import DriverRouteApplicationForm from '@/components/DriverRouteApplicationForm';
 import RouteSeatRequestForm from './RouteSeatRequestForm';
 import { joinOpenRouteChatFromForm, getOpenRouteChatView, sendOpenRouteChatMessageFromForm } from '@/lib/routes/open-chat';
 import LogoutButton from '@/components/LogoutButton';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+type SeatRequestSummary = {
+  id: string;
+  passenger_id: string;
+  route_id: string;
+  pickup_stop_id: string;
+  dropoff_stop_id: string;
+  seats_requested?: number | null;
+  requested_days: string[];
+  request_type: string;
+  preferred_morning_time?: string | null;
+  preferred_return_time?: string | null;
+  status: string;
+  seat_number?: number | null;
+  passenger_avatar_url?: string | null;
+  created_at: string;
+  updated_at: string;
+};
 
 function formatRouteStopTime(value?: string | null) {
   if (!value) return null;
@@ -22,6 +40,47 @@ function formatRouteStopTime(value?: string | null) {
   return `${hours.padStart(2, '0')}:${minutes} ${suffix}`;
 }
 
+function formatSeatRequestStatusLabel(status: string) {
+  switch (status) {
+    case 'pending':
+      return 'Pending review';
+    case 'approved':
+      return 'Seat reserved';
+    case 'assigned':
+      return 'Seat assigned';
+    case 'cancellation_requested':
+      return 'Cancellation pending';
+    case 'cancelled':
+      return 'Cancelled';
+    case 'removed':
+      return 'Removed';
+    case 'rejected':
+      return 'Rejected';
+    default:
+      return status;
+  }
+}
+
+function formatRouteStopLabel(stopName?: string | null, fallback?: string) {
+  return stopName || fallback || 'Stop pending';
+}
+
+function SeatAvatar({ avatarUrl, label }: { avatarUrl?: string | null; label: string }) {
+  return (
+    <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200">
+      {avatarUrl ? (
+        <Image src={avatarUrl} alt="Passenger avatar" width={40} height={40} className="h-full w-full object-cover" />
+      ) : (
+        <span className="text-[11px] font-semibold text-slate-500">{label}</span>
+      )}
+    </div>
+  );
+}
+
+async function requestSeatCancellationAction(formData: FormData) {
+  'use server';
+  await requestRouteSeatCancellation(formData);
+}
 export default async function RouteDetailPage({
   params,
   searchParams,
@@ -45,14 +104,7 @@ export default async function RouteDetailPage({
   const { data: profile } = user
     ? await supabase
         .from('profiles')
-        .select('id, role, membership_status, first_name, surname')
-        .eq('user_id', user.id)
-        .maybeSingle()
-    : { data: null };
-  const { data: driverProfile } = user
-    ? await supabase
-        .from('driver_profiles')
-        .select('id, user_id, verification_status, id_status, vehicle_status')
+        .select('id, role, membership_status, first_name, surname, profile_photo_url')
         .eq('user_id', user.id)
         .maybeSingle()
     : { data: null };
@@ -69,27 +121,43 @@ export default async function RouteDetailPage({
   const isLoggedIn = Boolean(user);
   const membershipActive = profile?.membership_status === 'active' || latestPayment?.status === 'approved';
   const isMemberUser = profile?.role === 'member' || latestPayment?.status === 'approved';
-  const isDriverUser = Boolean(profile?.role === 'driver' || driverProfile);
   const canRequestSeat = Boolean(isLoggedIn && isMemberUser && membershipActive);
-  const { data: driverVehicles } = user && driverProfile
+  const passengerSeatCapacity = getPassengerSeatCapacity(route.vehicle_capacity) || 0;
+  const seatRequestStatuses = ['pending', 'approved', 'assigned', 'cancellation_requested'] as const;
+
+  const activeSeatRequestsResult = isMemberUser && membershipActive
     ? await supabase
-        .from('vehicles')
-        .select('id, make, model, licence_plate, seat_capacity, verification_status, is_active')
-        .eq('driver_id', driverProfile.id)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-    : { data: [] };
-  const { data: driverApplication } = user && isDriverUser && profile?.id
-    ? await supabase
-        .from('driver_route_assignments')
-        .select('id, route_id, vehicle_id, status, created_at')
+        .from('route_seat_requests')
+        .select('id, passenger_id, route_id, status, seat_number, passenger_avatar_url, pickup_stop_id, dropoff_stop_id, seats_requested, requested_days, request_type, preferred_morning_time, preferred_return_time, created_at, updated_at')
         .eq('route_id', route.id)
-        .eq('driver_id', profile.id)
+        .in('status', ['approved', 'assigned', 'cancellation_requested'])
+        .order('seat_number', { ascending: true })
+        .order('created_at', { ascending: true })
+    : { data: [] };
+  const activeSeatRequests = ((activeSeatRequestsResult.data || []) as SeatRequestSummary[]).filter(Boolean);
+  const seatRequestsByNumber = new Map<number, SeatRequestSummary>();
+  const reservedSeatRequests = activeSeatRequests.filter((request) => !request.seat_number);
+
+  for (const request of activeSeatRequests) {
+    if (request.seat_number) {
+      seatRequestsByNumber.set(request.seat_number, request);
+    }
+  }
+
+  const currentSeatRequestResult = isLoggedIn && profile?.id
+    ? await supabase
+        .from('route_seat_requests')
+        .select('id, passenger_id, route_id, pickup_stop_id, dropoff_stop_id, seats_requested, requested_days, request_type, preferred_morning_time, preferred_return_time, status, seat_number, passenger_avatar_url, created_at, updated_at')
+        .eq('route_id', route.id)
+        .eq('passenger_id', profile.id)
+        .in('status', seatRequestStatuses as unknown as string[])
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
     : { data: null };
+  const currentSeatRequest = currentSeatRequestResult.data ? (currentSeatRequestResult.data as SeatRequestSummary) : null;
 
+  const stopById = new Map(stops.map((stop) => [stop.id, stop] as const));
   const openRouteChatViewResult = isMemberUser && membershipActive
     ? await getOpenRouteChatView(route.id)
     : null;
@@ -149,7 +217,7 @@ export default async function RouteDetailPage({
                       <div className="text-xs text-slate-600">{stop.area || 'Area to be confirmed'}</div>
                       <div className="mt-1 text-[11px] font-semibold text-slate-500">
                         {formatRouteStopTime(stop.estimated_morning_time) || 'AM time pending'}
-                        {' · '}
+                        {' - '}
                         {formatRouteStopTime(stop.estimated_return_time) || 'PM time pending'}
                       </div>
                     </div>
@@ -172,26 +240,158 @@ export default async function RouteDetailPage({
         </div>
 
         <div className="space-y-4">
-          {isDriverUser ? (
-            <DriverRouteApplicationForm
-              routeId={route.id}
-              routeVehicleCapacity={route.vehicle_capacity}
-              driverVerified={Boolean(
-                driverProfile?.id_status === 'approved' &&
-                  driverProfile?.vehicle_status === 'approved'
+          {isMemberUser && membershipActive ? (
+            <section className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">Seat occupancy</h2>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Approved requests reserve seats immediately. Seat numbers are assigned separately by the driver.
+                  </p>
+                </div>
+                <div className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
+                  {activeSeatRequests.length} / {passengerSeatCapacity || 0} reserved
+                </div>
+              </div>
+
+              {passengerSeatCapacity > 0 ? (
+                <>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {Array.from({ length: passengerSeatCapacity }, (_, index) => index + 1).map((seatNumber) => {
+                      const request = seatRequestsByNumber.get(seatNumber);
+                      return (
+                        <div key={seatNumber} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <div className="text-sm font-semibold text-slate-900">Seat {seatNumber}</div>
+                              <div className="text-[11px] text-slate-500">Avatar only while occupied</div>
+                            </div>
+                            {request ? (
+                              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                                {formatSeatRequestStatusLabel(request.status)}
+                              </span>
+                            ) : (
+                              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
+                                Open
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-3 flex items-center gap-3">
+                            {request ? (
+                              <SeatAvatar
+                                avatarUrl={request.passenger_avatar_url}
+                                label={`S${seatNumber}`}
+                              />
+                            ) : (
+                              <div className="flex h-10 w-10 items-center justify-center rounded-full border border-dashed border-slate-300 bg-white text-[11px] font-semibold text-slate-400">
+                                {seatNumber}
+                              </div>
+                            )}
+                            <div className="text-xs text-slate-500">
+                              {request ? 'Seat occupied' : 'Seat available'}
+                              {request?.seat_number ? (
+                                <div className="mt-1 text-[11px] font-semibold text-slate-400">
+                                  Assigned seat #{request.seat_number}
+                                </div>
+                              ) : request ? (
+                                <div className="mt-1 text-[11px] font-semibold text-slate-400">
+                                  Seat reserved, awaiting number assignment
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {reservedSeatRequests.length > 0 ? (
+                    <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                        Reserved seats awaiting numbers
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {reservedSeatRequests.map((request, index) => (
+                          <div key={request.id} className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2">
+                            <SeatAvatar avatarUrl={request.passenger_avatar_url} label={`R${index + 1}`} />
+                            <span className="text-xs font-semibold text-slate-600">Reserved</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </>
+              ) : (
+                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">
+                  Seat capacity is not available for this route yet.
+                </div>
               )}
-              vehicles={(driverVehicles || []).map((vehicle) => ({
-                id: vehicle.id,
-                make: vehicle.make,
-                model: vehicle.model,
-                licence_plate: vehicle.licence_plate,
-                seat_capacity: vehicle.seat_capacity,
-              }))}
-              existingApplication={(driverApplication || null) as
-                | { id: string; status: string; vehicle_id: string; created_at: string }
-                | null}
-            />
+            </section>
           ) : null}
+
+          {currentSeatRequest ? (
+            <section className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">Your seat request</h2>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {currentSeatRequest.status === 'pending'
+                      ? 'Your request is waiting for driver review.'
+                      : currentSeatRequest.status === 'approved' || currentSeatRequest.status === 'assigned'
+                        ? 'Your seat has been reserved.'
+                        : currentSeatRequest.status === 'cancellation_requested'
+                          ? 'Your cancellation request is waiting for driver review.'
+                          : 'This request is no longer active.'}
+                  </p>
+                </div>
+                <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                  {formatSeatRequestStatusLabel(currentSeatRequest.status)}
+                </span>
+              </div>
+
+              <div className="mt-3 grid gap-2 text-sm text-slate-600">
+                <div>
+                  Pickup: {formatRouteStopLabel(stopById.get(currentSeatRequest.pickup_stop_id)?.stop_name, 'Pickup pending')}
+                </div>
+                <div>
+                  Drop-off: {formatRouteStopLabel(stopById.get(currentSeatRequest.dropoff_stop_id)?.stop_name, 'Drop-off pending')}
+                </div>
+                <div>Requested days: {(currentSeatRequest.requested_days || []).join(', ') || 'Not set'}</div>
+                <div>Request type: {currentSeatRequest.request_type}</div>
+                <div>Seats requested: {currentSeatRequest.seats_requested ?? 1}</div>
+                {currentSeatRequest.seat_number ? <div>Seat number: {currentSeatRequest.seat_number}</div> : <div>Seat reserved when approved.</div>}
+              </div>
+
+              {currentSeatRequest.status === 'approved' || currentSeatRequest.status === 'assigned' ? (
+                <form action={requestSeatCancellationAction} className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                  <input type="hidden" name="routeId" value={route.id} />
+                  <input type="hidden" name="requestId" value={currentSeatRequest.id} />
+                  <p className="text-sm font-semibold text-amber-900">Need to cancel this seat?</p>
+                  <p className="mt-1 text-xs text-amber-800">
+                    Your driver will review the cancellation before the seat becomes available again.
+                  </p>
+                  <button
+                    type="submit"
+                    className="mt-3 inline-flex items-center justify-center rounded-lg bg-amber-500 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-600"
+                  >
+                    Request cancellation
+                  </button>
+                </form>
+              ) : currentSeatRequest.status === 'cancellation_requested' ? (
+                <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                  Cancellation request submitted. Awaiting driver review.
+                </div>
+              ) : null}
+            </section>
+          ) : (
+            <RouteSeatRequestForm
+              routeId={route.id}
+              stops={stops}
+              canRequestSeat={canRequestSeat}
+              isLoggedIn={isLoggedIn}
+              membershipStatus={membershipActive ? 'active' : profile?.membership_status || latestPayment?.status || null}
+            />
+          )}
 
           {openRouteChatView ? (
             <section className="rounded-xl border border-slate-200 bg-white p-4">
@@ -258,27 +458,14 @@ export default async function RouteDetailPage({
                   </form>
                 </>
               ) : (
-                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
                   Only active members can join this chat.
                 </div>
               )}
             </section>
-          ) : null}
-
-          {!isDriverUser ? (
-            <RouteSeatRequestForm
-              routeId={route.id}
-              stops={stops}
-              canRequestSeat={canRequestSeat}
-              isLoggedIn={isLoggedIn}
-              membershipStatus={membershipActive ? 'active' : profile?.membership_status || latestPayment?.status || null}
-            />
           ) : null}
         </div>
       </div>
     </div>
   );
 }
-
-
-

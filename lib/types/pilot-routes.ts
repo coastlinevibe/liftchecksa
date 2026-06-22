@@ -1,6 +1,15 @@
 export type PilotRouteStatus = 'draft' | 'active' | 'paused';
 export type PilotAssignmentStatus = 'pending' | 'approved' | 'rejected' | 'paused' | 'active' | 'suspended';
-export type PilotRequestStatus = 'pending' | 'approved' | 'rejected' | 'cancelled' | 'matched' | 'confirmed';
+export type PilotRequestStatus =
+  | 'pending'
+  | 'approved'
+  | 'assigned'
+  | 'cancellation_requested'
+  | 'rejected'
+  | 'cancelled'
+  | 'removed'
+  | 'matched'
+  | 'confirmed';
 export type PilotPaymentMethod =
   | 'manual_eft'
   | 'cash_marked'
@@ -121,10 +130,23 @@ export interface RouteSeatRequest {
   preferred_return_time?: string | null;
   status: PilotRequestStatus;
   matched_assignment_id?: string | null;
+  approved_by?: string | null;
+  approved_at?: string | null;
+  seat_number?: number | null;
+  seat_assigned_by?: string | null;
+  seat_assigned_at?: string | null;
+  cancellation_requested_by?: string | null;
+  cancellation_requested_at?: string | null;
+  cancellation_reviewed_by?: string | null;
+  cancellation_reviewed_at?: string | null;
+  removed_by?: string | null;
+  removed_at?: string | null;
+  removed_reason?: string | null;
   admin_notes?: string | null;
   passenger_name?: string | null;
   passenger_phone?: string | null;
   passenger_email?: string | null;
+  passenger_avatar_url?: string | null;
   pickup_stop_name?: string | null;
   dropoff_stop_name?: string | null;
   created_at: string;
