@@ -17,6 +17,7 @@ export default function AddVehiclePage() {
   const [success, setSuccess] = useState(false);
   const [vehiclePhoto, setVehiclePhoto] = useState<File | null>(null);
   const [idDocument, setIdDocument] = useState<File | null>(null);
+  const [idDocumentPreview, setIdDocumentPreview] = useState<string>('');
   const [photoPreview, setPhotoPreview] = useState<string>('');
 
   const [formData, setFormData] = useState({
@@ -30,6 +31,7 @@ export default function AddVehiclePage() {
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setError('');
       if (file.size > 5 * 1024 * 1024) {
         setError('Photo must be less than 5MB');
         return;
@@ -41,6 +43,37 @@ export default function AddVehiclePage() {
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const handleIdDocumentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+    setError('');
+
+    if (!file) {
+      setIdDocument(null);
+      setIdDocumentPreview('');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError('ID document must be less than 5MB');
+      setIdDocument(null);
+      setIdDocumentPreview('');
+      return;
+    }
+
+    setIdDocument(file);
+
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setIdDocumentPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+      return;
+    }
+
+    setIdDocumentPreview('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -144,8 +177,12 @@ export default function AddVehiclePage() {
         router.push('/dashboard/driver');
         }, 2000);
       }
-    } catch {
-      setError('An unexpected error occurred');
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'message' in err && typeof err.message === 'string') {
+        setError(err.message);
+      } else {
+        setError('An unexpected error occurred');
+      }
     } finally {
       setLoading(false);
     }
@@ -275,7 +312,7 @@ export default function AddVehiclePage() {
                   <input
                     type="file"
                     accept="image/*,.pdf"
-                    onChange={(e) => setIdDocument(e.target.files?.[0] ?? null)}
+                    onChange={handleIdDocumentChange}
                     required
                     className="hidden"
                   />
@@ -283,7 +320,35 @@ export default function AddVehiclePage() {
                   <p className="text-[10px] text-slate-500 mt-1">JPG, PNG, or PDF</p>
                 </label>
                 {idDocument ? (
-                  <p className="mt-2 text-xs text-emerald-600 font-medium">Selected: {idDocument.name}</p>
+                  <div className="mt-3">
+                    {idDocumentPreview ? (
+                      <div className="relative border-2 border-emerald-500 rounded-lg p-2 bg-white">
+                        <Image
+                          src={idDocumentPreview}
+                          alt="ID document preview"
+                          width={768}
+                          height={192}
+                          unoptimized
+                          className="h-40 w-full rounded object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIdDocument(null);
+                            setIdDocumentPreview('');
+                          }}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border-2 border-emerald-500 bg-white px-3 py-3">
+                        <p className="text-xs font-semibold text-slate-900">{idDocument.name}</p>
+                        <p className="mt-1 text-[11px] text-emerald-600">PDF selected and ready to upload</p>
+                      </div>
+                    )}
+                  </div>
                 ) : null}
               </div>
 

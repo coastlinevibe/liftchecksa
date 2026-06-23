@@ -12,7 +12,7 @@ import { isAdminRole, isSuperAdminEmail } from '@/lib/auth/routing';
 type DriverVerificationRow = {
   id: string;
   user_id: string;
-  id_status: string | null;
+  verification_status: string | null;
   id_document_url: string | null;
   provider_plan: string | null;
 };
@@ -81,7 +81,7 @@ async function getPendingVerifications() {
     .select(`
       id,
       user_id,
-      id_status,
+      verification_status,
       id_document_url,
       provider_plan
     `)
@@ -124,15 +124,12 @@ async function getPendingVerifications() {
     );
   }
 
-  const driverApplications = await Promise.all(
-    ((driverRows || []) as DriverVerificationRow[])
-      .filter((application) => application.id_status !== 'approved' && application.id_status !== 'rejected')
-      .map(async (application) => ({
-        ...application,
-        id_document_url: await resolveSignedStorageUrl(supabase, 'id-documents', application.id_document_url),
-        profile: profilesByUserId.get(application.user_id) || null,
-      }))
-  ) as DriverApplication[];
+  const driverApplications = ((driverRows || []) as DriverVerificationRow[])
+    .filter((application) => application.verification_status !== 'approved' && application.verification_status !== 'rejected')
+    .map((application) => ({
+      ...application,
+      profile: profilesByUserId.get(application.user_id) || null,
+    })) as DriverApplication[];
 
   const { data: vehicleRows, error: vehicleRowsError } = await supabase
     .from('vehicles')
@@ -290,21 +287,6 @@ export default async function AdminVerificationsPage() {
                   </div>
                 </div>
 
-                {application.id_document_url ? (
-                  <div className="mb-4 overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
-                    <Image
-                      src={application.id_document_url}
-                      alt={`${application.profile?.first_name || 'Driver'} ID document`}
-                      width={1200}
-                      height={800}
-                      className="h-56 w-full object-cover"
-                    />
-                  </div>
-                ) : (
-                  <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                    ID document missing
-                  </div>
-                )}
 
                 <ApproveRejectButtons driverProfileId={application.id} />
               </div>

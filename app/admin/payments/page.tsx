@@ -23,6 +23,13 @@ type PendingPayment = {
   } | null;
 };
 
+function getPendingPaymentKey(payment: Pick<PendingPayment, 'source' | 'user_id' | 'payment_reference' | 'id'>) {
+  if (payment.source === 'driver') {
+    return `driver:${payment.user_id}:${payment.payment_reference || payment.id}`;
+  }
+
+  return `payment:${payment.user_id}:${payment.payment_reference || payment.id}`;
+}
 async function getPendingPayments() {
   const supabase = await createClient();
 
@@ -97,7 +104,27 @@ async function getPendingPayments() {
     }),
   ]);
 
-  return paymentsWithProfiles;
+  const pendingByKey = new Map<string, PendingPayment>();
+
+  for (const payment of paymentsWithProfiles) {
+    const driverMirrorKey =
+      payment.source === 'driver'
+        ? `payment:${payment.user_id}:${payment.payment_reference || payment.id}`
+        : `driver:${payment.user_id}:${payment.payment_reference || payment.id}`;
+    const ownKey = getPendingPaymentKey(payment);
+    const existing = pendingByKey.get(ownKey) || pendingByKey.get(driverMirrorKey);
+
+    if (!existing || payment.source === 'driver') {
+      pendingByKey.set(ownKey, payment);
+      if (pendingByKey.has(driverMirrorKey)) {
+        pendingByKey.delete(driverMirrorKey);
+      }
+    }
+  }
+
+  return Array.from(pendingByKey.values()).sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
 }
 
 export default async function AdminPaymentsPage() {

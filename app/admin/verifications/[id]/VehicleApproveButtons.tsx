@@ -40,7 +40,8 @@ export default function VehicleApproveButtons({ vehicleId, driverProfileId }: Pr
       // Update driver profile
       const { error: driverError } = await supabase
         .from('driver_profiles')
-        .update({ 
+        .update({
+          id_status: 'approved',
           vehicle_status: 'approved'
         })
         .eq('id', driverProfileId);
@@ -75,6 +76,7 @@ export default function VehicleApproveButtons({ vehicleId, driverProfileId }: Pr
       const { error: driverError } = await supabase
         .from('driver_profiles')
         .update({
+          id_status: 'rejected',
           vehicle_status: 'rejected',
         })
         .eq('id', driverProfileId);

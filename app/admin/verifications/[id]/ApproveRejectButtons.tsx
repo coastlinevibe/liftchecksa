@@ -36,7 +36,7 @@ export default function ApproveRejectButtons({ driverProfileId }: Props) {
         const { error: driverError } = await supabase
           .from('driver_profiles')
           .update({ 
-            id_status: 'approved'
+            verification_status: 'approved'
           })
           .eq('id', driverProfileId);
 
@@ -49,7 +49,7 @@ export default function ApproveRejectButtons({ driverProfileId }: Props) {
         const { error: driverError } = await supabase
           .from('driver_profiles')
           .update({ 
-            id_status: 'rejected'
+            verification_status: 'rejected'
           })
           .eq('id', driverProfileId);
 

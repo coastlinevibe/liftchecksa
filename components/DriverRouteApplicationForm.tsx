@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useActionState, useState } from 'react';
+import { useState } from 'react';
 import { BadgeCheck, CarFront, CheckCircle2, Clock3, Send } from 'lucide-react';
 import { applyDriverToRouteFromForm } from '@/lib/routes/actions';
 import { formatVehicleCapacity } from '@/lib/types/pilot-routes';
@@ -12,11 +12,6 @@ type DriverVehicleOption = {
   model: string | null;
   licence_plate: string | null;
   seat_capacity: number | null;
-};
-
-type ApplicationState = {
-  error?: string;
-  success?: boolean;
 };
 
 type ExistingApplication = {
@@ -40,21 +35,10 @@ export default function DriverRouteApplicationForm({
   driverVerified?: boolean;
 }) {
   const [vehicleId, setVehicleId] = useState(vehicles[0]?.id || existingApplication?.vehicle_id || '');
-  const [state, formAction, pending] = useActionState(
-    async (_prev: ApplicationState, formData: FormData) => {
-      const result = await applyDriverToRouteFromForm(formData);
-      if ('error' in result) {
-        return { error: result.error, success: false };
-      }
-
-      return { error: undefined, success: true };
-    },
-    { error: undefined, success: false } satisfies ApplicationState
-  );
   const hasExistingApplication = Boolean(
     existingApplication && ['pending', 'approved', 'active', 'paused', 'suspended'].includes(existingApplication.status)
   );
-  const applicationLocked = pending || Boolean(state?.success) || hasExistingApplication;
+  const applicationLocked = hasExistingApplication;
 
   if (!vehicles.length) {
     return (
@@ -133,28 +117,16 @@ export default function DriverRouteApplicationForm({
         </div>
       </div>
 
-      {state?.error ? (
-        <div className="mb-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
-          {state.error}
-        </div>
-      ) : null}
-
-      {state?.success ? (
-        <div className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-          Route application submitted. The admin will review your driver and vehicle details.
-        </div>
-      ) : null}
-
-      <form action={formAction} className="space-y-3">
+      <form action={applyDriverToRouteFromForm} className="space-y-3">
         <input type="hidden" name="route_id" value={routeId} />
         <input type="hidden" name="vehicle_id" value={vehicleId} />
+        <input type="hidden" name="return_to" value={`/dashboard/driver/routes/${routeId}`} />
 
         <div>
           <label className="mb-1.5 block text-xs font-semibold text-slate-700">Approved vehicle</label>
           <select
             value={vehicleId}
             onChange={(event) => setVehicleId(event.target.value)}
-            disabled={applicationLocked}
             className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
           >
             {vehicles.map((vehicle) => (
@@ -171,11 +143,11 @@ export default function DriverRouteApplicationForm({
 
         <button
           type="submit"
-          disabled={applicationLocked}
+          disabled={false}
           className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600"
         >
           <Send className="h-4 w-4" />
-          {state?.success ? 'Application In Progress' : pending ? 'Submitting application...' : 'Submit route application'}
+          Submit route application
         </button>
       </form>
     </section>

@@ -73,6 +73,7 @@ export default function PaymentCard({ payment }: { payment: PaymentCardPayment }
         const { error: driverError } = await supabase
           .from('driver_profiles')
           .update({
+            id_status: 'approved',
             provider_payment_status: 'approved',
             provider_payment_proof_url: payment.provider_payment_proof_url || payment.proof_url || payment.proof_image || null,
             provider_last_paid_at: now.toISOString(),

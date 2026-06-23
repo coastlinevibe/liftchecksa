@@ -20,6 +20,7 @@ type RecentMemberRow = {
 type RecentDriverRow = {
   id: string;
   user_id: string;
+  verification_status: string | null;
   id_status: string | null;
   vehicle_status: string | null;
   provider_payment_status?: string | null;
@@ -68,6 +69,23 @@ type SuspendedDriverRow = {
   user_id: string;
 };
 
+type PendingPaymentRow = {
+  user_id: string;
+  payment_reference: string | null;
+};
+
+type PendingDriverSubscriptionProofRow = {
+  user_id: string;
+  provider_payment_reference: string | null;
+};
+
+function getAdminPendingPaymentKey(input: { source: 'payment' | 'driver'; user_id: string; payment_reference?: string | null; idFallback?: string | null }) {
+  if (input.source === 'driver') {
+    return `driver:${input.user_id}:${input.payment_reference || input.idFallback || ''}`;
+  }
+
+  return `payment:${input.user_id}:${input.payment_reference || input.idFallback || ''}`;
+}
 type DriverWithProfile = RecentDriverRow & {
   profile: DriverProfilePreviewRow | null;
 };
@@ -118,8 +136,8 @@ async function getAdminStats() {
     { count: activeRoutes },
     { data: pendingDriverVerificationRows },
     { count: pendingVehicleVerifications },
-    { count: pendingPayments },
-    { count: pendingDriverSubscriptionProofs },
+    { data: pendingPaymentRows },
+    { data: pendingDriverSubscriptionProofRows },
     { count: pendingRouteApplications },
     { count: activeReports },
     { data: recentMembers },
@@ -134,17 +152,17 @@ async function getAdminStats() {
     { data: suspendedDriverRows },
   ] = await Promise.all([
     supabase.from('profiles').select('*', { count: 'exact', head: true }).in('role', ['member', 'driver']),
-    supabase.from('driver_profiles').select('id_status, vehicle_status, provider_payment_status, provider_next_payment_at, provider_expires_at'),
+    supabase.from('driver_profiles').select('verification_status, id_status, vehicle_status, provider_payment_status, provider_next_payment_at, provider_expires_at'),
     supabase.from('official_routes').select('*', { count: 'exact', head: true }).eq('status', 'active'),
-    supabase.from('driver_profiles').select('id_status, vehicle_status, provider_payment_status, provider_next_payment_at, provider_expires_at'),
+    supabase.from('driver_profiles').select('verification_status, id_status, vehicle_status, provider_payment_status, provider_next_payment_at, provider_expires_at'),
     supabase.from('vehicles').select('*', { count: 'exact', head: true }).eq('verification_status', 'pending'),
-    supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-    supabase.from('driver_profiles').select('*', { count: 'exact', head: true }).eq('provider_payment_status', 'pending').not('provider_payment_proof_url', 'is', null),
+    supabase.from('payments').select('user_id, payment_reference').eq('status', 'pending'),
+    supabase.from('driver_profiles').select('user_id, provider_payment_reference').eq('provider_payment_status', 'pending').not('provider_payment_proof_url', 'is', null),
     supabase.from('driver_route_assignments').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
     supabase.from('reports').select('*', { count: 'exact', head: true }).in('status', ['new', 'under_review']),
     supabase.from('profiles').select('id, user_id, first_name, surname, phone, role, membership_status, created_at').eq('role', 'member').order('created_at', { ascending: false }).limit(5),
-    supabase.from('driver_profiles').select('id, user_id, id_status, vehicle_status, provider_payment_status, provider_next_payment_at, provider_expires_at, completed_trips, rating_average, created_at').order('created_at', { ascending: false }).limit(5),
-    supabase.from('driver_profiles').select('id_status, vehicle_status, created_at, updated_at'),
+    supabase.from('driver_profiles').select('id, user_id, verification_status, id_status, vehicle_status, provider_payment_status, provider_next_payment_at, provider_expires_at, completed_trips, rating_average, created_at').order('created_at', { ascending: false }).limit(5),
+    supabase.from('driver_profiles').select('verification_status, id_status, vehicle_status, created_at, updated_at'),
     supabase.from('vehicles').select('verification_status, created_at, updated_at').in('verification_status', ['approved', 'rejected', 'expired']),
     supabase.from('reports').select('status'),
     supabase.from('zii_tokens').select('*', { count: 'exact', head: true }).eq('token_status', 'active').gte('expires_at', nowIso),
@@ -154,6 +172,34 @@ async function getAdminStats() {
     supabase.from('driver_profiles').select('user_id').eq('is_suspended', true),
   ]);
 
+  const pendingPaymentKeys = new Map<string, true>();
+  for (const payment of ((pendingPaymentRows || []) as PendingPaymentRow[])) {
+    pendingPaymentKeys.set(
+      getAdminPendingPaymentKey({
+        source: 'payment',
+        user_id: payment.user_id,
+        payment_reference: payment.payment_reference,
+      }),
+      true
+    );
+  }
+  for (const driverPayment of ((pendingDriverSubscriptionProofRows || []) as PendingDriverSubscriptionProofRow[])) {
+    const ownKey = getAdminPendingPaymentKey({
+      source: 'driver',
+      user_id: driverPayment.user_id,
+      payment_reference: driverPayment.provider_payment_reference,
+    });
+    const mirrorKey = getAdminPendingPaymentKey({
+      source: 'payment',
+      user_id: driverPayment.user_id,
+      payment_reference: driverPayment.provider_payment_reference,
+    });
+
+    pendingPaymentKeys.delete(mirrorKey);
+    pendingPaymentKeys.set(ownKey, true);
+  }
+
+  const pendingPaymentCount = pendingPaymentKeys.size;
   const verifiedDrivers = ((verifiedDriverRows || []) as RecentDriverRow[]).filter((driver) => {
     const dueAt = driver.provider_next_payment_at || driver.provider_expires_at || null;
     const paymentApproved =
@@ -164,12 +210,7 @@ async function getAdminStats() {
   }).length;
 
   const pendingDriverVerifications = ((pendingDriverVerificationRows || []) as RecentDriverRow[]).filter((driver) => {
-    const dueAt = driver.provider_next_payment_at || driver.provider_expires_at || null;
-    const paymentApproved =
-      driver.provider_payment_status === 'approved' &&
-      (!dueAt || new Date(dueAt) > new Date());
-
-    return paymentApproved && !isDriverFullyApproved(driver);
+    return driver.verification_status !== 'approved' && driver.verification_status !== 'rejected';
   }).length;
 
   const driversWithProfiles: DriverWithProfile[] = [];
@@ -235,8 +276,8 @@ async function getAdminStats() {
     pendingVerifications: (pendingDriverVerifications || 0) + (pendingVehicleVerifications || 0),
     pendingDriverVerifications: pendingDriverVerifications || 0,
     pendingVehicleVerifications: pendingVehicleVerifications || 0,
-    pendingPayments: (pendingPayments || 0) + (pendingDriverSubscriptionProofs || 0),
-    pendingDriverSubscriptionProofs: pendingDriverSubscriptionProofs || 0,
+    pendingPayments: pendingPaymentCount,
+    pendingDriverSubscriptionProofs: (pendingDriverSubscriptionProofRows || []).length,
     pendingRouteApplications: pendingRouteApplications || 0,
     activeReports: activeReports || 0,
     recentMembers: recentMembers || [],

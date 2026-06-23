@@ -788,10 +788,19 @@ export async function applyDriverToRoute(input: {
 }
 
 export async function applyDriverToRouteFromForm(formData: FormData) {
-  return applyDriverToRoute({
-    routeId: String(formData.get('route_id') || ''),
-    vehicleId: String(formData.get('vehicle_id') || ''),
+  const routeId = String(formData.get('route_id') || '');
+  const vehicleId = String(formData.get('vehicle_id') || '');
+  const returnTo = String(formData.get('return_to') || `/dashboard/driver/routes/${routeId}`);
+  const result = await applyDriverToRoute({
+    routeId,
+    vehicleId,
   });
+
+  if ('error' in result) {
+    redirect(`${returnTo}?apply_status=error&apply_message=${encodeURIComponent(result.error || 'Unable to submit route application')}`);
+  }
+
+  redirect(`${returnTo}?apply_status=success`);
 }
 
 export async function requestRouteSeat(input: {
@@ -1891,7 +1900,17 @@ export async function getOfficialRoutes(includeInactive = false) {
     assigned_drivers: assignmentsByRoute.get(route.id) || [],
   })) as OfficialRouteWithStops[];
 
-  return { routes: normalizedRoutes };
+  const publicVisibleRouteIds = new Set(
+    typedAssignments
+      .filter((assignment) => Boolean(assignment.driver_id) && Boolean(assignment.vehicle_id))
+      .map((assignment) => assignment.route_id)
+  );
+
+  return {
+    routes: includeInactive
+      ? normalizedRoutes
+      : normalizedRoutes.filter((route) => publicVisibleRouteIds.has(route.id)),
+  };
 }
 
 export async function getRouteDetail(routeId: string): Promise<PublicRouteDetail | { error: string }> {

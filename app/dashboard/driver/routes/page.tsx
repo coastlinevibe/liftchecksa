@@ -64,7 +64,8 @@ export default async function DriverRoutesPage() {
     vehicleApproved &&
     (registeredVehicles?.length || 0) > 0;
 
-  const { routes, error } = await getOfficialRoutes(false);
+  const { routes: allRoutes, error } = await getOfficialRoutes(true);
+  const routes = (allRoutes || []).filter((route) => route.status === 'active');
 
   const { data: applications } = profile?.id
     ? await supabase
@@ -151,7 +152,7 @@ export default async function DriverRoutesPage() {
             return (
               <Link
                 key={route.id}
-                href={`/routes/${route.id}`}
+                href={`/dashboard/driver/routes/${route.id}`}
                 className="block rounded-xl border border-slate-200 bg-white p-4 transition hover:border-emerald-500"
               >
                 <div className="flex items-start justify-between gap-3">

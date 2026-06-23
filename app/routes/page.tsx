@@ -91,13 +91,10 @@ export default async function RoutesPage({
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
               <h1 className="text-xl font-bold text-slate-900">Official Routes</h1>
-              <p className="text-xs text-slate-600">Admin-managed routes with ordered stops and seat requests.</p>
+              <p className="text-xs text-slate-600">Official routes with ordered stops and seat requests.</p>
             </div>
             <div className="flex flex-col items-end gap-2">
               {user ? <LogoutButton /> : null}
-              <div className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
-                Admin managed
-              </div>
             </div>
           </div>
 

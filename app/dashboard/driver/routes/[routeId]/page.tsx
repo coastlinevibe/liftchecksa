@@ -6,6 +6,7 @@ import { getDisplayName } from '@/lib/display-name';
 import { createClient } from '@/lib/supabase/server';
 import { approveRouteSeatRequest, getDriverRouteDetail, rejectRouteSeatRequest, removeRouteSeatPassenger, reviewRouteSeatCancellation } from '@/lib/routes/actions';
 import RouteChatThread from '@/components/RouteChatThread';
+import DriverRouteApplicationForm from '@/components/DriverRouteApplicationForm';
 import { getVisibleRoutePrivateOffers, respondToPrivateOfferFromForm } from '@/lib/routes/private-offers';
 import { isAdminRole, isSuperAdminEmail } from '@/lib/auth/routing';
 import {
@@ -94,7 +95,7 @@ export default async function DriverRouteDetailPage({
   searchParams,
 }: {
   params: Promise<{ routeId: string }>;
-  searchParams?: Promise<{ chat_error?: string; offer_error?: string; offer_success?: string }>;
+  searchParams?: Promise<{ chat_error?: string; offer_error?: string; offer_success?: string; apply_status?: string; apply_message?: string }>;
 }) {
   const { routeId } = await params;
   const resolvedSearchParams = await searchParams;
@@ -147,19 +148,17 @@ export default async function DriverRouteDetailPage({
         .maybeSingle()
     : { data: null };
 
-  const assignment =
+  const currentDriverAssignment =
     (directAssignment as typeof assignments[number] | null) ||
     assignments.find((entry) => entry.driver_id === profile?.id || entry.driver_id === driverProfile?.id) ||
-    assignments.find((entry) => ['approved', 'active', 'pending', 'paused'].includes(entry.status)) ||
-    assignments[0] ||
     null;
-  const routeIsLive = Boolean(assignment && ['approved', 'active'].includes(assignment.status));
-  const routeChatViewResult = routeIsLive ? await getOpenRouteChatView(route.id) : null;
+  const routeHasAssignedDriver = assignments.some((entry) => ['approved', 'active'].includes(entry.status));
+  const routeIsManagedByDriver = Boolean(currentDriverAssignment && ['approved', 'active'].includes(currentDriverAssignment.status));
+  const routeChatViewResult = routeIsManagedByDriver ? await getOpenRouteChatView(route.id) : null;
   const routeChatView = routeChatViewResult && !('error' in routeChatViewResult) ? routeChatViewResult : null;
 
   const routeRequests = requests.filter((request) => request.route_id === route.id);
-  const routeLedger = ledger.filter((entry) => entry.route_id === route.id);
-  const privateOffers = routeIsLive ? await getVisibleRoutePrivateOffers(route.id) : [];
+  const privateOffers = routeIsManagedByDriver ? await getVisibleRoutePrivateOffers(route.id) : [];
   const driverName = getDisplayName({
     firstName: profile?.first_name,
     surname: profile?.surname,
@@ -170,14 +169,172 @@ export default async function DriverRouteDetailPage({
     driverProfile?.id_status === 'approved' &&
       driverProfile?.vehicle_status === 'approved'
   );
+  const currentApplication = currentDriverAssignment && ['pending', 'approved', 'active', 'paused', 'suspended'].includes(currentDriverAssignment.status)
+    ? {
+        id: currentDriverAssignment.id,
+        status: currentDriverAssignment.status,
+        vehicle_id: currentDriverAssignment.vehicle_id,
+        created_at: currentDriverAssignment.created_at,
+      }
+    : null;
+  const { data: approvedVehicles } = driverProfile?.id
+    ? await supabase
+        .from('vehicles')
+        .select('id, make, model, licence_plate, seat_capacity')
+        .eq('driver_id', driverProfile.id)
+        .eq('is_active', true)
+        .eq('verification_status', 'approved')
+        .order('created_at', { ascending: false })
+    : { data: [] };
+  const assignment = currentDriverAssignment;
+  const routeLedger = ledger.filter((entry) => entry.route_id === route.id);
+  const applyStatus = resolvedSearchParams?.apply_status || null;
+  const applyMessage = resolvedSearchParams?.apply_message || null;
+
+  if (!routeIsManagedByDriver) {
+    return (
+      <div className="min-h-screen bg-slate-50 pb-28 md:pb-0">
+        <div className="border-b border-slate-200 bg-white">
+          <div className="mx-auto max-w-5xl px-4 py-4">
+            <Link href="/dashboard/driver/routes" className="mb-2 inline-flex items-center text-sm text-slate-600">
+              <ArrowLeft className="mr-1 h-4 w-4" />
+              Back to available routes
+            </Link>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="mb-1 flex items-center gap-2">
+                  <RouteIcon className="h-4 w-4 text-emerald-600" />
+                  <h1 className="text-xl font-bold text-slate-900">{route.name}</h1>
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+                    {currentApplication?.status || 'available'}
+                  </span>
+                  {verifiedDriver ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                      <BadgeCheck className="h-3 w-3" />
+                      Verified driver
+                    </span>
+                  ) : null}
+                </div>
+                <p className="text-sm text-slate-600">
+                  {route.start_area} &rarr; {route.end_area}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mx-auto grid max-w-5xl gap-4 px-4 py-4 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="space-y-4">
+            {applyStatus === 'success' ? (
+              <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+                Route application submitted. Admin will review your driver and vehicle details.
+              </section>
+            ) : null}
+
+            {applyStatus === 'error' && applyMessage ? (
+              <section className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+                {applyMessage}
+              </section>
+            ) : null}
+
+            <section className="rounded-xl border border-slate-200 bg-white p-4">
+              <h2 className="mb-3 text-base font-bold text-slate-900">Ordered stops</h2>
+              <div className="space-y-2">
+                {stops.map((stop, index) => {
+                  const isFirstStop = index == 0;
+                  const isLastStop = index == stops.length - 1;
+
+                  return (
+                    <div key={stop.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-semibold text-slate-900">
+                            {stop.stop_order}. {stop.stop_name}
+                          </div>
+                          <div className="text-xs text-slate-600">
+                            {stop.area || 'Area to be confirmed'}
+                            {isFirstStop ? (
+                              <span className="ml-2 inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                                Start
+                              </span>
+                            ) : null}
+                            {isLastStop ? (
+                              <span className="ml-2 inline-flex rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-700">
+                                Destination
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="mt-1 text-[11px] font-semibold text-slate-500">
+                            {formatStopTime(stop.estimated_morning_time) || 'AM time pending'}
+                            {' - '}
+                            {formatStopTime(stop.estimated_return_time) || 'PM time pending'}
+                          </div>
+                        </div>
+                        <MapPin className="mt-0.5 h-4 w-4 text-emerald-500" />
+                      </div>
+                      {stop.notes ? (
+                        <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+                          {stop.notes}
+                        </p>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+
+            <section className="rounded-xl border border-slate-200 bg-white p-4">
+              <h2 className="mb-3 text-base font-bold text-slate-900">Apply for route</h2>
+              <div className="grid gap-2 text-sm text-slate-600">
+                <div>Choose one approved vehicle that matches this route's seating type.</div>
+                <div>Admin reviews your route application before assigning you.</div>
+                <div>Route chat, passenger requests, and private offers unlock only after assignment.</div>
+              </div>
+            </section>
+          </div>
+
+          <div className="space-y-4">
+            {routeHasAssignedDriver ? (
+              <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                This route already has an assigned driver. New applications are currently unavailable.
+              </section>
+            ) : null}
+
+            <section className="rounded-xl border border-slate-200 bg-white p-4">
+              <DriverRouteApplicationForm
+                routeId={route.id}
+                routeVehicleCapacity={route.vehicle_capacity}
+                vehicles={approvedVehicles || []}
+                existingApplication={currentApplication}
+                driverVerified={verifiedDriver}
+              />
+            </section>
+
+            <section className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="mb-2 flex items-center gap-2">
+                <MessageSquare className="h-4 w-4 text-emerald-600" />
+                <h2 className="text-base font-bold text-slate-900">What unlocks after assignment</h2>
+              </div>
+              <div className="grid gap-2 text-sm text-slate-600">
+                <div>Passenger seat requests</div>
+                <div>Route chat with joined members</div>
+                <div>Private offers from passengers</div>
+                <div>Payment ledger and trip management</div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 pb-28 md:pb-0">
       <div className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-5xl px-4 py-4">
-          <Link href="/dashboard/driver#assigned-routes" className="mb-2 inline-flex items-center text-sm text-slate-600">
+          <Link href="/dashboard/driver/routes" className="mb-2 inline-flex items-center text-sm text-slate-600">
             <ArrowLeft className="mr-1 h-4 w-4" />
-            Back to assigned routes
+            Back to available routes
           </Link>
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -224,25 +381,46 @@ export default async function DriverRouteDetailPage({
           <section className="rounded-xl border border-slate-200 bg-white p-4">
             <h2 className="mb-3 text-base font-bold text-slate-900">Ordered stops</h2>
             <div className="space-y-2">
-              {stops.map((stop) => (
-                <div key={stop.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-semibold text-slate-900">
-                        {stop.stop_order}. {stop.stop_name}
+              {stops.map((stop, index) => {
+                const isFirstStop = index === 0;
+                const isLastStop = index === stops.length - 1;
+
+                return (
+                  <div key={stop.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold text-slate-900">
+                          {stop.stop_order}. {stop.stop_name}
+                        </div>
+                        <div className="text-xs text-slate-600">
+                          {stop.area || 'Area to be confirmed'}
+                          {isFirstStop ? (
+                            <span className="ml-2 inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                              Start
+                            </span>
+                          ) : null}
+                          {isLastStop ? (
+                            <span className="ml-2 inline-flex rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-700">
+                              Destination
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="mt-1 text-[11px] font-semibold text-slate-500">
+                          {formatStopTime(stop.estimated_morning_time) || 'AM time pending'}
+                          {' / '}
+                          {formatStopTime(stop.estimated_return_time) || 'PM time pending'}
+                        </div>
                       </div>
-                      <div className="text-xs text-slate-600">{stop.area || 'Area to be confirmed'}</div>
-                      <div className="mt-1 text-[11px] font-semibold text-slate-500">
-                        {formatStopTime(stop.estimated_morning_time) || 'AM time pending'}
-                        {' Ã‚Â· '}
-                        {formatStopTime(stop.estimated_return_time) || 'PM time pending'}
-                      </div>
+                      <MapPin className="mt-0.5 h-4 w-4 text-emerald-500" />
                     </div>
-                    <MapPin className="mt-0.5 h-4 w-4 text-emerald-500" />
+                    {stop.notes ? (
+                      <p className="mt-2 text-xs font-medium text-sky-600">
+                        {stop.notes}
+                      </p>
+                    ) : null}
                   </div>
-                  {stop.notes ? <p className="mt-2 text-xs text-slate-500">{stop.notes}</p> : null}
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
 

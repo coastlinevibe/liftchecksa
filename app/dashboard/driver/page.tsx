@@ -96,11 +96,14 @@ async function getDriverData() {
     redirect('/dashboard/member');
   }
 
-  const { data: driverAssignments } = await supabase
-    .from('driver_route_assignments')
-    .select('id, driver_id, vehicle_id, route_id, status, seats_available, days_active, weekly_price, single_route_price, created_at, official_routes(id, name, start_area, end_area, status)')
-    .eq('driver_id', driverProfile.id)
-    .order('created_at', { ascending: false });
+  const assignmentDriverIds = [profile?.id, driverProfile.id].filter(Boolean) as string[];
+  const { data: driverAssignments } = assignmentDriverIds.length
+    ? await supabase
+        .from('driver_route_assignments')
+        .select('id, driver_id, vehicle_id, route_id, status, seats_available, days_active, weekly_price, single_route_price, created_at, official_routes(id, name, start_area, end_area, status)')
+        .in('driver_id', assignmentDriverIds)
+        .order('created_at', { ascending: false })
+    : { data: [] };
 
   const routeAssignments = (driverAssignments || []).map((assignment) => {
     const typedAssignment = assignment as DriverAssignmentRow;
@@ -166,6 +169,7 @@ export default async function DriverDashboard() {
   const registeredVehicles = data.vehicles.filter((vehicle: DriverVehicleSummary) => vehicle.is_active !== false);
   const vehicleRegistered = registeredVehicles.length > 0;
   const routeAssignments = data.routeAssignments ?? [];
+  const pendingRouteApplicationsCount = routeAssignments.filter((assignment) => assignment.status === 'pending').length;
   const routeRequests = data.routeRequests ?? [];
   const driverFullyVerified = paymentApproved && idApproved && vehicleApproved && vehicleRegistered;
   const canViewDriverRoutes = driverFullyVerified;
@@ -208,7 +212,7 @@ export default async function DriverDashboard() {
           </div>
           <div className="grid grid-cols-3 gap-2">
             <div className="bg-emerald-50 rounded-lg p-2.5 text-center">
-              <div className="text-lg font-bold text-emerald-600">{routeAssignments.length}</div>
+              <div className="text-lg font-bold text-emerald-600">{pendingRouteApplicationsCount}</div>
               <div className="text-[10px] text-slate-600">Applications</div>
             </div>
             <div className="bg-blue-50 rounded-lg p-2.5 text-center">
@@ -302,7 +306,7 @@ export default async function DriverDashboard() {
                     href="/dashboard/driver/routes"
                     className="inline-flex items-center justify-center rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-600"
                   >
-                    Browse Routes
+                    Browse New Routes
                   </Link>
                 ) : vehicleRegistered ? (
                   <Link
@@ -328,10 +332,7 @@ export default async function DriverDashboard() {
           <>
             <div id="assigned-routes" className="mb-6 scroll-mt-4">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-semibold text-slate-700">Route applications & assignments</h2>
-                <Link href="/dashboard/driver/routes" className="text-xs font-semibold text-emerald-600">
-                  Browse routes
-                </Link>
+                <h2 className="text-sm font-semibold text-slate-700">My route applications & assignments</h2>
               </div>
 
               {routeAssignments.length > 0 ? (
@@ -397,7 +398,7 @@ export default async function DriverDashboard() {
               ) : (
                 <div className="bg-white border border-slate-200 rounded-xl p-6 text-center">
                   <p className="text-sm text-slate-500">No route applications yet</p>
-                  <p className="text-xs text-slate-400 mt-1">Browse routes and apply when you are ready</p>
+                  <p className="text-xs text-slate-400 mt-1">Browse new routes and apply when you are ready</p>
                 </div>
               )}
             </div>

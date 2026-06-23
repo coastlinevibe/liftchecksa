@@ -68,7 +68,7 @@ export default function RouteBuilderForm() {
 
   useEffect(() => {
     if (state?.success) {
-      router.push('/admin/routes');
+      router.push('/admin/routes?route_created=1');
     }
   }, [router, state?.success]);
 
@@ -104,12 +104,6 @@ export default function RouteBuilderForm() {
       {state?.error ? (
         <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
           {state.error}
-        </div>
-      ) : null}
-
-      {state?.success ? (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-          Route created successfully.
         </div>
       ) : null}
 

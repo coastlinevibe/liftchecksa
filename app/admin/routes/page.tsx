@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, BadgeCheck, Bell, ChevronDown, Plus } from 'luci
 import { getOfficialRoutes } from '@/lib/routes/actions';
 import { createClient } from '@/lib/supabase/server';
 import { formatVehicleCapacity } from '@/lib/types/pilot-routes';
+import RouteCreatedToast from './RouteCreatedToast';
 
 function badgeClass(status: string) {
   if (status === 'active') return 'bg-emerald-100 text-emerald-700';
@@ -32,6 +33,7 @@ export default async function AdminRoutesPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      <RouteCreatedToast />
       <div className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-6xl px-4 py-4">
           <div className="mb-3">
