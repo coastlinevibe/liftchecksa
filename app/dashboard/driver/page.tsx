@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Bell, Calendar, Clock, MapPin, Settings, BadgeCheck } from 'lucide-react';
 import LogoutButton from '@/components/LogoutButton';
+import ProfileAvatar from '@/components/ProfileAvatar';
 import { getDisplayName } from '@/lib/display-name';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
@@ -74,7 +75,7 @@ async function getDriverData() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, first_name, surname, role, membership_status')
+    .select('id, first_name, surname, role, membership_status, profile_photo_url, dashboard_login_count')
     .eq('user_id', user.id)
     .maybeSingle();
 
@@ -138,8 +139,25 @@ async function getDriverData() {
     .eq('driver_id', driverProfile.id)
     .order('created_at', { ascending: false });
 
+  let effectiveProfile = profile;
+
+  if (profile?.id && !profile.profile_photo_url) {
+    const nextDashboardLoginCount = (profile.dashboard_login_count ?? 0) + 1;
+    const { error: profileUpdateError } = await supabase
+      .from('profiles')
+      .update({ dashboard_login_count: nextDashboardLoginCount })
+      .eq('id', profile.id);
+
+    if (!profileUpdateError) {
+      effectiveProfile = {
+        ...profile,
+        dashboard_login_count: nextDashboardLoginCount,
+      };
+    }
+  }
+
   return {
-    profile,
+    profile: effectiveProfile,
     driverProfile,
     userEmail: user.email ?? null,
     payment,
@@ -174,6 +192,7 @@ export default async function DriverDashboard() {
   const driverFullyVerified = paymentApproved && idApproved && vehicleApproved && vehicleRegistered;
   const canViewDriverRoutes = driverFullyVerified;
   const driverBadgeVisible = driverFullyVerified;
+  const showAvatarPrompt = !data.profile?.profile_photo_url && (data.profile?.dashboard_login_count ?? 0) >= 2;
   const needsPaymentProof = !!data.driverProfile && !paymentProof && !paymentApproved;
   const awaitingPaymentReview = !!paymentProof && paymentStatus === 'pending';
   const showVehicleCta = paymentApproved;
@@ -190,6 +209,30 @@ export default async function DriverDashboard() {
     <div className="min-h-screen bg-slate-50">
       <div className="bg-white border-b border-slate-200">
         <div className="px-4 py-4 max-w-md mx-auto">
+        {showAvatarPrompt && (
+          <div className="mb-4 rounded-xl border border-sky-200 bg-sky-50 p-4">
+            <div className="flex items-start gap-3">
+              <ProfileAvatar
+                name={driverDisplayName}
+                photoUrl={null}
+                size={40}
+                className="shrink-0 border border-sky-200"
+              />
+              <div className="flex-1">
+                <h3 className="text-sm font-bold text-sky-900">Add your profile photo</h3>
+                <p className="mt-1 text-xs text-sky-800">
+                  Drivers and passengers use avatars to identify each other. Add yours now to keep your profile recognizable.
+                </p>
+                <Link
+                  href="/settings/profile"
+                  className="mt-3 inline-flex items-center justify-center rounded-lg bg-sky-600 px-3 py-2 text-xs font-semibold text-white hover:bg-sky-700"
+                >
+                  Update profile photo
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
           <div className="flex items-center justify-between mb-3">
             <div>
               <h1 className="text-xl font-bold text-slate-900">Driver Dashboard</h1>
@@ -203,6 +246,12 @@ export default async function DriverDashboard() {
                 </div>
               ) : null}
             </div>
+            <ProfileAvatar
+              name={driverDisplayName}
+              photoUrl={data.profile?.profile_photo_url || null}
+              size={48}
+              className="shrink-0 border border-slate-200 shadow-sm"
+            />
             <div className="flex items-center gap-2">
               <Link href="/settings" className="p-2 hover:bg-slate-100 rounded-lg">
                 <Settings className="w-5 h-5 text-slate-600" />
